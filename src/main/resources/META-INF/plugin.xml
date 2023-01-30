@@ -14,8 +14,11 @@
         will be filtered according to **GIT SCOPE**
     </description>
     <version>3.0.6</version>
-    <vendor>WoelkIT</vendor>
+    <vendor>Michael Wölk</vendor>
+
     <change-notes>Fixed compatibility issues for latest versions, removed internal API usage, added logo and toolbar icon</change-notes>
+
+    <incompatible-with>com.intellij.java</incompatible-with>
 
     <!-- Product and plugin compatibility requirements.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
