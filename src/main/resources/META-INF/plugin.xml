@@ -6,17 +6,32 @@
     <id>Git Scope</id>
     <name>Git Scope</name>
     <description>
-        1. Adds a tool window with a change browser (similar to Version Control) which shows the current diff of your
-        **GIT SCOPE**.
-        2. Adapts the Line Status according to your **GIT SCOPE**. Usually this built-in feature shows only the current
-        "HEAD" changes.
-        3. Adds a Custom *Scope* (inspections, search/replaces, ect) "Git Scope (Files)", which means search results
-        will be filtered according to **GIT SCOPE**
+        <![CDATA[
+        <ul>
+            <li> 1. Adds a tool window with a change browser (similar to Version Control) which shows the current diff of your
+            **GIT SCOPE**.
+            <li> 2. Adapts the Line Status according to your **GIT SCOPE**. Usually this built-in feature shows only the current
+            "HEAD" changes.
+            <li> 3. Adds a Custom *Scope* (inspections, search/replaces, ect) "Git Scope (Files)", which means search results
+            will be filtered according to **GIT SCOPE**
+        </ul>
+
+        <h1>Announcement</h1>
+        This plugin will no longer be free in the future!
+        Keeping this plugin alive can be very challenging and time-consuming.
+        <br/>
+        Thank you for your understanding!
+        ]]>
     </description>
     <version>3.0.6</version>
     <vendor>Michael Wölk</vendor>
 
-    <change-notes>Fixed compatibility issues for latest versions, removed internal API usage, added logo and toolbar icon</change-notes>
+    <change-notes>
+        <![CDATA[
+        <h1>Fixes</h1>
+        Fixed compatibility issues for latest versions, removed internal API usage, added logo and toolbar icon.<br/>
+        ]]>
+    </change-notes>
 
     <incompatible-with>com.intellij.java</incompatible-with>
 
@@ -59,7 +74,7 @@
 
         <projectService serviceImplementation="implementation.Manager"/>
 
-        <statusBarWidgetProvider implementation="ui.TargetBranchStatusWidgetProvider"/>
+        <!--        <statusBarWidgetProvider implementation="ui.TargetBranchStatusWidgetProvider"/>-->
 
     </extensions>
 

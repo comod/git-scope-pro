@@ -18,8 +18,8 @@ intellij {
 //    version.set("2022.1.4")
     version.set("2022.2")
 //    type.set("IU") // Target IDE Platform
-    type.set("IC") // Target IDE Platform
-//    type.set("PS") // Target IDE Platform
+//    type.set("IC") // Target IDE Platform
+    type.set("PS") // Target IDE Platform
 
     plugins.set(listOf("git4idea"))
 }
