@@ -17,6 +17,8 @@ import org.jetbrains.annotations.Nullable;
 import implementation.targetBranchWidget.MyDvcsStatusWidget;
 import implementation.targetBranchWidget.MyGitBranchPopup;
 
+import java.util.Objects;
+
 public class StatusBar extends MyDvcsStatusWidget<GitRepository> {
 
     public static final String WIDGET_ID = "TargetBranchStatusBarWidget";
@@ -36,7 +38,7 @@ public class StatusBar extends MyDvcsStatusWidget<GitRepository> {
 
     @Override
     public StatusBarWidget copy() {
-        return new GitBranchWidget(ObjectUtils.assertNotNull(getProject()));
+        return new GitBranchWidget(Objects.requireNonNull(getProject()));
     }
 
     @Nullable

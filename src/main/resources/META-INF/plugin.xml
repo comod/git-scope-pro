@@ -33,22 +33,21 @@
         ]]>
     </change-notes>
 
-    <incompatible-with>com.intellij.java</incompatible-with>
-
     <!-- Product and plugin compatibility requirements.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
     <depends>com.intellij.modules.platform</depends>
     <depends>Git4Idea</depends>
 
+    <!-- https://plugins.jetbrains.com/docs/intellij/build-number-ranges.html#intellij-platform-based-products-of-recent-ide-versions-->
     <idea-version since-build="211"/>
 
     <!-- Plugin's application components (On Start IDE) -->
-    <application-components>
-        <component>
-            <implementation-class>system.OnStart</implementation-class>
-        </component>
-    </application-components>
-
+    <!--    https://plugins.jetbrains.com/docs/intellij/plugin-listeners.html#defining-application-level-listeners-->
+    <applicationListeners>
+        <listener
+                class="system.MyProjectManagerListener"
+                topic="com.intellij.openapi.project.ProjectManagerListener"/>
+    </applicationListeners>
     <!-- Plugin's project components -->
     <project-components>
         <component>

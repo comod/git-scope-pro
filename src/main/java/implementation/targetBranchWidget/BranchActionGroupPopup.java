@@ -43,6 +43,8 @@ import java.util.Objects;
 import static com.intellij.icons.AllIcons.General.FitContent;
 import static com.intellij.util.ui.UIUtil.DEFAULT_HGAP;
 
+import com.intellij.openapi.actionSystem.EmptyAction;
+
 public class BranchActionGroupPopup extends FlatSpeedSearchPopup {
     private static final Logger LOG = Logger.getInstance(BranchActionGroupPopup.class);
 
@@ -120,7 +122,8 @@ public class BranchActionGroupPopup extends FlatSpeedSearchPopup {
                 return mySettingsActions.toArray(AnAction.EMPTY_ARRAY);
             }
         };
-        settingsGroup.getTemplatePresentation().setHideGroupIfEmpty(true);
+        // @todo
+//        settingsGroup.getTemplatePresentation().setHideGroupIfEmpty(true);
         settingsGroup.getTemplatePresentation().setIcon(AllIcons.General.GearPlain);
 
 //        myToolbarActions.add(restoreSizeButton);
@@ -375,7 +378,8 @@ public class BranchActionGroupPopup extends FlatSpeedSearchPopup {
             super.customizeComponent(list, value, isSelected);
             if (mySeparatorComponent.isVisible()) {
                 boolean hideLineAboveCaption = StringUtil.isNotEmpty(mySeparatorComponent.getCaption());
-                ((GroupHeaderSeparator)mySeparatorComponent).setHideLine(myCurrentIndex == 0 || hideLineAboveCaption);
+                // @todo
+//                ((GroupHeaderSeparator)mySeparatorComponent).setHideLine(myCurrentIndex == 0 || hideLineAboveCaption);
             }
 
             CustomIconProvider actionWithIconProvider = getSpecificAction(value, CustomIconProvider.class);
@@ -499,7 +503,7 @@ public class BranchActionGroupPopup extends FlatSpeedSearchPopup {
         boolean shouldBeShown();
     }
 
-    private static final class HideableActionGroup extends ActionGroupWrapper implements MoreHideableActionGroup,
+    private static final class HideableActionGroup extends EmptyAction.MyDelegatingActionGroup implements MoreHideableActionGroup,
             DumbAware,
             AlwaysVisibleActionGroup {
         @NotNull private final MoreAction myMoreAction;

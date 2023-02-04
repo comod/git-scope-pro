@@ -317,7 +317,7 @@ public class MyBranchActionGroupPopup extends BranchActionGroupPopup {
         boolean shouldBeShown();
     }
 
-    private static class HideableActionGroup extends ActionGroupWrapper implements MoreHideableActionGroup, DumbAware {
+    private static class HideableActionGroup extends EmptyAction.MyDelegatingActionGroup implements MoreHideableActionGroup, DumbAware {
         @NotNull
         private final MoreAction myMoreAction;
 
