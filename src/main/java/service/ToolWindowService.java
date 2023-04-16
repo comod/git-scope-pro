@@ -8,6 +8,7 @@ import com.intellij.openapi.wm.ToolWindowManager;
 import com.intellij.ui.content.Content;
 import com.intellij.ui.content.ContentFactory;
 import com.intellij.ui.content.ContentFactoryImpl;
+import example.MyModel;
 import example.TabRecord;
 import example.ToolWindowView;
 import example.ViewService;
@@ -19,23 +20,30 @@ public final class ToolWindowService implements ToolWindowServiceInterface {
 
     public ToolWindowService(Project project) {
         this.project = project;
+
     }
 
-    public void addTab() {
-        ToolWindowManager toolWindowManager = com.intellij.openapi.wm.ToolWindowManager.getInstance(project);
+    public ToolWindow getToolWindow() {
+        ToolWindowManager toolWindowManager = ToolWindowManager.getInstance(project);
         ToolWindow toolWindow = toolWindowManager.getToolWindow("Git Scope");
+
+        assert toolWindow != null;
+        return toolWindow;
+    }
+
+    public void addTab(MyModel myModel, String tabName) {
 
         Manager manager = project.getService(Manager.class);
         assert manager != null;
-        ContentFactory contentFactory = new ContentFactoryImpl();
-        String tabName = "TabName";
-//        String tabName = null;
-
-        ViewService viewService = project.getService(ViewService.class);
-        TabRecord tabRecord = new TabRecord(tabName);
-        ToolWindowView toolWindowView = new ToolWindowView(project, viewService.getModel(tabRecord));
+        ToolWindowView toolWindowView = new ToolWindowView(project, myModel);
         Content content = ContentFactory.getInstance().createContent(toolWindowView.getContentPanel(), tabName, false);
-        assert toolWindow != null;
-        toolWindow.getContentManager().addContent(content);
+        getToolWindow().getContentManager().addContent(content);
     }
+
+    @Override
+    public void changeTabName(String title) {
+        getToolWindow().setTitle(title);
+    }
+
+
 }

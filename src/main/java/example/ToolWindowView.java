@@ -14,6 +14,7 @@ import org.jetbrains.annotations.NotNull;
 
 import service.TargetBranchService;
 import ui.elements.FeatureToggle;
+import ui.elements.VcsTree;
 
 public class ToolWindowView {
 
@@ -27,16 +28,14 @@ public class ToolWindowView {
 
     JButton tbp = new JButton();
 
-
-    Action action;
+    private VcsTree vcsTree;
 
     public ToolWindowView(Project project, MyModel myModel) {
         this.project = project;
 //        this.state = State.getInstance(project);
         this.myModel = myModel;
         this.targetBranchService = project.getService(TargetBranchService.class);
-        myModel.getObservable().subscribe(MyModel -> {
-            System.out.println(MyModel.getField1());
+        myModel.getObservable().subscribe(model -> {
             render();
         });
         contentPanel.setLayout(new BorderLayout(0, 20));
@@ -72,7 +71,17 @@ public class ToolWindowView {
         FeatureToggle featureToggle = new FeatureToggle();
         controlsPanel.add(featureToggle);
 
+        this.vcsTree = new VcsTree(this.project);
+
+        controlsPanel.add(vcsTree);
 //        TargetBranchPanel tbp = new TargetBranchPanel(this.project);
+        addListener();
+        controlsPanel.add(tbp);
+
+        return controlsPanel;
+    }
+
+    private void addListener() {
         tbp.addMouseListener(new MouseListener() {
             @Override
             public void mouseClicked(MouseEvent e) {
@@ -100,9 +109,6 @@ public class ToolWindowView {
 
             }
         });
-        controlsPanel.add(tbp);
-
-        return controlsPanel;
     }
 
 
@@ -119,7 +125,11 @@ public class ToolWindowView {
 
     private void render() {
         currentTime.setText(myModel.getField1());
-        tbp.setText(this.targetBranchService.getTargetBranchDisplay());
+        tbp.setText(this.targetBranchService.getTargetBranchDisplay(myModel.getTargetBranch()));
+        if (myModel.getChanges() == null) {
+            return;
+        }
+        vcsTree.update(myModel.getChanges());
     }
 
     private String getFormattedValue(Calendar calendar, int calendarField) {

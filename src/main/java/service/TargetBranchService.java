@@ -19,23 +19,17 @@ import static java.util.stream.Collectors.joining;
 public class TargetBranchService {
 
     private final GitService git;
-    private final ViewService viewService;
 
     public TargetBranchService(Project project) {
         this.git = project.getService(GitService.class);
-        this.viewService = project.getService(ViewService.class);
     }
 
-    public Map<String, String> getRepositoryTargetBranchMap() {
-        return this.viewService.getCurrent().getTargetBranch();
-    }
-
-    public String getTargetBranchDisplay() {
+    public String getTargetBranchDisplay(Map<String, String> targetBranch) {
 
         Map<String, String> list = new HashMap<>();
 
         git.getRepositories().forEach(repo -> {
-            String targetBranchByRepo = getTargetBranchByRepositoryDisplay(repo);
+            String targetBranchByRepo = getTargetBranchByRepositoryDisplay(repo, targetBranch);
             list.put(targetBranchByRepo, targetBranchByRepo);
         });
 
@@ -47,13 +41,13 @@ public class TargetBranchService {
 
     }
 
-    public String getTargetBranchByRepositoryDisplay(GitRepository repo) {
+    public String getTargetBranchByRepositoryDisplay(GitRepository repo, Map<String, String> targetBranch) {
 
 //        if (!isFeatureActive()) {
 //            return Git.BRANCH_HEAD;
 //        }
 
-        String branch = getTargetBranchByRepository(repo);
+        String branch = getTargetBranchByRepository(repo, targetBranch);
         if (branch != null) {
             return branch;
         }
@@ -62,9 +56,7 @@ public class TargetBranchService {
 
     }
 
-    public String getTargetBranchByRepository(GitRepository repo) {
-
-        Map<String, String> repositoryTargetBranchMap = getRepositoryTargetBranchMap();
+    public String getTargetBranchByRepository(GitRepository repo, Map<String, String> repositoryTargetBranchMap) {
 
         if (repositoryTargetBranchMap == null) {
             return null;
@@ -74,20 +66,20 @@ public class TargetBranchService {
 
     }
 
-
-    public Boolean isHeadActually() {
-
-        AtomicReference<Boolean> isHead = new AtomicReference<>(true);
-
-        git.getRepositories().forEach(repo -> {
-            String targetBranchByRepo = getTargetBranchByRepository(repo);
-            if (targetBranchByRepo != null && !targetBranchByRepo.equals(Git.BRANCH_HEAD)) {
-                isHead.set(false);
-            }
-        });
-
-        return isHead.get();
-    }
+//
+//    public Boolean isHeadActually() {
+//
+//        AtomicReference<Boolean> isHead = new AtomicReference<>(true);
+//
+//        git.getRepositories().forEach(repo -> {
+//            String targetBranchByRepo = getTargetBranchByRepository(repo, t);
+//            if (targetBranchByRepo != null && !targetBranchByRepo.equals(Git.BRANCH_HEAD)) {
+//                isHead.set(false);
+//            }
+//        });
+//
+//        return isHead.get();
+//    }
 
 
 }
