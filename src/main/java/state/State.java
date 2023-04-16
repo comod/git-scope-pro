@@ -1,13 +1,14 @@
 package state;
 
 import com.intellij.openapi.components.PersistentStateComponent;
-import com.intellij.openapi.components.ServiceManager;
 import com.intellij.openapi.components.Storage;
 import com.intellij.openapi.project.Project;
 import com.intellij.util.xmlb.XmlSerializerUtil;
-import git4idea.repo.GitRepository;
+import com.intellij.util.xmlb.annotations.Attribute;
+import com.intellij.util.xmlb.annotations.OptionTag;
 import org.jetbrains.annotations.Nullable;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -16,13 +17,13 @@ import java.util.Map;
  * Similar notion of 'preference' in Android
  */
 @com.intellij.openapi.components.State(
-    name = "GitScope",
-    storages = {
-        @Storage(
-                value="GitScope.xml"
-        )
-    },
-    reloadable=true
+        name = "GitScope",
+        storages = {
+                @Storage(
+                        value = "GitScope.xml"
+                )
+        },
+        reloadable = true
 )
 public class State implements PersistentStateComponent<State> {
 
@@ -32,20 +33,41 @@ public class State implements PersistentStateComponent<State> {
      * - To Create a "node" just add class property: public String data = "";
      * -- Implement Getter and Setter
      * --- By using the setter the data is saved
+     * --- Map<String, String> possible
+     * --- Map<String, Object> not possible
      */
-
-    //    public String history; // JSON Converted JList
-
-    public String targetBranch = "";
 
     public Map<String, String> repositoryTargetBranchMap = new HashMap<>();
 
-    public String getTargetBranch() {
-        return targetBranch;
+    public Map<String, String> toolWindowTabMap = new HashMap<>();
+
+    @Nullable
+    public static State getInstance(Project project) {
+        State sfec = project.getService(State.class);
+        return sfec;
     }
 
-    public void setTargetBranch(String targetBranch) {
-        this.targetBranch = targetBranch;
+    public Map<String, String> getToolWindowTabMap() {
+        return toolWindowTabMap;
+    }
+
+    public void setToolWindowTabMap(Map<String, String> toolWindowTabMap) {
+        this.toolWindowTabMap = toolWindowTabMap;
+    }
+
+    public ToolWindowTabVo getVo(String id) {
+        VoConverter voCon = new VoConverter();
+        if (!this.toolWindowTabMap.containsKey(id)) {
+            ToolWindowTabVo defaultVo = new ToolWindowTabVo("default");
+            setVo(id, defaultVo);
+        }
+        String value = this.toolWindowTabMap.get(id);
+        return voCon.fromString(value);
+    }
+
+    public void setVo(String id, ToolWindowTabVo vo) {
+        VoConverter voCon = new VoConverter();
+        this.toolWindowTabMap.put(id, voCon.toString(vo));
     }
 
     public Map<String, String> getRepositoryTargetBranchMap() {
@@ -56,39 +78,6 @@ public class State implements PersistentStateComponent<State> {
         this.repositoryTargetBranchMap = repositoryTargetBranchMap;
     }
 
-    //    public List<String> getHistory() {
-//
-////        final DefaultListModel defaultListModel = new DefaultListModel();
-//
-//        System.out.println("Get historyFromJson");
-//        System.out.println(this.history);
-//        Gson gson = new GsonBuilder().create();
-//        return gson.fromJson(this.history, new TypeToken<List<String>>() {}.getType());
-//
-//    }
-//
-//    public void setHistory(JList history) {
-//
-//        System.out.println("Set history");
-//
-//        Gson gson = new GsonBuilder().create();
-//
-//        // JLIST 2 List<String>
-//        Type listType = new TypeToken<List<String>>() {}.getType();
-//        List<String> listForJsonExport = new LinkedList<String>();
-//
-//        ListModel model = history.getModel();
-//
-//        for(int i=0; i < model.getSize(); i++){
-//            Object o =  model.getElementAt(i);
-//            listForJsonExport.add(o.toString());
-//        }
-//
-//        String json = gson.toJson(listForJsonExport);
-//        this.history = json;
-//
-//    }
-
     @Nullable
     @Override
     public State getState() {
@@ -98,11 +87,5 @@ public class State implements PersistentStateComponent<State> {
     @Override
     public void loadState(State state) {
         XmlSerializerUtil.copyBean(state, this);
-    }
-
-    @Nullable
-    public static State getInstance(Project project) {
-        State sfec = project.getService(State.class);
-        return sfec;
     }
 }

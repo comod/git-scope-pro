@@ -1,0 +1,55 @@
+package example;
+
+
+import io.reactivex.rxjava3.core.Observable;
+import io.reactivex.rxjava3.subjects.PublishSubject;
+
+import java.util.Map;
+
+public class MyModel {
+    private final TabRecord tabRecord;
+    private final PublishSubject<MyModel> changeObservable = PublishSubject.create();
+    private String field1;
+    private Map<String, String> targetBranch;
+
+    public MyModel(TabRecord ref) {
+        this.tabRecord = ref;
+    }
+
+    public TabRecord getTabRecord() {
+        return tabRecord;
+    }
+
+    public String getField1() {
+        return field1;
+    }
+
+    public void setField1(String field1) {
+        this.field1 = field1;
+        changeObservable.onNext(this);
+    }
+
+    public String getTabRecordName() {
+        return this.getTabRecord().branchName();
+    }
+
+    public Map<String, String> getTargetBranch() {
+        return targetBranch;
+    }
+
+    public void setTargetBranch(Map<String, String> targetBranch) {
+        this.targetBranch = targetBranch;
+        changeObservable.onNext(this);
+    }
+
+    public Observable<MyModel> getObservable() {
+        return changeObservable;
+    }
+
+    @Override
+    public String toString() {
+        return "MyModel{" +
+                "field1='" + field1 + '\'' +
+                '}';
+    }
+}

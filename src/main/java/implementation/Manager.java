@@ -1,6 +1,5 @@
 package implementation;
 
-import com.intellij.dvcs.repo.VcsRepositoryManager;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
@@ -8,8 +7,6 @@ import com.intellij.openapi.project.Project;
 //import com.intellij.openapi.ui.popup.JBPopup;
 //import com.intellij.openapi.ui.popup.JBPopupFactory;
 //import java.awt.*;
-import com.intellij.openapi.vcs.FileStatusListener;
-import com.intellij.openapi.vcs.FileStatusManager;
 import com.intellij.openapi.vcs.changes.*;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
@@ -18,13 +15,14 @@ import com.intellij.openapi.vfs.newvfs.events.VFileEvent;
 import com.intellij.util.messages.MessageBus;
 import com.intellij.util.messages.MessageBusConnection;
 import listener.ChangeActionNotifierInterface;
+import service.GitService;
 import state.State;
 import git4idea.repo.GitRepository;
 import implementation.compare.MyGitCompareWithBranchAction;
 import implementation.lineStatusTracker.MyLineStatusTrackerImpl;
 import implementation.scope.MyScope;
 import org.jetbrains.annotations.NotNull;
-import state.TargetBranch;
+import ui.elements.TargetBranch;
 import ui.ToolWindowUI;
 import implementation.targetBranchWidget.MyBranchAction;
 import utils.Git;
@@ -40,33 +38,26 @@ import static java.util.stream.Collectors.joining;
 
 public class Manager {
 
+    private static boolean busy;
+    private final Map<GitRepository, Collection<Change>> changesByRepoMap = new HashMap<>();
     private ToolWindowUI toolWindowUI;
     private MyScope myScope;
     private MyLineStatusTrackerImpl myLineStatusTrackerImpl;
-
     private Project project;
 
-    private Git git;
-
+    //    Map<String, String> repositoryTargetBranchMap = null;
+//    private Git git;
     private boolean initialized = false;
-
-//    Map<String, String> repositoryTargetBranchMap = null;
-
     private Collection<Change> changes;
     private Collection<Change> changesBefore;
-    private final Map<GitRepository, Collection<Change>> changesByRepoMap = new HashMap<>();
-
     private TargetBranch targetBranch;
-
     private Queue<String> queue;
     private MyGitCompareWithBranchAction myGitCompareWithBranchAction;
-    private static boolean busy;
-
     private MessageBus messageBus;
     private MessageBusConnection messageBusConnection;
 
     private Object lastOpenedAt;
-
+    private GitService git;
 //    private InitialUpdate initialUpdate;
 
     public Manager() {
@@ -75,36 +66,38 @@ public class Manager {
 
     public void init(Project project) {
 
+        System.out.println("init");
         State state = State.getInstance(project);
 
         this.project = project;
-
-        this.git = new Git(project);
-
-        this.targetBranch = new TargetBranch(project, state, git, toolWindowUI);
+        this.git = project.getService(GitService.class);
+//        this.git = new Git(project);
+//        ToolWindowUI toolWindowUI = new ToolWindowUI(
+//                project,
+//                getGit(),
+//                this
+//        );
+//        setToolWindowUI(toolWindowUI);
+//        this.targetBranch = new TargetBranch(project, state, git, toolWindowUI);
 
         // Scope
         this.myScope = new MyScope(project);
 
         // LST
-        this.myLineStatusTrackerImpl = new MyLineStatusTrackerImpl(project);
-
-        this.myGitCompareWithBranchAction = new MyGitCompareWithBranchAction();
-
-//        this.initialUpdate = new InitialUpdate();
-
-        this.initQueue();
-
+//        this.myLineStatusTrackerImpl = new MyLineStatusTrackerImpl(project);
+//
+//        this.initQueue();
+//
         this.messageBus = this.project.getMessageBus();
         this.messageBusConnection = messageBus.connect();
 
         // Init / First compare on init
-        messageBusConnection.subscribe(VcsRepositoryManager.VCS_REPOSITORY_MAPPING_UPDATED, () -> {
-            onInit();
-        });
+//        messageBusConnection.subscribe(VcsRepositoryManager.VCS_REPOSITORY_MAPPING_UPDATED, () -> {
+        onInit();
+//        });
 
         // Listener
-        this.editorListener();
+//        this.editorListener();
 
     }
 
@@ -114,16 +107,12 @@ public class Manager {
         queueWorker.start();
     }
 
-    public Git getGit() {
-        return this.git;
-    }
+//    public Git getGit() {
+//        return this.git;
+//    }
 
     public ToolWindowUI getToolWindowUI() {
         return toolWindowUI;
-    }
-
-    public void setInitialized(boolean initialized) {
-        this.initialized = initialized;
     }
 
     public void setToolWindowUI(ToolWindowUI toolWindowUI) {
@@ -136,13 +125,11 @@ public class Manager {
 //        System.out.println("OnInit");
 
 //        this.targetBranch.setFeatureActive(true);
-
-        ToolWindowUI toolWindowUI = this.getToolWindowUI();
-        boolean toolWindowWasOpen = toolWindowUI != null;
-        if (toolWindowWasOpen) {
-//            System.out.println("avoid duplicate doCompareAndUpdate");
-            return;
-        }
+//        ToolWindowUI toolWindowUI = this.getToolWindowUI();
+//        boolean toolWindowWasOpen = toolWindowUI != null;
+//        if (toolWindowWasOpen) {
+//            return;
+//        }
 
 //        SwingUtilities.invokeLater(this::doCompareAndUpdate);
         initialUpdate();
@@ -164,7 +151,11 @@ public class Manager {
         return initialized;
     }
 
-        private void editorListener() {
+    public void setInitialized(boolean initialized) {
+        this.initialized = initialized;
+    }
+
+    private void editorListener() {
 
 //        EditorFactory.getInstance().
 
@@ -180,7 +171,6 @@ public class Manager {
         //            "",
         //            ModalityState.NON_MODAL
         //        );
-
 
 
         //
@@ -209,7 +199,7 @@ public class Manager {
         //            if (lists.isEmpty()) return;
         //            try {
         //                //                doCompareAndUpdate();
-        //                // ChangeListManager.getInstance(myProject).setReadOnly(LocalChangeList.DEFAULT_NAME, true);
+        //                // ChangeListManager.getInstance(project).setReadOnly(LocalChangeList.DEFAULT_NAME, true);
         //
         //                //                if (!myConfiguration.changeListsSynchronized()) {
         //                //                    processChangeLists(lists);
@@ -222,20 +212,20 @@ public class Manager {
 
 
         messageBusConnection.subscribe(
-            FileEditorManagerListener.FILE_EDITOR_MANAGER,
-            new FileEditorManagerListener() {
-                @Override
-                public void fileOpened(@NotNull FileEditorManager source, @NotNull VirtualFile vFile) {
+                FileEditorManagerListener.FILE_EDITOR_MANAGER,
+                new FileEditorManagerListener() {
+                    @Override
+                    public void fileOpened(@NotNull FileEditorManager source, @NotNull VirtualFile vFile) {
 //                    System.out.println("fileOpened doCompareAndUpdate");
-                    doCompareAndUpdate();
-                }
+                        doCompareAndUpdate();
+                    }
 
-                @Override
-                public void selectionChanged(@NotNull FileEditorManagerEvent event) {
-                    //                    System.out.println("2");
-                    //                    doCompareAndUpdate();
+                    @Override
+                    public void selectionChanged(@NotNull FileEditorManagerEvent event) {
+                        //                    System.out.println("2");
+                        //                    doCompareAndUpdate();
+                    }
                 }
-            }
         );
 
 //                VirtualFileManager.getInstance().addVirtualFileListener(new VirtualFileListener() {
@@ -246,19 +236,20 @@ public class Manager {
 //                    }
 //                });
 
-        FileStatusManager.getInstance(this.project).addFileStatusListener(new FileStatusListener() {
-            //            @Override
-            //            public void fileStatusesChanged() {
-            //                System.out.println("fileStatusesChanged");
-            //                doCompareAndUpdate();
-            //            }
-
-            @Override
-            public void fileStatusChanged(@NotNull VirtualFile virtualFile) {
-//                System.out.println("fileStatusChangedVirtualFile");
-                doCompareAndUpdate(virtualFile);
-            }
-        }, () -> {});
+//        FileStatusManager.getInstance(this.project).addFileStatusListener(new FileStatusListener() {
+//            //            @Override
+//            //            public void fileStatusesChanged() {
+//            //                System.out.println("fileStatusesChanged");
+//            //                doCompareAndUpdate();
+//            //            }
+//
+//            @Override
+//            public void fileStatusChanged(@NotNull VirtualFile virtualFile) {
+////                System.out.println("fileStatusChangedVirtualFile");
+//                doCompareAndUpdate(virtualFile);
+//            }
+//        }, () -> {
+//        });
 
     }
 
@@ -303,83 +294,23 @@ public class Manager {
             return;
         }
 
-        if (!this.targetBranch.isFeatureActive()) {
-            updateFromHEAD();
-            return;
-        }
+        updateFromHEAD();
+        return;
+//        if (!this.targetBranch.isFeatureActive()) {
+//            updateFromHEAD();
+//            return;
+//        }
 
-        // System.out.println("+++");
+//        queue.add(""); // No parameter needed
 
-        queue.add(""); // No parameter needed
-
-    }
-
-    public void setLastOpenedAt(Object lastOpenedAt) {
-        this.lastOpenedAt = lastOpenedAt;
     }
 
     public Object getLastOpenedAt() {
         return this.lastOpenedAt;
     }
 
-    class QueueWorker extends Thread {
-
-        private final Queue<String> queue;
-        private final Iterator iterator;
-        private boolean busy;
-
-        public QueueWorker(Queue<String> queue) {
-            this.queue = queue;
-            this.iterator = queue.iterator();
-        }
-
-        public void run() {
-
-            while(true) {
-
-                try {
-                    sleep(100);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-
-                if (busy) {
-                    // System.out.println("x");
-                    continue;
-                }
-                if (!iterator.hasNext()) {
-                    // System.out.println(".");
-                    continue;
-                }
-
-                queue.clear();
-                doJob();
-
-            }
-
-        }
-
-        public void doJob() {
-
-            busy = true;
-            // System.out.println("doQueueJob");
-
-            git.getRepositories().forEach(repo -> {
-                String targetBranchByRepo = getTargetBranchByRepository(repo);
-                if (targetBranchByRepo == null) {
-                    // Notification.notify(Defs.NAME, "Choose a Branch");
-                    toolWindowUI.showTargetBranchPopupAtToolWindow();
-                    targetBranchByRepo = Git.BRANCH_HEAD;
-                }
-
-                myGitCompareWithBranchAction.collectChangesAndProcess(project, repo, targetBranchByRepo, changes -> {
-                    busy = false;
-                    onJobDone(repo, changes);
-                });
-            });
-
-        }
-
+    public void setLastOpenedAt(Object lastOpenedAt) {
+        this.lastOpenedAt = lastOpenedAt;
     }
 
     public void onJobDone(GitRepository repo, Collection<Change> changes) {
@@ -397,13 +328,6 @@ public class Manager {
         onAfterUpdate();
 
     }
-
-    //    public void updateFromHEAD(@NotNull VirtualFile virtualFile) {
-    //
-    //        changes = this.getOnlyLocalChanges();
-    //        onAfterUpdate(virtualFile);
-    //
-    //    }
 
     public void update() {
 
@@ -441,6 +365,13 @@ public class Manager {
         onAfterUpdate();
     }
 
+    //    public void updateFromHEAD(@NotNull VirtualFile virtualFile) {
+    //
+    //        changes = this.getOnlyLocalChanges();
+    //        onAfterUpdate(virtualFile);
+    //
+    //    }
+
     public void onAfterUpdate() {
 
 //        System.out.println("+++ onAfterUpdate +++");
@@ -452,13 +383,13 @@ public class Manager {
 
         changesBefore = changes;
 
-        this.updateToolWindowUI();
-
-//        if (!changesAreTheSame) {
-            this.updateDiff();
-//        }
-        this.updateLst();
-        this.updateScope();
+//        this.updateToolWindowUI();
+//
+////        if (!changesAreTheSame) {
+//        this.updateDiff();
+////        }
+//        this.updateLst();
+//        this.updateScope();
 
         // PUBLISH to custom listener
         ChangeActionNotifierInterface publisher = messageBus.syncPublisher(ChangeActionNotifierInterface.CHANGE_ACTION_TOPIC);
@@ -571,12 +502,6 @@ public class Manager {
 
         return changes;
     }
-//
-//    private Boolean isLocalChangeForThisRepo(String localChangePath) {
-//        GitRepository repo = MyGitCompareWithBranchAction.this.repo;
-//        String repoPath = repo.toString();
-//        return localChangePath.contains(repoPath);
-//    }
 
     private Boolean isLocalChangeOnly(String localChangePath, Collection<Change> changes) {
 
@@ -600,6 +525,12 @@ public class Manager {
         return true;
 
     }
+//
+//    private Boolean isLocalChangeForThisRepo(String localChangePath) {
+//        GitRepository repo = MyGitCompareWithBranchAction.this.repo;
+//        String repoPath = repo.toString();
+//        return localChangePath.contains(repoPath);
+//    }
 
     public void toggleHeadAction() {
 
@@ -610,20 +541,63 @@ public class Manager {
 
     }
 
-//    @NotNull
-//    JBPopup createPopup(ToolWindowUI toolWindow) {
-//
-//        JBPopup popup = JBPopupFactory
-//                .getInstance()
-//                .createComponentPopupBuilder(
-//                        toolWindow.getRootPanel(),
-//                        null
-//                )
-//                .setMinSize(new Dimension(200, 400))
-//                .createPopup();
-//
-//        return popup;
-//
-//    }
+    class QueueWorker extends Thread {
 
+        private final Queue<String> queue;
+        private final Iterator iterator;
+        private boolean busy;
+
+        public QueueWorker(Queue<String> queue) {
+            this.queue = queue;
+            this.iterator = queue.iterator();
+        }
+
+        public void run() {
+
+            while (true) {
+
+                try {
+                    sleep(100);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+
+                if (busy) {
+                    // System.out.println("x");
+                    continue;
+                }
+                if (!iterator.hasNext()) {
+                    // System.out.println(".");
+                    continue;
+                }
+
+                queue.clear();
+                doJob();
+
+            }
+
+        }
+
+        public void doJob() {
+
+            busy = true;
+            // System.out.println("doQueueJob");
+
+            git.getRepositories().forEach(repo -> {
+                String targetBranchByRepo = getTargetBranchByRepository(repo);
+                if (targetBranchByRepo == null) {
+                    // Notification.notify(Defs.NAME, "Choose a Branch");
+                    toolWindowUI.showTargetBranchPopupAtToolWindow();
+                    targetBranchByRepo = Git.BRANCH_HEAD;
+                }
+
+                myGitCompareWithBranchAction.collectChangesAndProcess(project, repo, targetBranchByRepo, changes -> {
+                    busy = false;
+                    onJobDone(repo, changes);
+                });
+            });
+
+        }
+
+    }
 }

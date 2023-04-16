@@ -16,6 +16,7 @@ import git4idea.ui.branch.GitMultiRootBranchConfig;
 import implementation.Manager;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import service.GitService;
 import ui.StatusBar;
 
 import java.util.List;
@@ -27,11 +28,33 @@ import static git4idea.GitUtil.getRepositoryManager;
 
 public class MyGitBranchPopup extends MyDvcsBranchPopup<GitRepository> {
 
-    private static final String DIMENSION_SERVICE_KEY = "Git.Branch.Popup";
     static final String SHOW_ALL_LOCALS_KEY = "Git.Branch.Popup.ShowAllLocals";
     static final String SHOW_ALL_REMOTES_KEY = "Git.Branch.Popup.ShowAllRemotes";
     static final String SHOW_ALL_REPOSITORIES = "Git.Branch.Popup.ShowAllRepositories";
+    private static final String DIMENSION_SERVICE_KEY = "Git.Branch.Popup";
     private static Manager manager;
+
+    private MyGitBranchPopup(
+            @NotNull final Project project,
+            @NotNull GitRepository currentRepository,
+            @NotNull GitRepositoryManager repositoryManager,
+            @NotNull GitVcsSettings vcsSettings,
+            @NotNull Condition<AnAction> preselectActionCondition,
+            @NotNull DataContext dataContext
+    ) {
+
+        super(
+                // currentRepository,
+                (project.getService(GitService.class)).getRepository(),
+                repositoryManager,
+                new GitMultiRootBranchConfig(repositoryManager.getRepositories()),
+                vcsSettings,
+                preselectActionCondition,
+                DIMENSION_SERVICE_KEY,
+                dataContext
+        );
+
+    }
 
     /**
      * @param currentRepository Current repository, which means the repository of the currently open or selected file.
@@ -57,28 +80,6 @@ public class MyGitBranchPopup extends MyDvcsBranchPopup<GitRepository> {
         );
     }
 
-    private MyGitBranchPopup(
-        @NotNull final Project project,
-        @NotNull GitRepository currentRepository,
-        @NotNull GitRepositoryManager repositoryManager,
-        @NotNull GitVcsSettings vcsSettings,
-        @NotNull Condition<AnAction> preselectActionCondition,
-        @NotNull DataContext dataContext
-    ) {
-
-        super(
-            // currentRepository,
-            (project.getService(Manager.class)).getGit().getRepository(),
-            repositoryManager,
-            new GitMultiRootBranchConfig(repositoryManager.getRepositories()),
-            vcsSettings,
-            preselectActionCondition,
-            DIMENSION_SERVICE_KEY,
-            dataContext
-        );
-
-    }
-
     @Override
     protected void fillWithCommonRepositoryActions(
             @NotNull LightActionGroup popupGroup,
@@ -97,19 +98,19 @@ public class MyGitBranchPopup extends MyDvcsBranchPopup<GitRepository> {
         LightActionGroup popupGroup = new LightActionGroup(false);
         popupGroup.addSeparator("Repositories");
         List<ActionGroup> rootActions = map(
-            DvcsUtil.sortRepositories(myRepositoryManager.getRepositories()),
-            repo -> {
-                return new RootAction <> (
-                    repo,
-                    new MyGitBranchPopupActions(repo.getProject(), repo).createActions(),
-                    manager.getTargetBranchByRepositoryDisplay(repo)
-                );
-            }
+                DvcsUtil.sortRepositories(myRepositoryManager.getRepositories()),
+                repo -> {
+                    return new RootAction<>(
+                            repo,
+                            new MyGitBranchPopupActions(repo.getProject(), repo).createActions(),
+                            manager.getTargetBranchByRepositoryDisplay(repo)
+                    );
+                }
         );
 
         popupGroup.addAll(rootActions);
 //        wrapWithMoreActionIfNeeded(
-//            myProject,
+//            project,
 //            popupGroup,
 //            rootActions,
 //            rootActions.size() > MAX_NUM ? DEFAULT_NUM : MAX_NUM,
@@ -122,14 +123,14 @@ public class MyGitBranchPopup extends MyDvcsBranchPopup<GitRepository> {
     @Override
     protected void fillPopupWithCurrentRepositoryActions(@NotNull LightActionGroup popupGroup, @Nullable LightActionGroup actions) {
         popupGroup.addAll(
-            new MyGitBranchPopupActions(
-                myCurrentRepository.getProject(),
-                myCurrentRepository
-            ).createActions(
-                null,
-                myRepoTitleInfo,
-                true
-            )
+                new MyGitBranchPopupActions(
+                        myCurrentRepository.getProject(),
+                        myCurrentRepository
+                ).createActions(
+                        null,
+                        myRepoTitleInfo,
+                        true
+                )
         );
     }
 

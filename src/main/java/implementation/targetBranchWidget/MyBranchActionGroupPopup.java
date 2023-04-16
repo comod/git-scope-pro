@@ -5,7 +5,6 @@ import com.intellij.dvcs.ui.LightActionGroup;
 import com.intellij.dvcs.ui.PopupElementWithAdditionalInfo;
 import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.openapi.actionSystem.*;
-import com.intellij.openapi.components.ServiceManager;
 import com.intellij.openapi.project.DumbAware;
 import com.intellij.openapi.project.DumbAwareAction;
 import com.intellij.openapi.project.Project;
@@ -40,7 +39,6 @@ public class MyBranchActionGroupPopup extends BranchActionGroupPopup {
 //  private static final DataKey MY_POPUP_MODEL = DataKey.create("GitScopeVcsPopupModel");
 //  static final String BRANCH_POPUP = "GitScopeBranchWidget";
 
-    private Project project;
     private MyPopupListElementRenderer myListElementRenderer;
 
     public MyBranchActionGroupPopup(@NotNull String title,
@@ -52,8 +50,47 @@ public class MyBranchActionGroupPopup extends BranchActionGroupPopup {
     ) {
 
         super(title, project, preselectActionCondition, actions, dimensionKey, dataContext);
-        this.project = project;
 
+    }
+
+    public static void _wrapWithMoreActionIfNeeded(
+            @NotNull Project project,
+            @NotNull LightActionGroup parentGroup,
+            @NotNull List<MyGitBranchPopupActions.TargetBranchAction> actionList,
+            int maxIndex,
+            @Nullable String settingName,
+            boolean defaultExpandValue
+    ) {
+        if (actionList.size() > maxIndex) {
+            boolean hasFavorites = actionList.stream().anyMatch(action ->
+                    action != null && action.isFavorite()
+            );
+
+            MoreAction moreAction = new MoreAction(project, actionList.size() - maxIndex, settingName, defaultExpandValue, hasFavorites);
+
+            for (int i = 0; i < actionList.size(); i++) {
+                // parentGroup.add(i < maxIndex ? actionList.get(i) : new BranchActionGroupPopup.HideableActionGroup(actionList.get(i), moreAction));
+
+                MyGitBranchPopupActions.TargetBranchAction myBranchAction = actionList.get(i);
+
+                if (i >= maxIndex && !moreAction.isExpanded()) {
+                    myBranchAction.setHide(true);
+                }
+
+                ActionGroup actionGroup = new ActionGroup() {
+                    @NotNull
+                    @Override
+                    public AnAction[] getChildren(@Nullable AnActionEvent e) {
+                        return new AnAction[]{myBranchAction};
+                    }
+                };
+
+                parentGroup.add(i < maxIndex ? myBranchAction : new HideableActionGroup(actionGroup, moreAction));
+            }
+            parentGroup.add(moreAction);
+        } else {
+            parentGroup.addAll(actionList);
+        }
     }
 
     @Override
@@ -100,19 +137,23 @@ public class MyBranchActionGroupPopup extends BranchActionGroupPopup {
         return true;
     }
 
-    private boolean clickedAtIcon(Point point) {
-        double x = point.getX();
-        return x > 10 && x < 21;
-    }
-
     //  @Nullable
     //  private BranchActionGroup getSelectedBranchGroup() {
     //    return getSpecificAction(getList().getSelectedValue(), BranchActionGroup.class);
     //  }
 
+    private boolean clickedAtIcon(Point point) {
+        double x = point.getX();
+        return x > 10 && x < 21;
+    }
+
     @Nullable
     private MyBranchAction getSelectedMyBranchAction() {
         return getSpecificAction(getList().getSelectedValue(), MyBranchAction.class);
+    }
+
+    interface MoreHideableActionGroup {
+        boolean shouldBeShown();
     }
 
     private static class MyPopupListElementRenderer extends PopupListElementRendererWithIcon {
@@ -120,6 +161,13 @@ public class MyBranchActionGroupPopup extends BranchActionGroupPopup {
 
         MyPopupListElementRenderer(ListPopupImpl aPopup) {
             super(aPopup);
+        }
+
+        private static Icon chooseUpdateIndicatorIcon(@NotNull BranchActionGroup branchActionGroup) {
+            if (branchActionGroup.hasIncomingCommits()) {
+                return branchActionGroup.hasOutgoingCommits() ? IncomingOutgoing : Incoming;
+            }
+            return branchActionGroup.hasOutgoingCommits() ? Outgoing : null;
         }
 
         @Override
@@ -141,13 +189,6 @@ public class MyBranchActionGroupPopup extends BranchActionGroupPopup {
             }
             PopupElementWithAdditionalInfo additionalInfoAction = getSpecificAction(value, PopupElementWithAdditionalInfo.class);
             updateInfoComponent(myInfoLabel, additionalInfoAction != null ? additionalInfoAction.getInfoText() : null, isSelected);
-        }
-
-        private static Icon chooseUpdateIndicatorIcon(@NotNull BranchActionGroup branchActionGroup) {
-            if (branchActionGroup.hasIncomingCommits()) {
-                return branchActionGroup.hasOutgoingCommits() ? IncomingOutgoing : Incoming;
-            }
-            return branchActionGroup.hasOutgoingCommits() ? Outgoing : null;
         }
 
         private void updateInfoComponent(@NotNull ErrorLabel infoLabel, @Nullable String infoText, boolean isSelected) {
@@ -211,15 +252,15 @@ public class MyBranchActionGroupPopup extends BranchActionGroupPopup {
     private static class MoreAction extends DumbAwareAction implements KeepingPopupOpenAction {
 
         @NotNull
-        private final Project myProject;
+        private final Project project;
         @Nullable
         private final String mySettingName;
         private final boolean myDefaultExpandValue;
-        private boolean myIsExpanded;
         @NotNull
         private final String myToCollapseText;
         @NotNull
         private final String myToExpandText;
+        private boolean myIsExpanded;
 
         MoreAction(@NotNull Project project,
                    int numberOfHiddenNodes,
@@ -227,7 +268,7 @@ public class MyBranchActionGroupPopup extends BranchActionGroupPopup {
                    boolean defaultExpandValue,
                    boolean hasFavorites) {
             super();
-            myProject = project;
+            this.project = project;
             mySettingName = settingName;
             myDefaultExpandValue = defaultExpandValue;
             assert numberOfHiddenNodes > 0;
@@ -242,7 +283,7 @@ public class MyBranchActionGroupPopup extends BranchActionGroupPopup {
 
             setExpanded(!myIsExpanded);
 
-            Manager manager = ServiceManager.getService(myProject, Manager.class);
+            Manager manager = project.getService(Manager.class);
             try {
                 manager.getToolWindowUI().showTargetBranchPopup(e);
             } catch (Throwable ex) {
@@ -268,56 +309,13 @@ public class MyBranchActionGroupPopup extends BranchActionGroupPopup {
         public void saveState() {
             // @todo save to own state, if problems continue
             if (mySettingName != null) {
-                PropertiesComponent.getInstance(myProject).setValue(mySettingName, myIsExpanded, myDefaultExpandValue);
+                PropertiesComponent.getInstance(project).setValue(mySettingName, myIsExpanded, myDefaultExpandValue);
             }
         }
     }
 
-    public static void _wrapWithMoreActionIfNeeded(
-            @NotNull Project project,
-            @NotNull LightActionGroup parentGroup,
-            @NotNull List<MyGitBranchPopupActions.TargetBranchAction> actionList,
-            int maxIndex,
-            @Nullable String settingName,
-            boolean defaultExpandValue
-    ) {
-        if (actionList.size() > maxIndex) {
-            boolean hasFavorites = actionList.stream().anyMatch(action ->
-                    action != null && action.isFavorite()
-            );
-
-            MoreAction moreAction = new MoreAction(project, actionList.size() - maxIndex, settingName, defaultExpandValue, hasFavorites);
-
-            for (int i = 0; i < actionList.size(); i++) {
-                // parentGroup.add(i < maxIndex ? actionList.get(i) : new BranchActionGroupPopup.HideableActionGroup(actionList.get(i), moreAction));
-
-                MyGitBranchPopupActions.TargetBranchAction myBranchAction = actionList.get(i);
-
-                if (i >= maxIndex && !moreAction.isExpanded()) {
-                    myBranchAction.setHide(true);
-                }
-
-                ActionGroup actionGroup = new ActionGroup() {
-                    @NotNull
-                    @Override
-                    public AnAction[] getChildren(@Nullable AnActionEvent e) {
-                        return new AnAction[]{myBranchAction};
-                    }
-                };
-
-                parentGroup.add(i < maxIndex ? myBranchAction : new HideableActionGroup(actionGroup, moreAction));
-            }
-            parentGroup.add(moreAction);
-        } else {
-            parentGroup.addAll(actionList);
-        }
-    }
-
-    interface MoreHideableActionGroup {
-        boolean shouldBeShown();
-    }
-
-    private static class HideableActionGroup extends EmptyAction.MyDelegatingActionGroup implements MoreHideableActionGroup, DumbAware {
+    //    private static class HideableActionGroup extends EmptyAction.MyDelegatingActionGroup implements MoreHideableActionGroup, DumbAware {
+    private static class HideableActionGroup extends ActionGroupWrapper implements MoreHideableActionGroup, DumbAware {
         @NotNull
         private final MoreAction myMoreAction;
 

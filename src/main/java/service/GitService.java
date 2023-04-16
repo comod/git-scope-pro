@@ -1,4 +1,4 @@
-package utils;
+package service;
 
 import com.intellij.dvcs.DvcsUtil;
 import com.intellij.dvcs.repo.VcsRepositoryManager;
@@ -6,27 +6,32 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import git4idea.GitUtil;
 import git4idea.config.GitVcsSettings;
-import git4idea.repo.*;
+import git4idea.repo.GitRepository;
+import git4idea.repo.GitRepositoryManager;
+import implementation.compare.MyGitCompareWithBranchAction;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
-public class Git {
+public class GitService {
 
     public static final String BRANCH_HEAD = "HEAD";
 
     private final GitRepositoryManager repositoryManager;
 
     private final Project project;
+    private final MyGitCompareWithBranchAction myGitCompareWithBranchAction;
     private GitRepository repository;
 
     private VirtualFile rootGitFile;
 
     private boolean isReady = false;
 
-    public Git(Project project) {
+    public GitService(Project project) {
 
         this.project = project;
         repositoryManager = GitRepositoryManager.getInstance(this.project);
+        this.myGitCompareWithBranchAction = new MyGitCompareWithBranchAction();
 
         this.repoChangedListener();
 
@@ -34,9 +39,9 @@ public class Git {
 
     public void repoChangedListener() {
 
-        this.project.getMessageBus().connect().subscribe(VcsRepositoryManager.VCS_REPOSITORY_MAPPING_UPDATED, () -> {
-            isReady = true;
-        });
+//        this.project.getMessageBus().connect().subscribe(VcsRepositoryManager.VCS_REPOSITORY_MAPPING_UPDATED, () -> {
+//            isReady = true;
+//        });
 
     }
 
@@ -58,15 +63,11 @@ public class Git {
         return repositoryManager.getRepositories();
     }
 
-    public Boolean isReady() {
-        return this.isReady;
-    }
+//    public VirtualFile getRoot() {
+//        return this.repository.getRoot();
+//    }
 
-    public VirtualFile getRoot() {
-        return this.repository.getRoot();
-    }
-
-    public String getBranchName() {
+    public String getCurrentBranchName() {
 
         String currentBranchName = "";
 
@@ -80,5 +81,4 @@ public class Git {
 
         return currentBranchName;
     }
-
 }

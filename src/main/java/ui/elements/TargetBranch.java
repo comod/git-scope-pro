@@ -1,10 +1,11 @@
-package state;
+package ui.elements;
 
 import com.intellij.openapi.components.ServiceManager;
 import com.intellij.openapi.project.Project;
 import git4idea.repo.GitRepository;
 import implementation.Manager;
 import implementation.targetBranchWidget.MyBranchAction;
+import state.State;
 import ui.ToolWindowUI;
 import utils.Git;
 
@@ -18,7 +19,7 @@ import static java.util.stream.Collectors.joining;
 public class TargetBranch {
 
     private final State state;
-//    private final ToolWindowUI toolWindowUI;
+    //    private final ToolWindowUI toolWindowUI;
     private final Git git;
     private final Manager manager;
 
@@ -79,10 +80,10 @@ public class TargetBranch {
         });
 
         return list
-            .entrySet()
-            .stream()
-            .map(Map.Entry::getValue)
-            .collect(joining(", "));
+                .entrySet()
+                .stream()
+                .map(Map.Entry::getValue)
+                .collect(joining(", "));
 
     }
 
@@ -112,7 +113,6 @@ public class TargetBranch {
         return repositoryTargetBranchMap.get(repo.toString());
 
     }
-
 
     public Boolean isHeadActually() {
 

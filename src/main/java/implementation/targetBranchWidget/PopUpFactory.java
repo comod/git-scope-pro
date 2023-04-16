@@ -1,4 +1,4 @@
-package ui.elements;
+package implementation.targetBranchWidget;
 
 import com.intellij.dvcs.DvcsUtil;
 import com.intellij.ide.DataManager;
@@ -8,110 +8,19 @@ import com.intellij.openapi.ui.popup.ListPopup;
 import git4idea.GitUtil;
 import git4idea.config.GitVcsSettings;
 import git4idea.repo.GitRepository;
-import implementation.targetBranchWidget.MyGitBranchPopup;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
-import java.util.function.Consumer;
 
-public class TargetBranchPanel extends JPanel implements Element {
+public class PopUpFactory {
 
     private final Project project;
-//    private final Manager manager;
 
-    JButton label = new JButton("loading...");
-
-    private Consumer<String> consumer;
-
-    public TargetBranchPanel(Project project) {
-
+    public PopUpFactory(Project project) {
         this.project = project;
-
-//        this.createElement();
-        this.createElementLater();
-        this.addListener();
-
-//        this.manager = project.getService(Manager.class);
-
-    }
-
-    public void createElement() {
-
-        FlowLayout layout = (FlowLayout) this.getLayout();
-        layout.setVgap(0);
-
-        label.setBorderPainted(false);
-        label.setFocusable(false);
-
-        label.addMouseListener(new MouseListener() {
-            @Override
-            public void mouseClicked(MouseEvent e) {
-
-            }
-
-            @Override
-            public void mousePressed(MouseEvent e) {
-
-            }
-
-            @Override
-            public void mouseReleased(MouseEvent e) {
-
-            }
-
-            @Override
-            public void mouseEntered(MouseEvent e) {
-                label.setBorderPainted(true);
-            }
-
-            @Override
-            public void mouseExited(MouseEvent e) {
-                label.setBorderPainted(false);
-            }
-        });
-
-    }
-
-    public void createElementLater() {
-
-//        SwingUtilities.invokeLater(() -> {
-
-        add(label);
-
-        label.addMouseListener(new MouseListener() {
-            @Override
-            public void mouseClicked(MouseEvent e) {
-
-                showPopup(e);
-            }
-
-            @Override
-            public void mousePressed(MouseEvent e) {
-
-            }
-
-            @Override
-            public void mouseReleased(MouseEvent e) {
-
-            }
-
-            @Override
-            public void mouseEntered(MouseEvent e) {
-
-            }
-
-            @Override
-            public void mouseExited(MouseEvent e) {
-
-            }
-        });
-
-//        });
-
     }
 
     public void showPopup(MouseEvent e) {
@@ -121,8 +30,9 @@ public class TargetBranchPanel extends JPanel implements Element {
         assert repository != null;
         MyGitBranchPopup myGitBranchPopup = MyGitBranchPopup.getInstance(project, repository, DataManager.getInstance().getDataContext(e.getComponent()));
 //                    MyGitBranchPopup myGitBranchPopup = MyGitBranchPopup.getInstance(project, git.getRepository());
-        myGitBranchPopup.setPopupLastOpenedAt(TargetBranchPanel.class);
-        showPopup(label);
+        myGitBranchPopup.setPopupLastOpenedAt(PopUpFactory.class);
+//        showPopup(label);
+        showPopup(e.getComponent());
     }
 
     public void showPopup(@NotNull AnActionEvent e) {
@@ -138,9 +48,10 @@ public class TargetBranchPanel extends JPanel implements Element {
 //        System.out.println(lastOpenedAt);
 
 
-        if (lastOpenedAt == TargetBranchPanel.class) {
+        if (lastOpenedAt == PopUpFactory.class) {
 //            System.out.println("instanceof TargetBranchPanel");
-            showPopupAtToolWindow();
+//            showPopupAtToolWindow();
+            showPopup(e.getInputEvent().getComponent());
             return;
         }
 
@@ -151,10 +62,10 @@ public class TargetBranchPanel extends JPanel implements Element {
 
     }
 
-    public void showPopupAtToolWindow() {
-//        System.out.println("showPopupAtToolWindow");
-        showPopup(label);
-    }
+//    public void showPopupAtToolWindow() {
+////        System.out.println("showPopupAtToolWindow");
+//        showPopup(label);
+//    }
 
     public void showPopup(Component label) {
 

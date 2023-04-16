@@ -5,33 +5,7 @@
     <!-- Unique identifier of the plugin. It should be FQN. It cannot be changed between the plugin versions. -->
     <id>Git Scope</id>
     <name>Git Scope</name>
-    <description>
-        <![CDATA[
-        <ul>
-            <li> 1. Adds a tool window with a change browser (similar to Version Control) which shows the current diff of your
-            **GIT SCOPE**.
-            <li> 2. Adapts the Line Status according to your **GIT SCOPE**. Usually this built-in feature shows only the current
-            "HEAD" changes.
-            <li> 3. Adds a Custom *Scope* (inspections, search/replaces, ect) "Git Scope (Files)", which means search results
-            will be filtered according to **GIT SCOPE**
-        </ul>
-
-        <h1>Announcement</h1>
-        This plugin will no longer be free in the future!
-        Keeping this plugin alive can be very challenging and time-consuming.
-        <br/>
-        Thank you for your understanding!
-        ]]>
-    </description>
-    <version>3.0.6</version>
     <vendor>Michael Wölk</vendor>
-
-    <change-notes>
-        <![CDATA[
-        <h1>Fixes</h1>
-        Fixed compatibility issues for latest versions, removed internal API usage, added logo and toolbar icon.<br/>
-        ]]>
-    </change-notes>
 
     <!-- Product and plugin compatibility requirements.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
@@ -39,28 +13,32 @@
     <depends>Git4Idea</depends>
 
     <!-- https://plugins.jetbrains.com/docs/intellij/build-number-ranges.html#intellij-platform-based-products-of-recent-ide-versions-->
-    <idea-version since-build="211"/>
 
-    <!-- Plugin's application components (On Start IDE) -->
-    <!--    https://plugins.jetbrains.com/docs/intellij/plugin-listeners.html#defining-application-level-listeners-->
+    <projectListeners>
+        <listener
+                class="listener.MyToolWindowListener"
+                topic="com.intellij.openapi.wm.ex.ToolWindowManagerListener"/>
+        <listener
+                class="listener.VcsStartup"
+                topic="com.intellij.dvcs.repo.VcsRepositoryMappingListener"/>
+    </projectListeners>
+
+
     <applicationListeners>
         <listener
-                class="system.MyProjectManagerListener"
-                topic="com.intellij.openapi.project.ProjectManagerListener"/>
+                class="listener.MyVfsListener"
+                topic="com.intellij.openapi.vfs.newvfs.BulkFileListener"/>
+
     </applicationListeners>
-    <!-- Plugin's project components -->
-    <project-components>
-        <component>
-            <!-- OnStart Project (with project payload) -->
-            <implementation-class>system.MyProjectManagerListener</implementation-class>
-        </component>
-    </project-components>
 
     <!-- Extension points defined by the plugin.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
     <extensions defaultExtensionNs="com.intellij">
 
+        <!--        <postStartupActivity implementation="listener.Startup"/>-->
+        <!--        <vcsRepositoryCreator implementation="listener.VcsStartup"/>-->
         <!-- ToolWindow -->
+        <!--                canCloseContents="true"-->
         <toolWindow
                 id="Git Scope"
                 secondary="true"
@@ -68,11 +46,19 @@
                 anchor="left"
                 factoryClass="ui.ToolWindowUIFactory"
         />
+        <toolWindow id="Sample Calendar" secondary="true" icon="AllIcons.Toolwindows.WebToolWindow" anchor="right"
+                    factoryClass="example.CalendarToolWindowFactory"/>
         <!-- Config (Persistent) -->
         <projectService serviceImplementation="state.State"/>
 
+        <projectService serviceImplementation="service.GitService"/>
         <projectService serviceImplementation="implementation.Manager"/>
-
+        <projectService serviceImplementation="example.ViewService"/>
+        <projectService serviceImplementation="implementation.targetBranchWidget.PopUpFactory"/>
+        <projectService serviceImplementation="service.TargetBranchService"/>
+        <projectService
+                serviceInterface="service.ToolWindowServiceInterface"
+                serviceImplementation="service.ToolWindowService"/>
         <!--        <statusBarWidgetProvider implementation="ui.TargetBranchStatusWidgetProvider"/>-->
 
     </extensions>

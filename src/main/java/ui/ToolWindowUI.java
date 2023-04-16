@@ -42,8 +42,8 @@ public class ToolWindowUI {
         this.project = project;
         this.git = git;
         this.manager = manager;
-
-        this.init();
+//        this.createUIComponents();
+//        this.init();
 
     }
 
@@ -66,11 +66,11 @@ public class ToolWindowUI {
 
     private void createUIComponents() {
 
-//        System.out.println("createUIComponents for ToolWindow");
+        System.out.println("createUIComponents for ToolWindow");
 
         // Create
-        FeatureToggle featureToggle = new FeatureToggle(manager);
-        TargetBranchPanel targetBranchPanel = new TargetBranchPanel(this.project, this.git);
+        FeatureToggle featureToggle = new FeatureToggle();
+        TargetBranchPanel targetBranchPanel = new TargetBranchPanel(this.project);
 
         VcsTree vcsTree = new VcsTree(this.project);
         CurrentBranch currentBranch = new CurrentBranch(this.git);
@@ -95,30 +95,31 @@ public class ToolWindowUI {
         // @todo: test with add new branches
 
 //        // @todo check invokeLater is relevant
-        SwingUtilities.invokeLater(() -> {
+//        SwingUtilities.invokeLater(() -> {
 
-            this.targetBranchPanel.createElementLater();
+        System.out.println("toolwindow init");
+        this.targetBranchPanel.createElementLater();
 
-            // Set Initial branch
+        // Set Initial branch
 //            this.setSourceBranch(this.git.getBranchName());
 
-            this.branchChangedListener();
+        this.branchChangedListener();
 
-            // Init the UI
-            manager.initOnOpenToolWindow();
+        // Init the UI
+        manager.initOnOpenToolWindow();
 
-            // Do Initial Compare and Update
+        // Do Initial Compare and Update
 //            System.out.println("doCompareAndUpdate ToolWindowUI");
 
-            if (manager.isInitialized()) {
-                manager.doCompareAndUpdate();
-                return;
-            }
-            manager.initialUpdate();
+        if (manager.isInitialized()) {
+            manager.doCompareAndUpdate();
+            return;
+        }
+        manager.initialUpdate();
 
 //            this.update();
 //
-        });
+//        });
 
     }
 

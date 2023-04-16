@@ -35,118 +35,123 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 
 public abstract class MyDvcsBranchPopup<Repo extends Repository> {
-  @NotNull protected final Project myProject;
-  @NotNull protected final AbstractRepositoryManager<Repo> myRepositoryManager;
-  @NotNull protected final DvcsSyncSettings myVcsSettings;
-  @NotNull protected final AbstractVcs myVcs;
-  @NotNull protected final DvcsMultiRootBranchConfig<Repo> myMultiRootBranchConfig;
+    @NotNull
+    protected final Project project;
+    @NotNull
+    protected final AbstractRepositoryManager<Repo> myRepositoryManager;
+    @NotNull
+    protected final DvcsSyncSettings myVcsSettings;
+    @NotNull
+    protected final AbstractVcs myVcs;
+    @NotNull
+    protected final DvcsMultiRootBranchConfig<Repo> myMultiRootBranchConfig;
 
-  @NotNull protected final Repo myCurrentRepository;
-  @NotNull protected final MyBranchActionGroupPopup myPopup;
-  @NotNull protected final String myRepoTitleInfo;
+    @NotNull
+    protected final Repo myCurrentRepository;
+    @NotNull
+    protected final MyBranchActionGroupPopup myPopup;
+    @NotNull
+    protected final String myRepoTitleInfo;
 
-  protected MyDvcsBranchPopup(@NotNull Repo currentRepository,
-                              @NotNull AbstractRepositoryManager<Repo> repositoryManager,
-                              @NotNull DvcsMultiRootBranchConfig<Repo> multiRootBranchConfig,
-                              @NotNull DvcsSyncSettings vcsSettings,
-                              @NotNull Condition<AnAction> preselectActionCondition, @Nullable String dimensionKey,
-                              @NotNull DataContext dataContext
-                              ) {
-    myProject = currentRepository.getProject();
-    myCurrentRepository = currentRepository;
-    myRepositoryManager = repositoryManager;
-    myVcs = currentRepository.getVcs();
-    myVcsSettings = vcsSettings;
-    myMultiRootBranchConfig = multiRootBranchConfig;
-    String title = "Target Branch";
-    myRepoTitleInfo = (myRepositoryManager.moreThanOneRoot() && myVcsSettings.getSyncSetting() == DvcsSyncSettings.Value.DONT_SYNC)
-                 ? " in " + DvcsUtil.getShortRepositoryName(currentRepository) : "";
-    myPopup = new MyBranchActionGroupPopup(
-            title + myRepoTitleInfo,
-            myProject,
-            preselectActionCondition,
-            createActions(),
-            dimensionKey,
-            dataContext
-    );
-    initBranchSyncPolicyIfNotInitialized();
-    //    warnThatBranchesDivergedIfNeeded();
-    if (myRepositoryManager.moreThanOneRoot()) {
-      myPopup.addToolbarAction(new TrackReposSynchronouslyAction(myVcsSettings), true);
-    }
-  }
-
-  @NotNull
-  public ListPopup asListPopup() {
-    return myPopup;
-  }
-
-  private void initBranchSyncPolicyIfNotInitialized() {
-    if (myRepositoryManager.moreThanOneRoot() && myVcsSettings.getSyncSetting() == DvcsSyncSettings.Value.NOT_DECIDED) {
-      if (myRepositoryManager.shouldProposeSyncControl()) {
-        //        notifyAboutSyncedBranches();
-        myVcsSettings.setSyncSetting(DvcsSyncSettings.Value.SYNC);
-      }
-      else {
-        myVcsSettings.setSyncSetting(DvcsSyncSettings.Value.DONT_SYNC);
-      }
-    }
-  }
-
-  @NotNull
-  private ActionGroup createActions() {
-    LightActionGroup popupGroup = new LightActionGroup(false);
-    AbstractRepositoryManager<Repo> repositoryManager = myRepositoryManager;
-    if (repositoryManager.moreThanOneRoot()) {
-      if (userWantsSyncControl()) {
-        fillWithCommonRepositoryActions(popupGroup, repositoryManager);
-      }
-      else {
-        fillPopupWithCurrentRepositoryActions(popupGroup, null);
-      }
-    }
-    else {
-      fillPopupWithCurrentRepositoryActions(popupGroup, null);
-    }
-    popupGroup.addSeparator();
-    return popupGroup;
-  }
-
-  protected boolean userWantsSyncControl() {
-    return (myVcsSettings.getSyncSetting() != DvcsSyncSettings.Value.DONT_SYNC);
-  }
-
-  protected abstract void fillWithCommonRepositoryActions(@NotNull LightActionGroup popupGroup,
-                                                          @NotNull AbstractRepositoryManager<Repo> repositoryManager);
-
-  @NotNull
-  protected List<Repo> filterRepositoriesNotOnThisBranch(@NotNull final String branch,
-                                                         @NotNull List<? extends Repo> allRepositories) {
-    return ContainerUtil.filter(allRepositories, repository -> !branch.equals(repository.getCurrentBranchName()));
-  }
-
-  @NotNull
-  protected abstract LightActionGroup createRepositoriesActions();
-
-  protected abstract void fillPopupWithCurrentRepositoryActions(@NotNull LightActionGroup popupGroup,
-                                                                @Nullable LightActionGroup actions);
-
-  private static class TrackReposSynchronouslyAction extends ToggleAction implements DumbAware {
-    private final DvcsSyncSettings myVcsSettings;
-
-    TrackReposSynchronouslyAction(@NotNull DvcsSyncSettings vcsSettings) {
-      super(DvcsBundle.message("sync.setting"), DvcsBundle.message("sync.setting.description", "repository"), null);
-      myVcsSettings = vcsSettings;
+    protected MyDvcsBranchPopup(@NotNull Repo currentRepository,
+                                @NotNull AbstractRepositoryManager<Repo> repositoryManager,
+                                @NotNull DvcsMultiRootBranchConfig<Repo> multiRootBranchConfig,
+                                @NotNull DvcsSyncSettings vcsSettings,
+                                @NotNull Condition<AnAction> preselectActionCondition, @Nullable String dimensionKey,
+                                @NotNull DataContext dataContext
+    ) {
+        project = currentRepository.getProject();
+        myCurrentRepository = currentRepository;
+        myRepositoryManager = repositoryManager;
+        myVcs = currentRepository.getVcs();
+        myVcsSettings = vcsSettings;
+        myMultiRootBranchConfig = multiRootBranchConfig;
+        String title = "Target Branch";
+        myRepoTitleInfo = (myRepositoryManager.moreThanOneRoot() && myVcsSettings.getSyncSetting() == DvcsSyncSettings.Value.DONT_SYNC)
+                ? " in " + DvcsUtil.getShortRepositoryName(currentRepository) : "";
+        myPopup = new MyBranchActionGroupPopup(
+                title + myRepoTitleInfo,
+                project,
+                preselectActionCondition,
+                createActions(),
+                dimensionKey,
+                dataContext
+        );
+        initBranchSyncPolicyIfNotInitialized();
+        //    warnThatBranchesDivergedIfNeeded();
+        if (myRepositoryManager.moreThanOneRoot()) {
+            myPopup.addToolbarAction(new TrackReposSynchronouslyAction(myVcsSettings), true);
+        }
     }
 
-    @Override
-    public boolean isSelected(@NotNull AnActionEvent e) {
-      return myVcsSettings.getSyncSetting() == DvcsSyncSettings.Value.SYNC;
+    @NotNull
+    public ListPopup asListPopup() {
+        return myPopup;
     }
 
-    @Override
-    public void setSelected(@NotNull AnActionEvent e, boolean state) {
-      myVcsSettings.setSyncSetting(state ? DvcsSyncSettings.Value.SYNC : DvcsSyncSettings.Value.DONT_SYNC);
+    private void initBranchSyncPolicyIfNotInitialized() {
+        if (myRepositoryManager.moreThanOneRoot() && myVcsSettings.getSyncSetting() == DvcsSyncSettings.Value.NOT_DECIDED) {
+            if (myRepositoryManager.shouldProposeSyncControl()) {
+                //        notifyAboutSyncedBranches();
+                myVcsSettings.setSyncSetting(DvcsSyncSettings.Value.SYNC);
+            } else {
+                myVcsSettings.setSyncSetting(DvcsSyncSettings.Value.DONT_SYNC);
+            }
+        }
     }
-  }
+
+    @NotNull
+    private ActionGroup createActions() {
+        LightActionGroup popupGroup = new LightActionGroup(false);
+        AbstractRepositoryManager<Repo> repositoryManager = myRepositoryManager;
+        if (repositoryManager.moreThanOneRoot()) {
+            if (userWantsSyncControl()) {
+                fillWithCommonRepositoryActions(popupGroup, repositoryManager);
+            } else {
+                fillPopupWithCurrentRepositoryActions(popupGroup, null);
+            }
+        } else {
+            fillPopupWithCurrentRepositoryActions(popupGroup, null);
+        }
+        popupGroup.addSeparator();
+        return popupGroup;
+    }
+
+    protected boolean userWantsSyncControl() {
+        return (myVcsSettings.getSyncSetting() != DvcsSyncSettings.Value.DONT_SYNC);
+    }
+
+    protected abstract void fillWithCommonRepositoryActions(@NotNull LightActionGroup popupGroup,
+                                                            @NotNull AbstractRepositoryManager<Repo> repositoryManager);
+
+    @NotNull
+    protected List<Repo> filterRepositoriesNotOnThisBranch(@NotNull final String branch,
+                                                           @NotNull List<? extends Repo> allRepositories) {
+        return ContainerUtil.filter(allRepositories, repository -> !branch.equals(repository.getCurrentBranchName()));
+    }
+
+    @NotNull
+    protected abstract LightActionGroup createRepositoriesActions();
+
+    protected abstract void fillPopupWithCurrentRepositoryActions(@NotNull LightActionGroup popupGroup,
+                                                                  @Nullable LightActionGroup actions);
+
+    private static class TrackReposSynchronouslyAction extends ToggleAction implements DumbAware {
+        private final DvcsSyncSettings myVcsSettings;
+
+        TrackReposSynchronouslyAction(@NotNull DvcsSyncSettings vcsSettings) {
+            super(DvcsBundle.message("sync.setting"), DvcsBundle.message("sync.setting.description", "repository"), null);
+            myVcsSettings = vcsSettings;
+        }
+
+        @Override
+        public boolean isSelected(@NotNull AnActionEvent e) {
+            return myVcsSettings.getSyncSetting() == DvcsSyncSettings.Value.SYNC;
+        }
+
+        @Override
+        public void setSelected(@NotNull AnActionEvent e, boolean state) {
+            myVcsSettings.setSyncSetting(state ? DvcsSyncSettings.Value.SYNC : DvcsSyncSettings.Value.DONT_SYNC);
+        }
+    }
 }

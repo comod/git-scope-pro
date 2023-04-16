@@ -11,11 +11,7 @@ import java.awt.event.MouseListener;
 
 public class FeatureToggle extends SteelCheckBox implements Element {
 
-    private final Manager manager;
-
-    public FeatureToggle(Manager manager) {
-
-        this.manager = manager;
+    public FeatureToggle() {
 
         this.createElement();
         this.addListener();
@@ -31,52 +27,8 @@ public class FeatureToggle extends SteelCheckBox implements Element {
 
     public void addListener() {
 
-        this.addActionListener(e -> {
-            manager.doCompareAndUpdate();
-        });
-
-//        this.addKeyListener(new KeyListener() {
-//            @Override
-//            public void keyTyped(KeyEvent e) {
-//
-//            }
-//
-//            @Override
-//            public void keyPressed(KeyEvent e) {
-//                manager.doCompareAndUpdate();
-//            }
-//
-//            @Override
-//            public void keyReleased(KeyEvent e) {
-//
-//            }
-//        });
-//
-//        this.addMouseListener(new MouseListener() {
-//            @Override
-//            public void mouseClicked(MouseEvent e) {
-//                manager.doCompareAndUpdate();
-//            }
-//
-//            @Override
-//            public void mousePressed(MouseEvent e) {
-//
-//            }
-//
-//            @Override
-//            public void mouseReleased(MouseEvent e) {
-//
-//            }
-//
-//            @Override
-//            public void mouseEntered(MouseEvent e) {
-//
-//            }
-//
-//            @Override
-//            public void mouseExited(MouseEvent e) {
-//
-//            }
+//        this.addActionListener(e -> {
+//            manager.doCompareAndUpdate();
 //        });
 
     }
