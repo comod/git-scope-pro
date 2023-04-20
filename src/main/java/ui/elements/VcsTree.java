@@ -23,7 +23,7 @@ public class VcsTree extends JPanel implements Element {
     }
 
     public void createElement() {
-        this.setLayout(new BorderLayout());
+//        this.setLayout(new BorderLayout());
 
         this.setLoading();
 
@@ -34,7 +34,7 @@ public class VcsTree extends JPanel implements Element {
     }
 
     public void setLoading() {
-        this.setComponent(centeredPanel(loadingIcon()));
+        this.setComponent(centeredLoadingPanel(loadingIcon()));
     }
 
     public void update(Collection<Change> changes) {
@@ -60,7 +60,7 @@ public class VcsTree extends JPanel implements Element {
 
     }
 
-    public JPanel centeredPanel(Component component){
+    public JPanel centeredLoadingPanel(Component component) {
         JPanel masterPane = new JPanel(new GridBagLayout());
 
         JPanel centerPane = new JPanel();

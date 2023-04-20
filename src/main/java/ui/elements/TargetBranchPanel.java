@@ -18,10 +18,9 @@ import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.util.function.Consumer;
 
-public class TargetBranchPanel extends JPanel implements Element {
+public class TargetBranchPanel extends JPanel {
 
     private final Project project;
-//    private final Manager manager;
 
     JButton label = new JButton("loading...");
 
@@ -36,43 +35,6 @@ public class TargetBranchPanel extends JPanel implements Element {
         this.addListener();
 
 //        this.manager = project.getService(Manager.class);
-
-    }
-
-    public void createElement() {
-
-        FlowLayout layout = (FlowLayout) this.getLayout();
-        layout.setVgap(0);
-
-        label.setBorderPainted(false);
-        label.setFocusable(false);
-
-        label.addMouseListener(new MouseListener() {
-            @Override
-            public void mouseClicked(MouseEvent e) {
-
-            }
-
-            @Override
-            public void mousePressed(MouseEvent e) {
-
-            }
-
-            @Override
-            public void mouseReleased(MouseEvent e) {
-
-            }
-
-            @Override
-            public void mouseEntered(MouseEvent e) {
-                label.setBorderPainted(true);
-            }
-
-            @Override
-            public void mouseExited(MouseEvent e) {
-                label.setBorderPainted(false);
-            }
-        });
 
     }
 

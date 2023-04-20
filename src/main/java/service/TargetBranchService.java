@@ -5,6 +5,7 @@ import example.ViewService;
 import git4idea.repo.GitRepository;
 import implementation.Manager;
 import implementation.targetBranchWidget.MyBranchAction;
+import model.valueObject.TargetBranch;
 import state.State;
 import ui.ToolWindowUI;
 import utils.Git;
@@ -24,7 +25,7 @@ public class TargetBranchService {
         this.git = project.getService(GitService.class);
     }
 
-    public String getTargetBranchDisplay(Map<String, String> targetBranch) {
+    public String getTargetBranchDisplay(TargetBranch targetBranch) {
 
         Map<String, String> list = new HashMap<>();
 
@@ -41,7 +42,7 @@ public class TargetBranchService {
 
     }
 
-    public String getTargetBranchByRepositoryDisplay(GitRepository repo, Map<String, String> targetBranch) {
+    public String getTargetBranchByRepositoryDisplay(GitRepository repo, TargetBranch targetBranch) {
 
 //        if (!isFeatureActive()) {
 //            return Git.BRANCH_HEAD;
@@ -56,30 +57,31 @@ public class TargetBranchService {
 
     }
 
-    public String getTargetBranchByRepository(GitRepository repo, Map<String, String> repositoryTargetBranchMap) {
+    public String getTargetBranchByRepository(GitRepository repo, TargetBranch repositoryTargetBranchMap) {
 
         if (repositoryTargetBranchMap == null) {
             return null;
         }
 
-        return repositoryTargetBranchMap.get(repo.toString());
+        return repositoryTargetBranchMap.getValue().get(repo.toString());
 
     }
 
-//
-//    public Boolean isHeadActually() {
-//
-//        AtomicReference<Boolean> isHead = new AtomicReference<>(true);
-//
-//        git.getRepositories().forEach(repo -> {
+    public Boolean isHeadActually(TargetBranch targetBranchByRepo) {
+
+        AtomicReference<Boolean> isHead = new AtomicReference<>(true);
+
+        // repo, git, changes, targetbranch cleanup @todo
+        git.getRepositories().forEach(repo -> {
+            String branchToCompare = targetBranchByRepo.getValue().get(repo.toString());
 //            String targetBranchByRepo = getTargetBranchByRepository(repo, t);
-//            if (targetBranchByRepo != null && !targetBranchByRepo.equals(Git.BRANCH_HEAD)) {
-//                isHead.set(false);
-//            }
-//        });
-//
-//        return isHead.get();
-//    }
+            if (branchToCompare != null && !branchToCompare.equals(Git.BRANCH_HEAD)) {
+                isHead.set(false);
+            }
+        });
+
+        return isHead.get();
+    }
 
 
 }

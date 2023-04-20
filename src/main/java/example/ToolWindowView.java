@@ -5,15 +5,13 @@ import java.awt.*;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.util.Calendar;
-import java.util.Objects;
 
 import com.intellij.openapi.project.Project;
 import implementation.targetBranchWidget.PopUpFactory;
+import model.MyModel;
 import org.apache.commons.lang3.StringUtils;
-import org.jetbrains.annotations.NotNull;
 
 import service.TargetBranchService;
-import ui.elements.FeatureToggle;
 import ui.elements.VcsTree;
 
 public class ToolWindowView {
@@ -38,47 +36,36 @@ public class ToolWindowView {
         myModel.getObservable().subscribe(model -> {
             render();
         });
-        contentPanel.setLayout(new BorderLayout(0, 20));
-        contentPanel.setBorder(BorderFactory.createEmptyBorder(40, 0, 0, 0));
-        contentPanel.add(createCalendarPanel(), BorderLayout.PAGE_START);
-        contentPanel.add(createControlsPanel(), BorderLayout.CENTER);
-//        ToolWindowUI toolWindowUI = new ToolWindowUI(project);
-//        contentPanel.add(toolWindowUI.getRootPanel());
-        render();
-    }
-
-    @NotNull
-    private JPanel createCalendarPanel() {
-        JPanel calendarPanel = new JPanel();
-        calendarPanel.add(currentTime);
-        return calendarPanel;
-    }
-
-    private void setIconLabel(JLabel label, String imagePath) {
-        label.setIcon(new ImageIcon(Objects.requireNonNull(getClass().getResource(imagePath))));
-    }
-
-    @NotNull
-    private JPanel createControlsPanel() {
+        contentPanel.setLayout(new BorderLayout(0, 0));
+//        contentPanel.setLayout(new FlowLayout());
+//        contentPanel.setBorder(null);
+//        contentPanel.add(createCalendarPanel(), BorderLayout.PAGE_START);
+//        JPanel topPanel = new JPanel();
+//        topPanel.add(tbp);
+//        contentPanel.add(topPanel);
         JPanel controlsPanel = new JPanel();
-        JButton refreshDateAndTimeButton = new JButton("Refresh");
-        refreshDateAndTimeButton.addActionListener(e -> someAction());
-        controlsPanel.add(refreshDateAndTimeButton);
-        JButton hideToolWindowButton = new JButton("Hide");
-//        hideToolWindowButton.addActionListener(e -> toolWindow.hide(null));
-        controlsPanel.add(hideToolWindowButton);
+//        JButton refreshDateAndTimeButton = new JButton("Refresh");
+//        refreshDateAndTimeButton.addActionListener(e -> someAction());
+//        controlsPanel.add(refreshDateAndTimeButton);
+//        JButton hideToolWindowButton = new JButton("Hide");
+////        hideToolWindowButton.addActionListener(e -> toolWindow.hide(null));
+//        controlsPanel.add(hideToolWindowButton);
 
-        FeatureToggle featureToggle = new FeatureToggle();
-        controlsPanel.add(featureToggle);
+//        FeatureToggle featureToggle = new FeatureToggle();
+//        controlsPanel.add(featureToggle);
 
         this.vcsTree = new VcsTree(this.project);
-
+        this.vcsTree.setLayout(new FlowLayout());
+        controlsPanel.setLayout(new FlowLayout());
+        controlsPanel.add(tbp);
         controlsPanel.add(vcsTree);
 //        TargetBranchPanel tbp = new TargetBranchPanel(this.project);
         addListener();
-        controlsPanel.add(tbp);
 
-        return controlsPanel;
+        contentPanel.add(controlsPanel);
+//        ToolWindowUI toolWindowUI = new ToolWindowUI(project);
+//        contentPanel.add(toolWindowUI.getRootPanel());
+        render();
     }
 
     private void addListener() {

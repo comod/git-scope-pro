@@ -22,7 +22,6 @@ import implementation.compare.MyGitCompareWithBranchAction;
 import implementation.lineStatusTracker.MyLineStatusTrackerImpl;
 import implementation.scope.MyScope;
 import org.jetbrains.annotations.NotNull;
-import ui.elements.TargetBranch;
 import ui.ToolWindowUI;
 import implementation.targetBranchWidget.MyBranchAction;
 import utils.Git;
@@ -50,7 +49,6 @@ public class Manager {
     private boolean initialized = false;
     private Collection<Change> changes;
     private Collection<Change> changesBefore;
-    private TargetBranch targetBranch;
     private Queue<String> queue;
     private MyGitCompareWithBranchAction myGitCompareWithBranchAction;
     private MessageBus messageBus;
@@ -103,8 +101,8 @@ public class Manager {
 
     public void initQueue() {
         queue = new LinkedList<>();
-        QueueWorker queueWorker = new QueueWorker(queue);
-        queueWorker.start();
+//        QueueWorker queueWorker = new QueueWorker(queue);
+//        queueWorker.start();
     }
 
 //    public Git getGit() {
@@ -252,41 +250,36 @@ public class Manager {
 //        });
 
     }
-
-    public void initOnOpenToolWindow() {
-        targetBranch.initOnOpenToolWindow();
-    }
-
-    public String getTargetBranchDisplay() {
-        return targetBranch.getTargetBranchDisplay();
-    }
-
-    public String getTargetBranchByRepository(GitRepository repo) {
-        return targetBranch.getTargetBranchByRepository(repo);
-    }
-
-    public String getTargetBranchByRepositoryDisplay(GitRepository repo) {
-        return targetBranch.getTargetBranchByRepositoryDisplay(repo);
-    }
-
-    public void targetBranchListener(MyBranchAction myBranchAction) {
-//        System.out.println("doCompareAndUpdate targetBranchListener");
-        targetBranch.targetBranchListener(myBranchAction, aVoid -> doCompareAndUpdate());
-    }
-
-    public void doCompareAndUpdate(@NotNull VirtualFile virtualFile) {
-
-        if (!this.initialized) {
-            return;
-        }
-
-        if (!this.targetBranch.isFeatureActive()) {
-            // updateFromHEAD(virtualFile); //@todo
-            updateFromHEAD();
-            return;
-        }
-
-    }
+//
+//    public void initOnOpenToolWindow() {
+//        targetBranch.initOnOpenToolWindow();
+//    }
+//
+//    public String getTargetBranchDisplay() {
+//        return targetBranch.getTargetBranchDisplay();
+//    }
+//
+//    public String getTargetBranchByRepository(GitRepository repo) {
+//        return targetBranch.getTargetBranchByRepository(repo);
+//    }
+//
+//    public String getTargetBranchByRepositoryDisplay(GitRepository repo) {
+//        return targetBranch.getTargetBranchByRepositoryDisplay(repo);
+//    }
+//
+//    public void doCompareAndUpdate(@NotNull VirtualFile virtualFile) {
+//
+//        if (!this.initialized) {
+//            return;
+//        }
+//
+//        if (!this.targetBranch.isFeatureActive()) {
+//            // updateFromHEAD(virtualFile); //@todo
+//            updateFromHEAD();
+//            return;
+//        }
+//
+//    }
 
     public void doCompareAndUpdate() {
 
@@ -534,70 +527,10 @@ public class Manager {
 
     public void toggleHeadAction() {
 
-        this.targetBranch.toggleFeature();
+//        this.targetBranch.toggleFeature();
 
 //        System.out.println("doCompareAndUpdate toggleHeadAction");
         this.doCompareAndUpdate();
-
-    }
-
-    class QueueWorker extends Thread {
-
-        private final Queue<String> queue;
-        private final Iterator iterator;
-        private boolean busy;
-
-        public QueueWorker(Queue<String> queue) {
-            this.queue = queue;
-            this.iterator = queue.iterator();
-        }
-
-        public void run() {
-
-            while (true) {
-
-                try {
-                    sleep(100);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-
-                if (busy) {
-                    // System.out.println("x");
-                    continue;
-                }
-                if (!iterator.hasNext()) {
-                    // System.out.println(".");
-                    continue;
-                }
-
-                queue.clear();
-                doJob();
-
-            }
-
-        }
-
-        public void doJob() {
-
-            busy = true;
-            // System.out.println("doQueueJob");
-
-            git.getRepositories().forEach(repo -> {
-                String targetBranchByRepo = getTargetBranchByRepository(repo);
-                if (targetBranchByRepo == null) {
-                    // Notification.notify(Defs.NAME, "Choose a Branch");
-                    toolWindowUI.showTargetBranchPopupAtToolWindow();
-                    targetBranchByRepo = Git.BRANCH_HEAD;
-                }
-
-                myGitCompareWithBranchAction.collectChangesAndProcess(project, repo, targetBranchByRepo, changes -> {
-                    busy = false;
-                    onJobDone(repo, changes);
-                });
-            });
-
-        }
 
     }
 }

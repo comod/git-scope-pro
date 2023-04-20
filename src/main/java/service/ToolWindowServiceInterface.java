@@ -1,6 +1,6 @@
 package service;
 
-import example.MyModel;
+import model.MyModel;
 
 public interface ToolWindowServiceInterface {
     void addTab(MyModel myModel, String tabName);

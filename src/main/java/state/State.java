@@ -4,12 +4,12 @@ import com.intellij.openapi.components.PersistentStateComponent;
 import com.intellij.openapi.components.Storage;
 import com.intellij.openapi.project.Project;
 import com.intellij.util.xmlb.XmlSerializerUtil;
-import com.intellij.util.xmlb.annotations.Attribute;
-import com.intellij.util.xmlb.annotations.OptionTag;
+import model.MyModel;
 import org.jetbrains.annotations.Nullable;
 
-import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -41,10 +41,24 @@ public class State implements PersistentStateComponent<State> {
 
     public Map<String, String> toolWindowTabMap = new HashMap<>();
 
+    public List<MyModel> collection = new ArrayList<>();
+
     @Nullable
     public static State getInstance(Project project) {
         State sfec = project.getService(State.class);
         return sfec;
+    }
+
+    public List<MyModel> getCollection() {
+        return collection;
+    }
+
+    public void setCollection(List<MyModel> collection) {
+        this.collection = collection;
+    }
+
+    public void addToCollection(MyModel model) {
+        this.collection.add(model);
     }
 
     public Map<String, String> getToolWindowTabMap() {

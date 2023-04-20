@@ -31,6 +31,7 @@ import git4idea.branch.GitBranchesCollection;
 import git4idea.repo.GitRepository;
 import git4idea.ui.branch.GitBranchManager;
 import implementation.Manager;
+import model.valueObject.TargetBranch;
 import one.util.streamex.StreamEx;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -220,7 +221,7 @@ class MyGitBranchPopupActions {
 //            MyBranchAction myBranchAction = (MyBranchAction) e;
             Map<String, String> repositoryTargetBranchMap = new HashMap<>();
             repositoryTargetBranchMap.put(myBranchAction.getRepoName(), myBranchAction.getBranchName());
-            viewService.getCurrent().setTargetBranch(repositoryTargetBranchMap);
+            viewService.getCurrent().setTargetBranch(new TargetBranch(repositoryTargetBranchMap));
         }
 
         public Boolean getHide() {

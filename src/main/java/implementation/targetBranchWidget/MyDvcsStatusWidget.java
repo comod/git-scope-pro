@@ -150,7 +150,8 @@ public abstract class MyDvcsStatusWidget<T extends Repository> extends EditorBas
         if (repository == null) return;
 
 //    int maxLength = MAX_STRING.length() - 1; // -1, because there are arrows indicating that it is a popup
-        myText = manager.getTargetBranchDisplay();
+//        myText = manager.getTargetBranchDisplay();
+        myText = "fixme";
 //    myTooltip = getToolTip(project);
         if (myStatusBar != null) {
             myStatusBar.updateWidget(ID());

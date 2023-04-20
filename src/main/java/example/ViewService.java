@@ -1,52 +1,75 @@
 package example;
 
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.vcs.changes.Change;
+import model.MyModel;
+import org.jetbrains.annotations.NotNull;
 import service.ChangesService;
 import service.TargetBranchService;
 import service.ToolWindowServiceInterface;
+import state.State;
 
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 
 public class ViewService {
 
-    public static TabRecord defaultRef = new TabRecord(TabRecord.head);
     private final Project project;
     private final ToolWindowServiceInterface toolWindowService;
     private final TargetBranchService targetBranchService;
     private final ChangesService changesService;
-    public Map<TabRecord, MyModel> map = new HashMap<>();
+    private final State state;
 
-    public TabRecord currentTab;
+
+    public Integer currentTabIndex = 0;
 
     public ViewService(Project project) {
         this.project = project;
         this.toolWindowService = project.getService(ToolWindowServiceInterface.class);
         this.changesService = project.getService(ChangesService.class);
         this.targetBranchService = project.getService(TargetBranchService.class);
+        this.state = State.getInstance(project);
     }
 
-    public void addTab() {
-        String tabName = "TabName";
-//        String tabName = null;
+    public void init() {
+        List<MyModel> collection = state.getCollection();
+        if (collection.size() == 0) {
+            // new default "set"
+            MyModel model = createModel();
+            addModel(model);
+        }
 
-        ViewService viewService = project.getService(ViewService.class);
-        TabRecord tabRecord = new TabRecord(tabName);
-        MyModel model = viewService.getModel(tabRecord);
-        toolWindowService.addTab(model, tabName);
+        collection.forEach(this::subscribeToObservable);
+    }
+
+    public void initTabs() {
+        List<MyModel> collection = state.getCollection();
+        collection.forEach(model -> {
+            String tabName = "+";
+            toolWindowService.addTab(model, tabName);
+        });
+    }
+
+    @NotNull
+    private MyModel createModel() {
+        return new MyModel();
+    }
+
+    private void subscribeToObservable(MyModel model) {
         model.getObservable().subscribe(field -> {
             switch (field) {
 //                case field1 -> System.out.println("yolo:" + field);
                 case targetBranch -> {
 
+                    Boolean isHead = targetBranchService.isHeadActually(model.getTargetBranch());
+                    System.out.println("isHed" + isHead);
+
                     toolWindowService.changeTabName(
                             this.targetBranchService.
                                     getTargetBranchDisplay(model.getTargetBranch())
                     );
-                    Collection<Change> changes = changesService.getOnlyLocalChanges();
-                    model.setChanges(changes);
+//                    model.getTargetBranch().get()
+//                    Collection<Change> changes = changesService.getOnlyLocalChanges();
+                    changesService.collectChanges(model.getTargetBranch(), model::setChanges);
+//                    model.setChanges(changes);
                 }
 //                case changes -> System.out.println("changes!!:" + field);
             }
@@ -54,21 +77,12 @@ public class ViewService {
         });
     }
 
-    public MyModel getModel(TabRecord tabRecord) {
-        if (!this.map.containsKey(tabRecord)) {
-            currentTab = tabRecord;
-            MyModel model = new MyModel(tabRecord);
-            setModel(tabRecord, model);
-        }
-        return this.map.get(tabRecord);
-    }
-
     public MyModel getCurrent() {
-        return getModel(currentTab);
+        return state.getCollection().get(currentTabIndex);
     }
 
-    public void setModel(TabRecord ref, MyModel model) {
-        this.map.put(ref, model);
+    public void addModel(MyModel model) {
+        state.addToCollection(model);
     }
 
 }

@@ -103,7 +103,8 @@ public class MyGitBranchPopup extends MyDvcsBranchPopup<GitRepository> {
                     return new RootAction<>(
                             repo,
                             new MyGitBranchPopupActions(repo.getProject(), repo).createActions(),
-                            manager.getTargetBranchByRepositoryDisplay(repo)
+                            null
+//                            manager.getTargetBranchByRepositoryDisplay(repo)
                     );
                 }
         );

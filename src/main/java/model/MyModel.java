@@ -1,27 +1,17 @@
-package example;
-
+package model;
 
 import com.intellij.openapi.vcs.changes.Change;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.subjects.PublishSubject;
+import model.valueObject.TargetBranch;
 
 import java.util.Collection;
-import java.util.Map;
 
 public class MyModel {
-    private final TabRecord tabRecord;
     private final PublishSubject<MyModel.field> changeObservable = PublishSubject.create();
     private String field1;
-    private Map<String, String> targetBranch;
+    private TargetBranch targetBranch;
     private Collection<Change> changes;
-
-    public MyModel(TabRecord ref) {
-        this.tabRecord = ref;
-    }
-
-    public TabRecord getTabRecord() {
-        return tabRecord;
-    }
 
     public String getField1() {
         return field1;
@@ -32,15 +22,11 @@ public class MyModel {
         changeObservable.onNext(field.field1);
     }
 
-    public String getTabRecordName() {
-        return this.getTabRecord().branchName();
-    }
-
-    public Map<String, String> getTargetBranch() {
+    public TargetBranch getTargetBranch() {
         return targetBranch;
     }
 
-    public void setTargetBranch(Map<String, String> targetBranch) {
+    public void setTargetBranch(TargetBranch targetBranch) {
         this.targetBranch = targetBranch;
         changeObservable.onNext(field.targetBranch);
     }
@@ -65,7 +51,7 @@ public class MyModel {
                 '}';
     }
 
-    enum field {
+    public enum field {
         field1,
         changes,
         targetBranch

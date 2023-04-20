@@ -106,7 +106,7 @@ public class ToolWindowUI {
         this.branchChangedListener();
 
         // Init the UI
-        manager.initOnOpenToolWindow();
+//        manager.initOnOpenToolWindow();
 
         // Do Initial Compare and Update
 //            System.out.println("doCompareAndUpdate ToolWindowUI");
