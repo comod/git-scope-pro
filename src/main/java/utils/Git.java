@@ -16,7 +16,7 @@ public class Git {
 
     private final GitRepositoryManager repositoryManager;
 
-    private Project project;
+    private final Project project;
     private GitRepository repository;
 
     private VirtualFile rootGitFile;

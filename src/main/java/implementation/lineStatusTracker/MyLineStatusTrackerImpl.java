@@ -27,20 +27,18 @@ import static java.lang.Thread.sleep;
 
 public class MyLineStatusTrackerImpl {
 
-    private final MessageBus messageBus;
     private final MessageBusConnection messageBusConnection;
 
-    private Project project;
+    private final Project project;
     private Collection<Change> changes;
 
-//    private List<MyLineStatusTrackerManager> myLineStatusTrackerManagerCollection;
     private Map<String, MyLineStatusTrackerManager> myLineStatusTrackerManagerCollection;
 
     public MyLineStatusTrackerImpl(Project project) {
 
         this.project = project;
 
-        this.messageBus = this.project.getMessageBus();
+        MessageBus messageBus = this.project.getMessageBus();
         this.messageBusConnection = messageBus.connect();
 
         // Deactivate the Main Line Status Manager
@@ -50,7 +48,6 @@ public class MyLineStatusTrackerImpl {
         editorListener();
 
         init();
-
     }
 
     private void init() {
@@ -172,7 +169,7 @@ public class MyLineStatusTrackerImpl {
             }
 
             VirtualFile vcsFile;
-            Boolean isOperationUseful = false;
+            boolean isOperationUseful = false;
             ContentRevision contentRevision = null;
 
             for (Change change : changes) {
@@ -224,7 +221,6 @@ public class MyLineStatusTrackerImpl {
             return;
         }
 
-//        System.out.println("setBaseRevision");
         myLineStatusTrackerManager.setBaseRevision(content);
 
     }

@@ -22,10 +22,7 @@ import com.intellij.dvcs.repo.AbstractRepositoryManager;
 import com.intellij.dvcs.repo.Repository;
 import com.intellij.dvcs.ui.DvcsBundle;
 import com.intellij.dvcs.ui.LightActionGroup;
-import com.intellij.openapi.actionSystem.ActionGroup;
-import com.intellij.openapi.actionSystem.AnAction;
-import com.intellij.openapi.actionSystem.AnActionEvent;
-import com.intellij.openapi.actionSystem.ToggleAction;
+import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.project.DumbAware;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.popup.ListPopup;
@@ -52,7 +49,9 @@ public abstract class MyDvcsBranchPopup<Repo extends Repository> {
                               @NotNull AbstractRepositoryManager<Repo> repositoryManager,
                               @NotNull DvcsMultiRootBranchConfig<Repo> multiRootBranchConfig,
                               @NotNull DvcsSyncSettings vcsSettings,
-                              @NotNull Condition<AnAction> preselectActionCondition, @Nullable String dimensionKey) {
+                              @NotNull Condition<AnAction> preselectActionCondition, @Nullable String dimensionKey,
+                              @NotNull DataContext dataContext
+                              ) {
     myProject = currentRepository.getProject();
     myCurrentRepository = currentRepository;
     myRepositoryManager = repositoryManager;
@@ -62,7 +61,14 @@ public abstract class MyDvcsBranchPopup<Repo extends Repository> {
     String title = "Target Branch";
     myRepoTitleInfo = (myRepositoryManager.moreThanOneRoot() && myVcsSettings.getSyncSetting() == DvcsSyncSettings.Value.DONT_SYNC)
                  ? " in " + DvcsUtil.getShortRepositoryName(currentRepository) : "";
-    myPopup = new MyBranchActionGroupPopup(title + myRepoTitleInfo, myProject, preselectActionCondition, createActions(), dimensionKey);
+    myPopup = new MyBranchActionGroupPopup(
+            title + myRepoTitleInfo,
+            myProject,
+            preselectActionCondition,
+            createActions(),
+            dimensionKey,
+            dataContext
+    );
     initBranchSyncPolicyIfNotInitialized();
     //    warnThatBranchesDivergedIfNeeded();
     if (myRepositoryManager.moreThanOneRoot()) {

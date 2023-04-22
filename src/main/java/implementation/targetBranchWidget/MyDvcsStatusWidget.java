@@ -40,7 +40,7 @@ public abstract class MyDvcsStatusWidget<T extends Repository> extends EditorBas
     super(project);
     myPrefix = prefix;
 
-    manager = ServiceManager.getService(project, Manager.class);
+    manager = project.getService(Manager.class);
   }
 
   @Nullable

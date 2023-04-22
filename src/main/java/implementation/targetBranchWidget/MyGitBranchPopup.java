@@ -38,12 +38,23 @@ public class MyGitBranchPopup extends MyDvcsBranchPopup<GitRepository> {
      *                          In the case of synchronized branch operations current repository matter much less, but sometimes is used,
      *                          for example, it is preselected in the repositories combobox in the compare branches dialog.
      */
-    public static MyGitBranchPopup getInstance(@NotNull final Project project, @NotNull GitRepository currentRepository) {
-        manager = ServiceManager.getService(project, Manager.class);
+    public static MyGitBranchPopup getInstance(
+            @NotNull final Project project,
+            @NotNull GitRepository currentRepository,
+            @NotNull DataContext dataContext
+    ) {
+        manager = project.getService(Manager.class);
         final GitVcsSettings vcsSettings = GitVcsSettings.getInstance(project);
         Condition<AnAction> preselectActionCondition = action -> false;
 
-        return new MyGitBranchPopup(project, currentRepository, getRepositoryManager(project), vcsSettings, preselectActionCondition);
+        return new MyGitBranchPopup(
+                project,
+                currentRepository,
+                getRepositoryManager(project),
+                vcsSettings,
+                preselectActionCondition,
+                dataContext
+        );
     }
 
     private MyGitBranchPopup(
@@ -51,17 +62,19 @@ public class MyGitBranchPopup extends MyDvcsBranchPopup<GitRepository> {
         @NotNull GitRepository currentRepository,
         @NotNull GitRepositoryManager repositoryManager,
         @NotNull GitVcsSettings vcsSettings,
-        @NotNull Condition<AnAction> preselectActionCondition
+        @NotNull Condition<AnAction> preselectActionCondition,
+        @NotNull DataContext dataContext
     ) {
 
         super(
             // currentRepository,
-            (ServiceManager.getService(project, Manager.class)).getGit().getRepository(),
+            (project.getService(Manager.class)).getGit().getRepository(),
             repositoryManager,
             new GitMultiRootBranchConfig(repositoryManager.getRepositories()),
             vcsSettings,
             preselectActionCondition,
-            DIMENSION_SERVICE_KEY
+            DIMENSION_SERVICE_KEY,
+            dataContext
         );
 
     }

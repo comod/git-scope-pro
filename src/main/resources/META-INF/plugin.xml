@@ -1,28 +1,53 @@
+<!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
 <idea-plugin>
-
+    <!-- Public plugin name should be written in Title Case.
+         Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-name -->
+    <!-- Unique identifier of the plugin. It should be FQN. It cannot be changed between the plugin versions. -->
     <id>Git Scope</id>
     <name>Git Scope</name>
     <description>
-        1. Adds a tool window with a change browser (similar to Version Control) which shows the current diff of your **GIT SCOPE**.
-        2. Adapts the Line Status according to your **GIT SCOPE**. Usually this built-in feature shows only the current "HEAD" changes.
-        3. Adds a Custom *Scope* (inspections, search/replaces, ect) "Git Scope (Files)", which means search results will be filtered according to **GIT SCOPE**
+        <![CDATA[
+        <ul>
+            <li> 1. Adds a tool window with a change browser (similar to Version Control) which shows the current diff of your
+            **GIT SCOPE**.
+            <li> 2. Adapts the Line Status according to your **GIT SCOPE**. Usually this built-in feature shows only the current
+            "HEAD" changes.
+            <li> 3. Adds a Custom *Scope* (inspections, search/replaces, ect) "Git Scope (Files)", which means search results
+            will be filtered according to **GIT SCOPE**
+        </ul>
+
+        <h1>Announcement</h1>
+        This plugin will no longer be free in the future!
+        Keeping this plugin alive can be very challenging and time-consuming.
+        <br/>
+        Thank you for your understanding!
+        ]]>
     </description>
-    <version>3.0.4</version>
+    <version>3.0.6</version>
     <vendor>Michael Wölk</vendor>
 
-    <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/build_number_ranges.html for description -->
-    <idea-version since-build="194"/>
+    <change-notes>
+        <![CDATA[
+        <h1>Fixes</h1>
+        Fixed compatibility issues for latest versions, removed internal API usage, added logo and toolbar icon.<br/>
+        ]]>
+    </change-notes>
 
-    <depends>com.intellij.modules.lang</depends>
+    <!-- Product and plugin compatibility requirements.
+         Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
+    <depends>com.intellij.modules.platform</depends>
     <depends>Git4Idea</depends>
 
-    <!-- Plugin's application components (On Start IDE) -->
-    <application-components>
-        <component>
-            <implementation-class>system.OnStart</implementation-class>
-        </component>
-    </application-components>
+    <!-- https://plugins.jetbrains.com/docs/intellij/build-number-ranges.html#intellij-platform-based-products-of-recent-ide-versions-->
+    <idea-version since-build="211"/>
 
+    <!-- Plugin's application components (On Start IDE) -->
+    <!--    https://plugins.jetbrains.com/docs/intellij/plugin-listeners.html#defining-application-level-listeners-->
+    <applicationListeners>
+        <listener
+                class="system.MyProjectManagerListener"
+                topic="com.intellij.openapi.project.ProjectManagerListener"/>
+    </applicationListeners>
     <!-- Plugin's project components -->
     <project-components>
         <component>
@@ -31,18 +56,24 @@
         </component>
     </project-components>
 
+    <!-- Extension points defined by the plugin.
+         Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
     <extensions defaultExtensionNs="com.intellij">
 
-        <!-- Tool window -->
-<!--        <toolWindow id="Git Scope" secondary="true" anchor="right" factoryClass="myToolWindow.MyToolWindowFactory"/>-->
-        <toolWindow id="Git Scope" secondary="true" anchor="right" factoryClass="ui.ToolWindowUIFactory"/>
-
+        <!-- ToolWindow -->
+        <toolWindow
+                id="Git Scope"
+                secondary="true"
+                icon="AllIcons.Actions.Diff"
+                anchor="left"
+                factoryClass="ui.ToolWindowUIFactory"
+        />
         <!-- Config (Persistent) -->
         <projectService serviceImplementation="state.State"/>
 
-        <projectService serviceImplementation="implementation.Manager" />
+        <projectService serviceImplementation="implementation.Manager"/>
 
-        <statusBarWidgetProvider implementation="ui.TargetBranchStatusWidgetProvider"/>
+        <!--        <statusBarWidgetProvider implementation="ui.TargetBranchStatusWidgetProvider"/>-->
 
     </extensions>
 

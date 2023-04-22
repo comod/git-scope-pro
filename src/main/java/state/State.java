@@ -102,7 +102,7 @@ public class State implements PersistentStateComponent<State> {
 
     @Nullable
     public static State getInstance(Project project) {
-        State sfec = ServiceManager.getService(project, State.class);
+        State sfec = project.getService(State.class);
         return sfec;
     }
 }

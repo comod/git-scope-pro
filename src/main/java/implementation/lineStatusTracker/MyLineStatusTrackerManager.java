@@ -17,7 +17,7 @@ import java.util.List;
 class MyLineStatusTrackerManager {
 
     @NotNull
-    private SimpleLineStatusTracker myLineStatusTracker;
+    private final SimpleLineStatusTracker myLineStatusTracker;
 
     MyLineStatusTrackerManager(Project project, Document document) {
         myLineStatusTracker = new SimpleLineStatusTracker(project, document, MyLineStatusMarkerRenderer::new);
@@ -25,10 +25,17 @@ class MyLineStatusTrackerManager {
 
     void setBaseRevision(CharSequence vcsContent) {
 //        SwingUtilities.invokeLater(() -> {
+//            System.out.println("setBaseRevision!");
             if (vcsContent == null) {
+
+                System.out.println("vcsContent == null");
                 return;
             }
-            this.myLineStatusTracker.setBaseRevision(vcsContent);
+            try {
+                this.myLineStatusTracker.setBaseRevision(vcsContent);
+            } catch (Exception e) {
+            System.out.println("avoid exception be thrown!");
+            }
 //        });
     }
 
@@ -36,8 +43,8 @@ class MyLineStatusTrackerManager {
         this.myLineStatusTracker.release();
     }
 
-    private class MyLineStatusMarkerRenderer extends LineStatusMarkerPopupRenderer {
-        MyLineStatusMarkerRenderer(@NotNull LineStatusTrackerBase tracker) {
+    private static class MyLineStatusMarkerRenderer extends LineStatusMarkerPopupRenderer {
+        MyLineStatusMarkerRenderer(@NotNull LineStatusTrackerI tracker) {
             super(tracker);
         }
 

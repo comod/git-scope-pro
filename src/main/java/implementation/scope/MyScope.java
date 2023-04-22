@@ -7,23 +7,22 @@ import com.intellij.psi.search.scope.packageSet.NamedScopeManager;
 import com.intellij.util.ArrayUtil;
 import system.Defs;
 
+import java.util.function.Supplier;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
 public class MyScope {
 
-    public static final String OLD_SCOPE_NAME = Defs.APPLICATION_NAME + " (Files)";
-    public static final String SCOPE_NAME = Defs.APPLICATION_NAME;
+    public static final String OLD_SCOPE_NAME = Defs.APPLICATION_NAME;
+    public static final String SCOPE_ID = "GitScope";
 
-    private final Project project;
     private final NamedScopeManager scopeManager;
     private MyPackageSet myPackageSet;
 
     public MyScope(Project project) {
 
-        this.project = project;
-        this.scopeManager = NamedScopeManager.getInstance(this.project);
+        this.scopeManager = NamedScopeManager.getInstance(project);
 
         this.createScope();
 
@@ -31,19 +30,19 @@ public class MyScope {
 
     public void createScope() {
         this.myPackageSet = new MyPackageSet();
-        NamedScope myScope = new NamedScope(SCOPE_NAME, this.myPackageSet);
+        NamedScope myScope = new NamedScope(SCOPE_ID, new MyScopeNameSupplier(), Defs.ICON, this.myPackageSet);
         boolean scopeExists = false;
 
         NamedScope[] scopes = this.scopeManager.getEditableScopes();
         NamedScope[] newNamedScopes = new NamedScope[0];
 
         for (NamedScope scope : scopes) {
-            if (SCOPE_NAME.contentEquals(scope.getName())) {
+            if (SCOPE_ID.contentEquals(scope.getScopeId())) {
                 scopeExists = true;
                 scope = myScope;
             }
             // @todo Delete in newer Versions after some time
-            if (OLD_SCOPE_NAME.contentEquals(scope.getName())) {
+            if (OLD_SCOPE_NAME.contentEquals(scope.getPresentableName())) {
                 continue;
             }
             newNamedScopes = ArrayUtil.append(newNamedScopes, scope);

@@ -29,7 +29,7 @@ public class TargetBranch {
         this.state = state;
         this.git = git;
 //        this.toolWindowUI = toolWindowUI;
-        this.manager = ServiceManager.getService(project, Manager.class);
+        this.manager = project.getService(Manager.class);
 
     }
 

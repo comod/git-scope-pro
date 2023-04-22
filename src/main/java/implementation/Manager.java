@@ -54,9 +54,8 @@ public class Manager {
 
     private Collection<Change> changes;
     private Collection<Change> changesBefore;
-    private Map<GitRepository, Collection<Change>> changesByRepoMap = new HashMap<>();
+    private final Map<GitRepository, Collection<Change>> changesByRepoMap = new HashMap<>();
 
-    private State state;
     private TargetBranch targetBranch;
 
     private Queue<String> queue;
@@ -76,7 +75,7 @@ public class Manager {
 
     public void init(Project project) {
 
-        this.state = State.getInstance(project);
+        State state = State.getInstance(project);
 
         this.project = project;
 
@@ -164,33 +163,6 @@ public class Manager {
     public boolean isInitialized() {
         return initialized;
     }
-
-//    class InitialUpdate extends Thread {
-//
-//        public InitialUpdate() {
-//            // ...
-//        }
-//
-//        public void run() {
-//
-//            // @todo replace this hacky crap with something event based
-//
-//            try {
-//                sleep(500);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//            SwingUtilities.invokeLater(() -> {
-//
-////                    System.out.println("InitialUpdate run");
-//                    setInitialized(true);
-//                    doCompareAndUpdate();
-//
-//                }
-//            );
-//        }
-//
-//    }
 
         private void editorListener() {
 
@@ -286,7 +258,7 @@ public class Manager {
 //                System.out.println("fileStatusChangedVirtualFile");
                 doCompareAndUpdate(virtualFile);
             }
-        });
+        }, () -> {});
 
     }
 
@@ -451,8 +423,7 @@ public class Manager {
             }
 
             Stream<Change> combinedStream = Stream.of(changes, changesByRepo).flatMap(Collection::stream);
-            Collection<Change> collectionCombined = combinedStream.collect(Collectors.toList());
-            changes = collectionCombined;
+            changes = combinedStream.collect(Collectors.toList());
 
         });
 
@@ -474,7 +445,7 @@ public class Manager {
 
 //        System.out.println("+++ onAfterUpdate +++");
 
-        Boolean changesAreTheSame = false;
+        boolean changesAreTheSame = false;
         if (changesBefore != null && changesBefore.equals(changes)) {
             changesAreTheSame = true;
         }

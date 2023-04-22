@@ -2,19 +2,12 @@ package ui.elements;
 
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.changes.Change;
-import com.intellij.openapi.vcs.changes.ui.ChangeNodeDecorator;
-import com.intellij.openapi.vcs.changes.ui.ChangesBrowser;
 import com.intellij.openapi.vcs.changes.ui.SimpleChangesBrowser;
-import com.intellij.openapi.vcs.changes.ui.TreeModelBuilder;
-import com.intellij.util.containers.ContainerUtil;
-import org.jetbrains.annotations.NotNull;
 import ui.MySimpleChangesBrowser;
 
 import javax.swing.*;
-import javax.swing.tree.DefaultTreeModel;
 import java.awt.*;
 import java.util.Collection;
-import java.util.List;
 
 public class VcsTree extends JPanel implements Element {
 
@@ -82,6 +75,7 @@ public class VcsTree extends JPanel implements Element {
 
         ClassLoader cldr = this.getClass().getClassLoader();
         java.net.URL imageURL = cldr.getResource("loading.png");
+        assert imageURL != null;
         ImageIcon imageIcon = new ImageIcon(imageURL);
         JLabel iconLabel = new JLabel();
         iconLabel.setIcon(imageIcon);

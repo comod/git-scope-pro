@@ -1,10 +1,18 @@
 package ui.elements;
 
-import com.intellij.openapi.components.ServiceManager;
+import com.intellij.dvcs.DvcsUtil;
+import com.intellij.ide.DataManager;
+import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.popup.ListPopup;
+import git4idea.GitUtil;
+import git4idea.config.GitVcsSettings;
+import git4idea.repo.GitRepository;
 import implementation.Manager;
 import implementation.targetBranchWidget.MyGitBranchPopup;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import utils.Git;
 
 import javax.swing.*;
@@ -31,7 +39,7 @@ public class TargetBranchPanel extends JPanel implements Element {
         this.createElement();
         this.addListener();
 
-        this.manager = ServiceManager.getService(project, Manager.class);
+        this.manager = project.getService(Manager.class);
 
     }
 
@@ -81,7 +89,13 @@ public class TargetBranchPanel extends JPanel implements Element {
             label.addMouseListener(new MouseListener() {
                 @Override
                 public void mouseClicked(MouseEvent e) {
-                    MyGitBranchPopup myGitBranchPopup = MyGitBranchPopup.getInstance(project, git.getRepository());
+
+                    GitVcsSettings mySettings = GitVcsSettings.getInstance(project);
+                    @Nullable GitRepository repository = DvcsUtil.guessCurrentRepositoryQuick(project, GitUtil.getRepositoryManager(project), mySettings.getRecentRootPath());
+//                    GitBranchesUsageCollector.branchWidgetClicked();
+                    assert repository != null;
+                    MyGitBranchPopup myGitBranchPopup = MyGitBranchPopup.getInstance(project, repository, DataManager.getInstance().getDataContext(e.getComponent()));
+//                    MyGitBranchPopup myGitBranchPopup = MyGitBranchPopup.getInstance(project, git.getRepository());
                     myGitBranchPopup.setPopupLastOpenedAt(TargetBranchPanel.class);
                     showPopup(label);
                 }
@@ -111,10 +125,14 @@ public class TargetBranchPanel extends JPanel implements Element {
 
     }
 
-    public void showPopup() {
+    public void showPopup(@NotNull AnActionEvent e) {
 
 //        System.out.println("showPopup");
-        MyGitBranchPopup myGitBranchPopup = MyGitBranchPopup.getInstance(project, git.getRepository());
+        GitVcsSettings mySettings = GitVcsSettings.getInstance(project);
+        @Nullable GitRepository repository = DvcsUtil.guessCurrentRepositoryQuick(project, GitUtil.getRepositoryManager(project), mySettings.getRecentRootPath());
+//        GitBranchesUsageCollector.branchWidgetClicked();
+        assert repository != null;
+        MyGitBranchPopup myGitBranchPopup = MyGitBranchPopup.getInstance(project, repository, e.getDataContext());
         Object lastOpenedAt = myGitBranchPopup.getLastOpenedAt();
 
 //        System.out.println(lastOpenedAt);
@@ -144,7 +162,11 @@ public class TargetBranchPanel extends JPanel implements Element {
 
         SwingUtilities.invokeLater(() -> {
 
-            MyGitBranchPopup myGitBranchPopup = MyGitBranchPopup.getInstance(project, git.getRepository());
+            GitVcsSettings mySettings = GitVcsSettings.getInstance(project);
+            @Nullable GitRepository repository = DvcsUtil.guessCurrentRepositoryQuick(project, GitUtil.getRepositoryManager(project), mySettings.getRecentRootPath());
+//            GitBranchesUsageCollector.branchWidgetClicked();
+            assert repository != null;
+            MyGitBranchPopup myGitBranchPopup = MyGitBranchPopup.getInstance(project, repository, DataManager.getInstance().getDataContext(label));
             ListPopup popup = myGitBranchPopup.asListPopup();
             popup.showUnderneathOf(label);
 

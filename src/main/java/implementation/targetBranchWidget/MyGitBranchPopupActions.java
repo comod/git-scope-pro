@@ -176,7 +176,7 @@ class MyGitBranchPopupActions {
       myRepositories = ContainerUtil.immutableList(repositories);
       //    myBranchName = branchName;
       mySelectedRepository = repo;
-      gitBranchManager = ServiceManager.getService(project, GitBranchManager.class);
+      gitBranchManager = project.getService(GitBranchManager.class);
 
       setFavorite(gitBranchManager.isFavorite(gitBranchType, repositories.size() > 1 ? null : mySelectedRepository, myBranchName));
 

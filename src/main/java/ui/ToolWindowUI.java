@@ -1,6 +1,7 @@
 package ui;
 
 import com.intellij.dvcs.repo.VcsRepositoryManager;
+import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.BranchChangeListener;
 import com.intellij.openapi.vcs.changes.Change;
@@ -182,8 +183,12 @@ public class ToolWindowUI {
         return this.eRootPanel;
     }
 
-    public void showTargetBranchPopup() {
-        this.targetBranchPanel.showPopup();
+    public void showTargetBranchPopup(@NotNull AnActionEvent e) {
+        try {
+            this.targetBranchPanel.showPopup(e);
+        } catch (Throwable ex) {
+            // no exceptions
+        }
     }
 
     public void showTargetBranchPopupAtToolWindow() {
