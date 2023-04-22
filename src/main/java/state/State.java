@@ -5,6 +5,7 @@ import com.intellij.openapi.components.Storage;
 import com.intellij.openapi.project.Project;
 import com.intellij.util.xmlb.XmlSerializerUtil;
 import model.MyModel;
+import model.MyModelBase;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -37,59 +38,67 @@ public class State implements PersistentStateComponent<State> {
      * --- Map<String, Object> not possible
      */
 
-    public Map<String, String> repositoryTargetBranchMap = new HashMap<>();
+    public String data;
 
-    public Map<String, String> toolWindowTabMap = new HashMap<>();
-
-    public List<MyModel> collection = new ArrayList<>();
-
-    @Nullable
-    public static State getInstance(Project project) {
-        State sfec = project.getService(State.class);
-        return sfec;
+    public String getData() {
+        return data;
     }
 
-    public List<MyModel> getCollection() {
-        return collection;
+    public void setData(String data) {
+        this.data = data;
+    }
+    //    public List<MyModelBase> collection = new ArrayList<>();
+//
+//    public List<MyModelBase> getCollection() {
+//        return collection;
+//    }
+//
+//    public void setCollection(List<MyModelBase> collection) {
+//        this.collection = collection;
+//    }
+//    public List<String> collection = new ArrayList<>();
+//
+//    public List<String> getCollection() {
+//        return collection;
+//    }
+//
+//    public void setCollection(List<String> collection) {
+//        this.collection = collection;
+//    }
+
+    public void save(List<MyModel> modelCollection) {
+        List<MyModelBase> persistList = new ArrayList<>();
+        modelCollection.forEach(model -> {
+            MyModelBase myModelBase = new MyModelBase();
+            myModelBase.setTargetBranch(model.getTargetBranch());
+            persistList.add(myModelBase);
+        });
+        MyModelConverter converter = new MyModelConverter();
+        setData(converter.toString(persistList));
+//        setCollection(persistList);
+//        MyModelConverter converter = new MyModelConverter();
+//        List<String> newCollection = new ArrayList<>();
+//
+//        modelCollection.forEach(model -> {
+//            MyModelBase myModelBase = new MyModelBase();
+//            myModelBase.setTargetBranch(model.getTargetBranch());
+//
+//            String modelAsString = converter.toString(myModelBase);
+//            System.out.println(modelAsString);
+//            newCollection.add(modelAsString);
+//        });
+//        setCollection(newCollection);
     }
 
-    public void setCollection(List<MyModel> collection) {
-        this.collection = collection;
-    }
-
-    public void addToCollection(MyModel model) {
-        this.collection.add(model);
-    }
-
-    public Map<String, String> getToolWindowTabMap() {
-        return toolWindowTabMap;
-    }
-
-    public void setToolWindowTabMap(Map<String, String> toolWindowTabMap) {
-        this.toolWindowTabMap = toolWindowTabMap;
-    }
-
-    public ToolWindowTabVo getVo(String id) {
-        VoConverter voCon = new VoConverter();
-        if (!this.toolWindowTabMap.containsKey(id)) {
-            ToolWindowTabVo defaultVo = new ToolWindowTabVo("default");
-            setVo(id, defaultVo);
-        }
-        String value = this.toolWindowTabMap.get(id);
-        return voCon.fromString(value);
-    }
-
-    public void setVo(String id, ToolWindowTabVo vo) {
-        VoConverter voCon = new VoConverter();
-        this.toolWindowTabMap.put(id, voCon.toString(vo));
-    }
-
-    public Map<String, String> getRepositoryTargetBranchMap() {
-        return repositoryTargetBranchMap;
-    }
-
-    public void setRepositoryTargetBranchMap(Map<String, String> repositoryTargetBranchMap) {
-        this.repositoryTargetBranchMap = repositoryTargetBranchMap;
+    public List<MyModelBase> load() {
+        MyModelConverter converter = new MyModelConverter();
+        return converter.fromString(data);
+//        if (baseModelCollection == null) {
+//            return modelCollection;
+//        }
+//
+//
+//        return modelCollection;
     }
 
     @Nullable

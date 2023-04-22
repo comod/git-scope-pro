@@ -65,7 +65,6 @@ public class Manager {
     public void init(Project project) {
 
         System.out.println("init");
-        State state = State.getInstance(project);
 
         this.project = project;
         this.git = project.getService(GitService.class);

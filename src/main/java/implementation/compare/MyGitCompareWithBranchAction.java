@@ -20,10 +20,10 @@ public class MyGitCompareWithBranchAction extends GitCompareWithBranchAction {
     private Task.Backgroundable task;
 
     public void collectChangesAndProcess(
-        @NotNull Project project,
-        @NotNull GitRepository repo,
-        @NotNull String branchToCompare,
-        Consumer<Collection<Change>> callBack
+            @NotNull Project project,
+            @NotNull GitRepository repo,
+            @NotNull String branchToCompare,
+            Consumer<Collection<Change>> callBack
     ) {
 
         VirtualFile file = repo.getRoot();
@@ -35,11 +35,11 @@ public class MyGitCompareWithBranchAction extends GitCompareWithBranchAction {
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
 
-                //                try {
-                //                    Thread.sleep(3000);
-                //                } catch (InterruptedException e) {
-                //                    e.printStackTrace();
-                //                }
+                try {
+                    Thread.sleep(3000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
 
                 try {
 

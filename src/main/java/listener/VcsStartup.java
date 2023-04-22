@@ -3,7 +3,6 @@ package listener;
 import com.intellij.dvcs.repo.VcsRepositoryMappingListener;
 import com.intellij.openapi.project.Project;
 import example.ViewService;
-import implementation.Manager;
 //import implementation.EventManager;
 //import implementation.Manager;
 //import service.ToolWindowServiceInterface;
@@ -21,7 +20,7 @@ public class VcsStartup implements VcsRepositoryMappingListener {
         System.out.println("VcsStartup");
 
         ViewService viewService = project.getService(ViewService.class);
-        viewService.init();
+        viewService.eventVcsReady();
 //        Manager manager = project.getService(Manager.class);
 //        manager.init(project);
 //        EventManager manager = project.getService(EventManager.class);

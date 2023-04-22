@@ -1,25 +1,22 @@
 package example;
 
 import javax.swing.*;
-import java.awt.*;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
-import java.util.Calendar;
 
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.roots.ui.componentsList.layout.VerticalStackLayout;
+import com.intellij.openapi.ui.VerticalFlowLayout;
+import com.intellij.ui.components.panels.HorizontalBox;
 import implementation.targetBranchWidget.PopUpFactory;
 import model.MyModel;
-import org.apache.commons.lang3.StringUtils;
 
 import service.TargetBranchService;
 import ui.elements.VcsTree;
 
 public class ToolWindowView {
 
-    private final JPanel contentPanel = new JPanel();
-
-    private final JLabel currentTime = new JLabel();
-    //    private final State state;
+    private final JPanel rootPanel = new JPanel();
     private final MyModel myModel;
     private final Project project;
     private final TargetBranchService targetBranchService;
@@ -33,39 +30,30 @@ public class ToolWindowView {
 //        this.state = State.getInstance(project);
         this.myModel = myModel;
         this.targetBranchService = project.getService(TargetBranchService.class);
+
         myModel.getObservable().subscribe(model -> {
             render();
         });
-        contentPanel.setLayout(new BorderLayout(0, 0));
-//        contentPanel.setLayout(new FlowLayout());
-//        contentPanel.setBorder(null);
-//        contentPanel.add(createCalendarPanel(), BorderLayout.PAGE_START);
-//        JPanel topPanel = new JPanel();
-//        topPanel.add(tbp);
-//        contentPanel.add(topPanel);
-        JPanel controlsPanel = new JPanel();
-//        JButton refreshDateAndTimeButton = new JButton("Refresh");
-//        refreshDateAndTimeButton.addActionListener(e -> someAction());
-//        controlsPanel.add(refreshDateAndTimeButton);
-//        JButton hideToolWindowButton = new JButton("Hide");
-////        hideToolWindowButton.addActionListener(e -> toolWindow.hide(null));
-//        controlsPanel.add(hideToolWindowButton);
 
-//        FeatureToggle featureToggle = new FeatureToggle();
-//        controlsPanel.add(featureToggle);
+        draw();
 
-        this.vcsTree = new VcsTree(this.project);
-        this.vcsTree.setLayout(new FlowLayout());
-        controlsPanel.setLayout(new FlowLayout());
-        controlsPanel.add(tbp);
-        controlsPanel.add(vcsTree);
-//        TargetBranchPanel tbp = new TargetBranchPanel(this.project);
         addListener();
 
-        contentPanel.add(controlsPanel);
-//        ToolWindowUI toolWindowUI = new ToolWindowUI(project);
-//        contentPanel.add(toolWindowUI.getRootPanel());
         render();
+    }
+
+    private void draw() {
+        VerticalStackLayout verticalStackLayout = new VerticalStackLayout();
+        rootPanel.setLayout(verticalStackLayout);
+        HorizontalBox hBox = new HorizontalBox();
+
+        hBox.add(tbp);
+
+        vcsTree = new VcsTree(this.project);
+        vcsTree.setLayout(new VerticalFlowLayout());
+
+        rootPanel.add(hBox);
+        rootPanel.add(vcsTree);
     }
 
     private void addListener() {
@@ -98,33 +86,19 @@ public class ToolWindowView {
         });
     }
 
-
-    private void someAction() {
-        Calendar calendar = Calendar.getInstance();
-
-        String s =
-                getFormattedValue(calendar, Calendar.HOUR_OF_DAY) + ":" +
-                        getFormattedValue(calendar, Calendar.MINUTE) + ":" +
-                        getFormattedValue(calendar, Calendar.SECOND);
-        myModel.setField1(s);
-
-    }
-
     private void render() {
-        currentTime.setText(myModel.getField1());
+//        if (myModel.getTargetBranch() == null) {
         tbp.setText(this.targetBranchService.getTargetBranchDisplay(myModel.getTargetBranch()));
+//        } else {
+//            tbp.hide();
+//        }
         if (myModel.getChanges() == null) {
             return;
         }
         vcsTree.update(myModel.getChanges());
     }
 
-    private String getFormattedValue(Calendar calendar, int calendarField) {
-        int value = calendar.get(calendarField);
-        return StringUtils.leftPad(Integer.toString(value), 2, "0");
-    }
-
-    public JPanel getContentPanel() {
-        return contentPanel;
+    public JPanel getRootPanel() {
+        return rootPanel;
     }
 }

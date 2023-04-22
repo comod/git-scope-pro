@@ -7,24 +7,9 @@ import model.valueObject.TargetBranch;
 
 import java.util.Collection;
 
-public class MyModel {
+public class MyModel extends MyModelBase {
     private final PublishSubject<MyModel.field> changeObservable = PublishSubject.create();
-    private String field1;
-    private TargetBranch targetBranch;
     private Collection<Change> changes;
-
-    public String getField1() {
-        return field1;
-    }
-
-    public void setField1(String field1) {
-        this.field1 = field1;
-        changeObservable.onNext(field.field1);
-    }
-
-    public TargetBranch getTargetBranch() {
-        return targetBranch;
-    }
 
     public void setTargetBranch(TargetBranch targetBranch) {
         this.targetBranch = targetBranch;
@@ -44,15 +29,7 @@ public class MyModel {
         return changeObservable;
     }
 
-    @Override
-    public String toString() {
-        return "MyModel{" +
-                "field1='" + field1 + '\'' +
-                '}';
-    }
-
     public enum field {
-        field1,
         changes,
         targetBranch
     }

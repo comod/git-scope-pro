@@ -158,13 +158,18 @@ public class ChangesService {
 
     public void collectChanges(TargetBranch targetBranchByRepo, Consumer<Collection<Change>> callBack) {
         git.getRepositories().forEach(repo -> {
-            String branchToCompare = targetBranchByRepo.getValue().get(repo.toString());
+            String branchToCompare = null;
+            if (targetBranchByRepo == null) {
+                branchToCompare = GitService.BRANCH_HEAD;
+            } else {
+                branchToCompare = targetBranchByRepo.getValue().get(repo.toString());
+            }
 //            String targetBranchByRepo = getTargetBranchByRepository(repo);
-//            if (targetBranchByRepo == null) {
-//                // Notification.notify(Defs.NAME, "Choose a Branch");
+            if (branchToCompare == null) {
+                // Notification.notify(Defs.NAME, "Choose a Branch");
 //                toolWindowUI.showTargetBranchPopupAtToolWindow();
-//                targetBranchByRepo = Git.BRANCH_HEAD;
-//            }
+                branchToCompare = GitService.BRANCH_HEAD;
+            }
 
             myGitCompareWithBranchAction.collectChangesAndProcess(project, repo, branchToCompare, callBack);
         });
