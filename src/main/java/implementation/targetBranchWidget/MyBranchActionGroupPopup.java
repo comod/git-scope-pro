@@ -39,7 +39,7 @@ public class MyBranchActionGroupPopup extends BranchActionGroupPopup {
 //  private static final DataKey MY_POPUP_MODEL = DataKey.create("GitScopeVcsPopupModel");
 //  static final String BRANCH_POPUP = "GitScopeBranchWidget";
 
-    private MyPopupListElementRenderer myListElementRenderer;
+//    private MyPopupListElementRenderer myListElementRenderer;
 
     public MyBranchActionGroupPopup(@NotNull String title,
                                     @NotNull Project project,
@@ -56,7 +56,7 @@ public class MyBranchActionGroupPopup extends BranchActionGroupPopup {
     public static void _wrapWithMoreActionIfNeeded(
             @NotNull Project project,
             @NotNull LightActionGroup parentGroup,
-            @NotNull List<MyGitBranchPopupActions.TargetBranchAction> actionList,
+            @NotNull List<TargetBranchAction> actionList,
             int maxIndex,
             @Nullable String settingName,
             boolean defaultExpandValue
@@ -71,7 +71,7 @@ public class MyBranchActionGroupPopup extends BranchActionGroupPopup {
             for (int i = 0; i < actionList.size(); i++) {
                 // parentGroup.add(i < maxIndex ? actionList.get(i) : new BranchActionGroupPopup.HideableActionGroup(actionList.get(i), moreAction));
 
-                MyGitBranchPopupActions.TargetBranchAction myBranchAction = actionList.get(i);
+                TargetBranchAction myBranchAction = actionList.get(i);
 
                 if (i >= maxIndex && !moreAction.isExpanded()) {
                     myBranchAction.setHide(true);
@@ -124,19 +124,19 @@ public class MyBranchActionGroupPopup extends BranchActionGroupPopup {
 //      super.handleSelect(handleFinalChoices, e);
 //    }
     }
-
-    @Override
-    protected boolean shouldBeShowing(@NotNull AnAction action) {
-        if (!super.shouldBeShowing(action)) return false;
-        if (getSpeedSearch().isHoldingFilter()) return !(action instanceof MyBranchActionGroupPopup.MoreAction);
-        if (action instanceof MyBranchActionGroupPopup.MoreHideableActionGroup)
-            return ((MyBranchActionGroupPopup.MoreHideableActionGroup) action).shouldBeShown();
-        if (action instanceof MyGitBranchPopupActions.TargetBranchAction) {
-            return !((MyGitBranchPopupActions.TargetBranchAction) action).getHide();
-        }
-        return true;
-    }
-
+//
+//    @Override
+//    protected boolean shouldBeShowing(@NotNull AnAction action) {
+//        if (!super.shouldBeShowing(action)) return false;
+//        if (getSpeedSearch().isHoldingFilter()) return !(action instanceof MyBranchActionGroupPopup.MoreAction);
+//        if (action instanceof MyBranchActionGroupPopup.MoreHideableActionGroup)
+//            return ((MyBranchActionGroupPopup.MoreHideableActionGroup) action).shouldBeShown();
+//        if (action instanceof TargetBranchAction) {
+//            return !((TargetBranchAction) action).getHide();
+//        }
+//        return true;
+//    }
+//
     //  @Nullable
     //  private BranchActionGroup getSelectedBranchGroup() {
     //    return getSpecificAction(getList().getSelectedValue(), BranchActionGroup.class);
@@ -156,98 +156,98 @@ public class MyBranchActionGroupPopup extends BranchActionGroupPopup {
         boolean shouldBeShown();
     }
 
-    private static class MyPopupListElementRenderer extends PopupListElementRendererWithIcon {
-        private ErrorLabel myInfoLabel;
+//    private static class MyPopupListElementRenderer extends PopupListElementRendererWithIcon {
+//        private ErrorLabel myInfoLabel;
+//
+//        MyPopupListElementRenderer(ListPopupImpl aPopup) {
+//            super(aPopup);
+//        }
+//
+//        private static Icon chooseUpdateIndicatorIcon(@NotNull BranchActionGroup branchActionGroup) {
+//            if (branchActionGroup.hasIncomingCommits()) {
+//                return branchActionGroup.hasOutgoingCommits() ? IncomingOutgoing : Incoming;
+//            }
+//            return branchActionGroup.hasOutgoingCommits() ? Outgoing : null;
+//        }
+//
+//        @Override
+//        protected SeparatorWithText createSeparator() {
+//            return new MyTextSeparator();
+//        }
+//
+//        @Override
+//        protected void customizeComponent(JList list, Object value, boolean isSelected) {
+//            MoreAction more = getSpecificAction(value, MoreAction.class);
+//            if (more != null) {
+//                myTextLabel.setForeground(JBColor.gray);
+//            }
+//            super.customizeComponent(list, value, isSelected);
+//            BranchActionGroup branchActionGroup = getSpecificAction(value, BranchActionGroup.class);
+//            if (branchActionGroup != null) {
+//                myTextLabel.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+//                myTextLabel.setIcon(chooseUpdateIndicatorIcon(branchActionGroup));
+//            }
+//            PopupElementWithAdditionalInfo additionalInfoAction = getSpecificAction(value, PopupElementWithAdditionalInfo.class);
+//            updateInfoComponent(myInfoLabel, additionalInfoAction != null ? additionalInfoAction.getInfoText() : null, isSelected);
+//        }
+//
+//        private void updateInfoComponent(@NotNull ErrorLabel infoLabel, @Nullable String infoText, boolean isSelected) {
+//            if (infoText != null) {
+//                infoLabel.setVisible(true);
+//                infoLabel.setText(infoText);
+//
+//                if (isSelected) {
+//                    setSelected(infoLabel);
+//                } else {
+//                    infoLabel.setBackground(getBackground());
+//                    infoLabel.setForeground(JBColor.GRAY);    // different foreground than for other elements
+//                }
+//            } else {
+//                infoLabel.setVisible(false);
+//            }
+//        }
+//
+//        @Override
+//        protected JComponent createItemComponent() {
+//            myTextLabel = new ErrorLabel();
+//            myTextLabel.setOpaque(true);
+//            myTextLabel.setBorder(JBUI.Borders.empty(1));
+//
+//            myInfoLabel = new ErrorLabel();
+//            myInfoLabel.setOpaque(true);
+//            myInfoLabel.setBorder(JBUI.Borders.empty(1, DEFAULT_HGAP, 1, 1));
+//            myInfoLabel.setFont(FontUtil.minusOne(myInfoLabel.getFont()));
+//
+//            JPanel compoundPanel = new OpaquePanel(new BorderLayout(), JBColor.WHITE);
+//            myIconLabel = new IconComponent();
+//            myInfoLabel.setHorizontalAlignment(SwingConstants.RIGHT);
+//            JPanel compoundTextPanel = new OpaquePanel(new BorderLayout(), compoundPanel.getBackground());
+//            JPanel textPanel = new OpaquePanel(new BorderLayout(), compoundPanel.getBackground());
+//            compoundPanel.add(myIconLabel, BorderLayout.WEST);
+//            textPanel.add(myTextLabel, BorderLayout.WEST);
+//            textPanel.add(myInfoLabel, BorderLayout.CENTER);
+//            compoundTextPanel.add(textPanel, BorderLayout.CENTER);
+//            compoundPanel.add(compoundTextPanel, BorderLayout.CENTER);
+//            return layoutComponent(compoundPanel);
+//        }
+//    }
 
-        MyPopupListElementRenderer(ListPopupImpl aPopup) {
-            super(aPopup);
-        }
-
-        private static Icon chooseUpdateIndicatorIcon(@NotNull BranchActionGroup branchActionGroup) {
-            if (branchActionGroup.hasIncomingCommits()) {
-                return branchActionGroup.hasOutgoingCommits() ? IncomingOutgoing : Incoming;
-            }
-            return branchActionGroup.hasOutgoingCommits() ? Outgoing : null;
-        }
-
-        @Override
-        protected SeparatorWithText createSeparator() {
-            return new MyTextSeparator();
-        }
-
-        @Override
-        protected void customizeComponent(JList list, Object value, boolean isSelected) {
-            MoreAction more = getSpecificAction(value, MoreAction.class);
-            if (more != null) {
-                myTextLabel.setForeground(JBColor.gray);
-            }
-            super.customizeComponent(list, value, isSelected);
-            BranchActionGroup branchActionGroup = getSpecificAction(value, BranchActionGroup.class);
-            if (branchActionGroup != null) {
-                myTextLabel.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
-                myTextLabel.setIcon(chooseUpdateIndicatorIcon(branchActionGroup));
-            }
-            PopupElementWithAdditionalInfo additionalInfoAction = getSpecificAction(value, PopupElementWithAdditionalInfo.class);
-            updateInfoComponent(myInfoLabel, additionalInfoAction != null ? additionalInfoAction.getInfoText() : null, isSelected);
-        }
-
-        private void updateInfoComponent(@NotNull ErrorLabel infoLabel, @Nullable String infoText, boolean isSelected) {
-            if (infoText != null) {
-                infoLabel.setVisible(true);
-                infoLabel.setText(infoText);
-
-                if (isSelected) {
-                    setSelected(infoLabel);
-                } else {
-                    infoLabel.setBackground(getBackground());
-                    infoLabel.setForeground(JBColor.GRAY);    // different foreground than for other elements
-                }
-            } else {
-                infoLabel.setVisible(false);
-            }
-        }
-
-        @Override
-        protected JComponent createItemComponent() {
-            myTextLabel = new ErrorLabel();
-            myTextLabel.setOpaque(true);
-            myTextLabel.setBorder(JBUI.Borders.empty(1));
-
-            myInfoLabel = new ErrorLabel();
-            myInfoLabel.setOpaque(true);
-            myInfoLabel.setBorder(JBUI.Borders.empty(1, DEFAULT_HGAP, 1, 1));
-            myInfoLabel.setFont(FontUtil.minusOne(myInfoLabel.getFont()));
-
-            JPanel compoundPanel = new OpaquePanel(new BorderLayout(), JBColor.WHITE);
-            myIconLabel = new IconComponent();
-            myInfoLabel.setHorizontalAlignment(SwingConstants.RIGHT);
-            JPanel compoundTextPanel = new OpaquePanel(new BorderLayout(), compoundPanel.getBackground());
-            JPanel textPanel = new OpaquePanel(new BorderLayout(), compoundPanel.getBackground());
-            compoundPanel.add(myIconLabel, BorderLayout.WEST);
-            textPanel.add(myTextLabel, BorderLayout.WEST);
-            textPanel.add(myInfoLabel, BorderLayout.CENTER);
-            compoundTextPanel.add(textPanel, BorderLayout.CENTER);
-            compoundPanel.add(compoundTextPanel, BorderLayout.CENTER);
-            return layoutComponent(compoundPanel);
-        }
-    }
-
-    private static class MyTextSeparator extends SeparatorWithText {
-
-        MyTextSeparator() {
-            super();
-            setTextForeground(UIUtil.getListForeground());
-            setCaptionCentered(false);
-            UIUtil.addInsets(this, DEFAULT_VGAP, UIUtil.getListCellHPadding(), 0, 0);
-        }
-
-        @Override
-        protected void paintLine(Graphics g, int x, int y, int width) {
-            if (StringUtil.isEmptyOrSpaces(getCaption())) {
-                super.paintLine(g, x, y, width);
-            }
-        }
-    }
+//    private static class MyTextSeparator extends SeparatorWithText {
+//
+//        MyTextSeparator() {
+//            super();
+//            setTextForeground(UIUtil.getListForeground());
+//            setCaptionCentered(false);
+//            UIUtil.addInsets(this, DEFAULT_VGAP, UIUtil.getListCellHPadding(), 0, 0);
+//        }
+//
+//        @Override
+//        protected void paintLine(Graphics g, int x, int y, int width) {
+//            if (StringUtil.isEmptyOrSpaces(getCaption())) {
+//                super.paintLine(g, x, y, width);
+//            }
+//        }
+//    }
 
     private static class MoreAction extends DumbAwareAction implements KeepingPopupOpenAction {
 
@@ -314,7 +314,8 @@ public class MyBranchActionGroupPopup extends BranchActionGroupPopup {
         }
     }
 
-    //    private static class HideableActionGroup extends EmptyAction.MyDelegatingActionGroup implements MoreHideableActionGroup, DumbAware {
+    //
+//    //    private static class HideableActionGroup extends EmptyAction.MyDelegatingActionGroup implements MoreHideableActionGroup, DumbAware {
     private static class HideableActionGroup extends ActionGroupWrapper implements MoreHideableActionGroup, DumbAware {
         @NotNull
         private final MoreAction myMoreAction;
@@ -329,5 +330,5 @@ public class MyBranchActionGroupPopup extends BranchActionGroupPopup {
             return myMoreAction.isExpanded();
         }
     }
-
+//
 }

@@ -9,7 +9,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.util.Collection;
 
-public class VcsTree extends JPanel implements Element {
+public class VcsTree extends JPanel {
 
     private final Project project;
 

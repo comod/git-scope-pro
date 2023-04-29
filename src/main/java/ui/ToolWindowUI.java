@@ -73,19 +73,19 @@ public class ToolWindowUI {
         TargetBranchPanel targetBranchPanel = new TargetBranchPanel(this.project);
 
         VcsTree vcsTree = new VcsTree(this.project);
-        CurrentBranch currentBranch = new CurrentBranch(this.git);
+//        CurrentBranch currentBranch = new CurrentBranch(this.git);
 
         // Assign Classes
         this.vcsTree = vcsTree;
         this.featureToggle = featureToggle;
         this.targetBranchPanel = targetBranchPanel;
-        this.currentBranch = currentBranch;
+//        this.currentBranch = currentBranch;
 
         // Assign Elements
         this.eVcsTree = vcsTree;
         this.eFeatureToggle = featureToggle;
         this.eTargetBranchPanel = targetBranchPanel;
-        this.eCurrentBranch = currentBranch;
+//        this.eCurrentBranch = currentBranch;
 
     }
 

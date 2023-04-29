@@ -29,7 +29,6 @@ public final class ToolWindowService implements ToolWindowServiceInterface {
     public ToolWindow getToolWindow() {
         ToolWindowManager toolWindowManager = ToolWindowManager.getInstance(project);
         ToolWindow toolWindow = toolWindowManager.getToolWindow("Git Scope");
-
         assert toolWindow != null;
         return toolWindow;
     }
@@ -44,6 +43,7 @@ public final class ToolWindowService implements ToolWindowServiceInterface {
         Content content = ContentFactory.getInstance().createContent(toolWindowView.getRootPanel(), tabName, false);
         content.setCloseable(true);
         ContentManager contentManager = getContentManager();
+//        contentManager.getComponent();
         contentManager.addContent(content);
 //        int index = contentManager.getIndexOfContent(content);
 //        System.out.println("addTab " + tabName + "as index" + index);
@@ -51,7 +51,7 @@ public final class ToolWindowService implements ToolWindowServiceInterface {
 
 
     public void addListener() {
-        getContentManager().addContentManagerListener(new MyTabContentListener());
+        getContentManager().addContentManagerListener(new MyTabContentListener(project));
     }
 
     @Override

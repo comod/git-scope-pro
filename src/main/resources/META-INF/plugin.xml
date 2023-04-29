@@ -17,6 +17,7 @@
     <projectListeners>
         <listener class="listener.MyToolWindowListener" topic="com.intellij.openapi.wm.ex.ToolWindowManagerListener"/>
         <listener class="listener.VcsStartup" topic="com.intellij.dvcs.repo.VcsRepositoryMappingListener"/>
+        <!--        <listener class="listener.MouseListener" topic="com.intellij.openapi.editor.event.EditorMouseMotionListener"/>-->
         <!--        <listener class="listener.MyTabContentListener" topic="com.intellij.ui.content.ContentManagerListener"/>-->
     </projectListeners>
 
@@ -29,6 +30,10 @@
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
     <extensions defaultExtensionNs="com.intellij">
 
+        <!--        <statusBarWidgetFactory-->
+        <!--                implementation="git4idea.ui.branch.GitBranchWidget$Factory"/>-->
+        <!--        <editorFactoryMouseMotionListener-->
+        <!--                implementation="listener.MouseListener"/>-->
         <!--        <postStartupActivity implementation="listener.Startup"/>-->
         <!--        <vcsRepositoryCreator implementation="listener.VcsStartup"/>-->
         <!-- ToolWindow -->

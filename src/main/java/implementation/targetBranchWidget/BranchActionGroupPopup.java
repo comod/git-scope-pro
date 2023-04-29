@@ -185,8 +185,7 @@ public class BranchActionGroupPopup extends FlatSpeedSearchPopup {
                 return mySettingsActions.toArray(AnAction.EMPTY_ARRAY);
             }
         };
-        // @todo
-//        settingsGroup.getTemplatePresentation().setHideGroupIfEmpty(true);
+
         settingsGroup.getTemplatePresentation().setIcon(AllIcons.General.GearPlain);
 
 //        myToolbarActions.add(restoreSizeButton);
@@ -359,17 +358,17 @@ public class BranchActionGroupPopup extends FlatSpeedSearchPopup {
         return true;
     }
 
-    @Override
-    protected WizardPopup createPopup(WizardPopup parent, PopupStep step, Object parentValue) {
-        return createListPopupStep(parent, step, parentValue);
-    }
-
-    private WizardPopup createListPopupStep(WizardPopup parent, PopupStep step, Object parentValue) {
-        if (step instanceof ListPopupStep) {
-            return new BranchActionGroupPopup(parent, (ListPopupStep) step, parentValue);
-        }
-        return super.createPopup(parent, step, parentValue);
-    }
+//    @Override
+//    protected WizardPopup createPopup(WizardPopup parent, PopupStep step, Object parentValue) {
+//        return createListPopupStep(parent, step, parentValue);
+//    }
+//
+//    private WizardPopup createListPopupStep(WizardPopup parent, PopupStep step, Object parentValue) {
+//        if (step instanceof ListPopupStep) {
+//            return new BranchActionGroupPopup(parent, (ListPopupStep) step, parentValue);
+//        }
+//        return super.createPopup(parent, step, parentValue);
+//    }
 
     @Override
     protected MyPopupListElementRenderer getListElementRenderer() {

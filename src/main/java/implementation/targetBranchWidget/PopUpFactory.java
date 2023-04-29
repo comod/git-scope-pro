@@ -3,8 +3,10 @@ package implementation.targetBranchWidget;
 import com.intellij.dvcs.DvcsUtil;
 import com.intellij.ide.DataManager;
 import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.popup.ListPopup;
+import com.intellij.ui.awt.RelativePoint;
 import git4idea.GitUtil;
 import git4idea.config.GitVcsSettings;
 import git4idea.repo.GitRepository;
@@ -23,26 +25,24 @@ public class PopUpFactory {
         this.project = project;
     }
 
+//    public void showPopup() {
+//        MyGitBranchPopup myGitBranchPopup = getMyGitBranchPopup(DataManager.getInstance().getDataContext(e.getComponent()));
+//        myGitBranchPopup.setPopupLastOpenedAt(PopUpFactory.class);
+//    }
+
     public void showPopup(MouseEvent e) {
-        GitVcsSettings mySettings = GitVcsSettings.getInstance(project);
-        @Nullable GitRepository repository = DvcsUtil.guessCurrentRepositoryQuick(project, GitUtil.getRepositoryManager(project), mySettings.getRecentRootPath());
-//                    GitBranchesUsageCollector.branchWidgetClicked();
-        assert repository != null;
-        MyGitBranchPopup myGitBranchPopup = MyGitBranchPopup.getInstance(project, repository, DataManager.getInstance().getDataContext(e.getComponent()));
+        MyGitBranchPopup myGitBranchPopup = getMyGitBranchPopup(DataManager.getInstance().getDataContext(e.getComponent()));
 //                    MyGitBranchPopup myGitBranchPopup = MyGitBranchPopup.getInstance(project, git.getRepository());
         myGitBranchPopup.setPopupLastOpenedAt(PopUpFactory.class);
 //        showPopup(label);
         showPopup(e.getComponent());
     }
 
+
     public void showPopup(@NotNull AnActionEvent e) {
 
 //        System.out.println("showPopup");
-        GitVcsSettings mySettings = GitVcsSettings.getInstance(project);
-        @Nullable GitRepository repository = DvcsUtil.guessCurrentRepositoryQuick(project, GitUtil.getRepositoryManager(project), mySettings.getRecentRootPath());
-//        GitBranchesUsageCollector.branchWidgetClicked();
-        assert repository != null;
-        MyGitBranchPopup myGitBranchPopup = MyGitBranchPopup.getInstance(project, repository, e.getDataContext());
+        MyGitBranchPopup myGitBranchPopup = getMyGitBranchPopup(e.getDataContext());
         Object lastOpenedAt = myGitBranchPopup.getLastOpenedAt();
 
 //        System.out.println(lastOpenedAt);
@@ -67,27 +67,40 @@ public class PopUpFactory {
 //        showPopup(label);
 //    }
 
-    public void showPopup(Component label) {
+
+    public void showPopup(Component component) {
 
 //        System.out.println("showPopup(Component label)");
 
-        SwingUtilities.invokeLater(() -> {
 
-            GitVcsSettings mySettings = GitVcsSettings.getInstance(project);
-            @Nullable GitRepository repository = DvcsUtil.guessCurrentRepositoryQuick(project, GitUtil.getRepositoryManager(project), mySettings.getRecentRootPath());
-//            GitBranchesUsageCollector.branchWidgetClicked();
-            assert repository != null;
-            MyGitBranchPopup myGitBranchPopup = MyGitBranchPopup.getInstance(project, repository, DataManager.getInstance().getDataContext(label));
-            ListPopup popup = myGitBranchPopup.asListPopup();
-            popup.showUnderneathOf(label);
+//        SwingUtilities.invokeLater(() -> {
 
-            Object lastOpenedAt = myGitBranchPopup.getLastOpenedAt();
+        DataContext dataContext = DataManager.getInstance().getDataContext(component);
+        MyGitBranchPopup myGitBranchPopup = getMyGitBranchPopup(dataContext);
+        ListPopup popup = myGitBranchPopup.asListPopup();
 
-            if (lastOpenedAt instanceof JList) {
-                myGitBranchPopup.setPopupLastOpenedAtList();
-            }
+//            if (component == null) {
+        popup.showUnderneathOf(component);
+//            }else{
+//        popup.showInBestPositionFor(dataContext);
+//            }
 
-        });
+        Object lastOpenedAt = myGitBranchPopup.getLastOpenedAt();
+
+        if (lastOpenedAt instanceof JList) {
+            myGitBranchPopup.setPopupLastOpenedAtList();
+        }
+
+//        });
+    }
+
+    @NotNull
+    private MyGitBranchPopup getMyGitBranchPopup(DataContext e) {
+        GitVcsSettings mySettings = GitVcsSettings.getInstance(project);
+        @Nullable GitRepository repository = DvcsUtil.guessCurrentRepositoryQuick(project, GitUtil.getRepositoryManager(project), mySettings.getRecentRootPath());
+        assert repository != null;
+        MyGitBranchPopup myGitBranchPopup = MyGitBranchPopup.getInstance(project, repository, e);
+        return myGitBranchPopup;
     }
 
     public void update() {

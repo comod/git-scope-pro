@@ -1,17 +1,21 @@
 package ui.elements;
 
+import com.intellij.openapi.project.Project;
+import com.intellij.ui.JBColor;
+import service.GitService;
 import utils.Git;
 
 import javax.swing.*;
+import java.awt.*;
 
-public class CurrentBranch extends JLabel implements Element {
+public class CurrentBranch extends JLabel {
 
     public static final int MAX_BRANCH_COUNT = 2;
-    private final Git git;
+    private final GitService git;
 
-    public CurrentBranch(Git git) {
+    public CurrentBranch(Project project) {
 
-        this.git = git;
+        this.git = project.getService(GitService.class);
 
         this.createElement();
         this.addListener();
@@ -19,7 +23,7 @@ public class CurrentBranch extends JLabel implements Element {
     }
 
     public void createElement() {
-
+        update();
     }
 
     public void addListener() {
@@ -27,13 +31,19 @@ public class CurrentBranch extends JLabel implements Element {
     }
 
     public void update() {
-
-        String branchName = git.getBranchName();
+        setSize(30, 3);
+        setVerticalAlignment(JLabel.CENTER);
+        setHorizontalAlignment(JLabel.CENTER);
+        setVerticalTextPosition(JLabel.CENTER);
+        setHorizontalTextPosition(JLabel.CENTER);
+        setAlignmentX(JLabel.CENTER);
+        String currentBranchName = git.getCurrentBranchName();
+        String branchName = currentBranchName;
         int count = git.getRepositories().size();
 
         if (count >= MAX_BRANCH_COUNT) {
             branchName = count + " Repositories";
-            setToolTipText(this.git.getBranchName());
+            setToolTipText(currentBranchName);
         }
 
         setText(branchName);

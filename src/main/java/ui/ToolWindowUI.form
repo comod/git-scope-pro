@@ -25,7 +25,7 @@
               <text value="Initializing..."/>
             </properties>
           </component>
-          <grid id="7da6e" binding="eTargetBranchPanel" custom-create="true" layout-manager="FlowLayout" hgap="5" vgap="5" flow-align="0">
+          <grid id="7da6e" binding="eTargetBranchPanel" custom-create="true" layout-manager="FlowLayout" hgap="3" vgap="3" flow-align="0">
             <constraints>
               <grid row="0" column="3" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="0" fill="3" indent="0" use-parent-layout="false"/>
             </constraints>
