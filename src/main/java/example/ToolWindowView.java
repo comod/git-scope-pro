@@ -31,6 +31,7 @@ import service.TargetBranchService;
 import ui.elements.CurrentBranch;
 import ui.elements.VcsTree;
 
+import java.util.*;
 import java.util.List;
 
 public class ToolWindowView {
@@ -47,6 +48,7 @@ public class ToolWindowView {
     JButton tbp = new JButton();
 
     private VcsTree vcsTree;
+    private SearchTextField search;
 
     public ToolWindowView(Project project, MyModel myModel) {
         this.project = project;
@@ -79,28 +81,43 @@ public class ToolWindowView {
     }
 
     private void drawNew() {
-        SearchTextField search = new SearchTextField();
+        this.search = new SearchTextField();
+        search.setText("hallo");
+
+        // node
+        Map<String, List<FavLabel>> node = new LinkedHashMap<>();
 
         // branchTree
         List<FavLabel> localBranchList = gitService.iconLabelListOfLocalBranches();
+
+        List<FavLabel> recentBranchList = new ArrayList<>();
+        recentBranchList.add(FavLabel.create("HEAD (Current)"));
+        recentBranchList.add(FavLabel.create("master"));
+
+        List<FavLabel> specialBranchList = new ArrayList<>();
+        specialBranchList.add(FavLabel.create("HEAD (Current)"));
+        specialBranchList.add(FavLabel.create(".."));
+        specialBranchList.add(FavLabel.create("Tag or Revision..."));
+        node.put("Recent", recentBranchList);
+        node.put("Specific", specialBranchList);
+        node.put("Local", localBranchList);
+        node.put("Remote", localBranchList);
+
 //        List<IconLabel> remoteBranchList = gitService.iconLabelListOfRemoteBranches();
-        BranchTree bt = new BranchTree("root", localBranchList);
+//        BranchTree special = new BranchTree("Special", specialBranchList);
 
-        JPanel content = new JPanel();
-
-        content.setBorder(JBUI.Borders.empty(JBUI.emptyInsets()));
-        content.setLayout(new VerticalStackLayout());
-//        content.setLayout(new VerticalFlowLayout());
-        content.add(search);
-        content.add(bt);
+        BranchTree bt = new BranchTree(node);
 
         // apply
-        JBScrollPane scroll = new JBScrollPane(content);
-//        scroll.setLayout(new VerticalFlowLayout());
+//        JPanel panel = new JPanel();
+//        panel.setLayout(new VerticalStackLayout());
+//        panel.setBorder(JBUI.Borders.empty(JBUI.emptyInsets()));
+//        panel.add(special);
+//        panel.add(bt);
+        JBScrollPane scroll = new JBScrollPane(bt);
         scroll.setBorder(JBUI.Borders.empty(JBUI.emptyInsets()));
-//        rootPanel.add(search);
-        rootPanel.add(scroll);
-//        rootPanel.setLayout(new BorderLayout());
+        rootPanel.add(search, BorderLayout.NORTH);
+        rootPanel.add(scroll, BorderLayout.CENTER);
     }
 
     private void draw() {
