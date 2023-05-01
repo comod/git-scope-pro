@@ -3,45 +3,37 @@ package example;
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.ui.VerticalFlowLayout;
 import com.intellij.ui.ColoredTreeCellRenderer;
-import com.intellij.ui.SimpleColoredComponent;
-import com.intellij.ui.components.JBPanel;
-import com.intellij.ui.components.JBScrollPane;
-import com.intellij.ui.components.JBViewport;
-import com.intellij.ui.components.panels.VerticalLayout;
-import com.intellij.ui.speedSearch.SpeedSearchUtil;
+import com.intellij.ui.SearchTextField;
 import com.intellij.ui.treeStructure.Tree;
 import com.intellij.util.ui.JBUI;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
-import javax.swing.event.TreeSelectionEvent;
-import javax.swing.event.TreeSelectionListener;
 import javax.swing.tree.DefaultMutableTreeNode;
-import java.awt.*;
-import java.awt.event.KeyEvent;
-import java.awt.event.KeyListener;
-import java.util.HashMap;
-import java.util.Iterator;
+import javax.swing.tree.DefaultTreeModel;
 import java.util.List;
 import java.util.Map;
 
 public class BranchTree extends JPanel {
 
-    public BranchTree(Map<String, List<FavLabel>> nodes) {
+    private final Tree myTree;
+    private final SearchTextField search;
+    private final Map<String, List<FavLabel>> nodes;
+    private final DefaultTreeModel model;
+    private final DefaultMutableTreeNode root;
+
+    public BranchTree(Map<String, List<FavLabel>> nodes, SearchTextField search) {
+        this.nodes = nodes;
+        this.search = search;
         this.setLayout(new VerticalFlowLayout());
 
-        DefaultMutableTreeNode root = new DefaultMutableTreeNode();
-//        this.setBorder(JBUI.Borders.empty(JBUI.emptyInsets()));
-        nodes.forEach((nodeLabel, list) -> {
-            DefaultMutableTreeNode node = new DefaultMutableTreeNode(nodeLabel);
-            list.forEach(e -> {
-                node.add(new DefaultMutableTreeNode(e));
-            });
-            root.add(node);
-        });
-        Tree myTree = new Tree(root);
-        expandAllNodes(myTree, 0, 0);
+//        DefaultMutableTreeNode root = createTreeStructure(nodes, search);
+        this.root = new DefaultMutableTreeNode();
+        this.model = new DefaultTreeModel(root);
+        this.myTree = new Tree(model);
+        expandAllNodes(myTree);
         myTree.setRootVisible(false);
+//        applySearchFilter(root);
         myTree.setBorder(JBUI.Borders.empty(JBUI.emptyInsets()));
         add(myTree);
         myTree.setCellRenderer(new MyColoredTreeCellRenderer());
@@ -53,22 +45,41 @@ public class BranchTree extends JPanel {
                 System.out.println(favLabel);
             }
         });
-        myTree.addKeyListener(new KeyListener() {
-            @Override
-            public void keyTyped(KeyEvent keyEvent) {
-                System.out.println(keyEvent);
-            }
+        update(search);
+    }
 
-            @Override
-            public void keyPressed(KeyEvent keyEvent) {
-
-            }
-
-            @Override
-            public void keyReleased(KeyEvent keyEvent) {
-
-            }
+    @NotNull
+    private static DefaultMutableTreeNode createTreeStructure(
+            Map<String, List<FavLabel>> nodes, SearchTextField search
+    ) {
+        DefaultMutableTreeNode root = new DefaultMutableTreeNode();
+//        this.setBorder(JBUI.Borders.empty(JBUI.emptyInsets()));
+        nodes.forEach((nodeLabel, list) -> {
+            DefaultMutableTreeNode node = new DefaultMutableTreeNode(nodeLabel);
+            list.forEach(e -> {
+                if (e.getName().contains(search.getText())) {
+                    node.add(new DefaultMutableTreeNode(e));
+                }
+            });
+            root.add(node);
         });
+        return root;
+    }
+
+    public void update(SearchTextField search) {
+        DefaultMutableTreeNode newRoot = createTreeStructure(nodes, search);
+        model.setRoot(newRoot);
+        model.reload(root);
+        expandAllNodes(myTree);
+    }
+
+    public JTree getTreeComponent() {
+        return this.myTree;
+    }
+
+    private void expandAllNodes(JTree tree) {
+        expandAllNodes(tree, 0, 0);
+
     }
 
     private void expandAllNodes(JTree tree, int startingIndex, int rowCount) {
@@ -82,18 +93,31 @@ public class BranchTree extends JPanel {
     }
 
     private static class MyColoredTreeCellRenderer extends ColoredTreeCellRenderer {
-//        MyColoredTreeCellRenderer() {
-//            myUsedCustomSpeedSearchHighlighting = true;
+//        private final SearchTextField search;
+//
+//        MyColoredTreeCellRenderer(SearchTextField search) {
+//            this.search = search;
 //        }
 
         @Override
         public void customizeCellRenderer(@NotNull JTree tree, Object value, boolean selected, boolean expanded, boolean leaf, int row, boolean hasFocus) {
             Object userObject = ((DefaultMutableTreeNode) value).getUserObject();
+//            String mySearch = search.getText();
+//            if (!string.contains(mySearch)) {
+//                tree.isVisible();
+//                return;
+//            }
+            if (userObject == null) {
+                return;
+            }
             if (userObject instanceof FavLabel projectTemplate) {
                 setIcon((projectTemplate.isFav() ? AllIcons.Nodes.Favorite : AllIcons.Vcs.Branch));
             }
 
-            append(userObject.toString());
+            String string = userObject.toString();
+            append(string);
+//            append(string, SimpleTextAttributes.SYNTHETIC_ATTRIBUTES);
+//            setVisible(false);
 
 //            SpeedSearchUtil.applySpeedSearchHighlightingFiltered(tree, value, (SimpleColoredComponent) this, false, selected);
         }

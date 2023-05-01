@@ -1,17 +1,18 @@
 package example;
 
 import javax.swing.*;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
+import javax.swing.event.DocumentEvent;
 import java.awt.*;
-import java.awt.event.KeyEvent;
-import java.awt.event.KeyListener;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
+import java.awt.event.*;
 
 import com.intellij.dvcs.DvcsUtil;
 import com.intellij.ide.DataManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ui.componentsList.layout.VerticalStackLayout;
 import com.intellij.openapi.ui.VerticalFlowLayout;
+import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.SearchTextField;
 import com.intellij.ui.components.JBPanel;
 import com.intellij.ui.components.JBScrollPane;
@@ -23,6 +24,7 @@ import git4idea.config.GitVcsSettings;
 import git4idea.repo.GitRepository;
 import implementation.targetBranchWidget.MyGitBranchPopup;
 import implementation.targetBranchWidget.PopUpFactory;
+import listener.TreeKeyListener;
 import model.MyModel;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -31,8 +33,12 @@ import service.TargetBranchService;
 import ui.elements.CurrentBranch;
 import ui.elements.VcsTree;
 
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.util.*;
 import java.util.List;
+
+import static java.awt.event.KeyEvent.VK_BACK_SPACE;
 
 public class ToolWindowView {
 
@@ -82,8 +88,7 @@ public class ToolWindowView {
 
     private void drawNew() {
         this.search = new SearchTextField();
-        search.setText("hallo");
-
+        search.setText("");
         // node
         Map<String, List<FavLabel>> node = new LinkedHashMap<>();
 
@@ -106,18 +111,67 @@ public class ToolWindowView {
 //        List<IconLabel> remoteBranchList = gitService.iconLabelListOfRemoteBranches();
 //        BranchTree special = new BranchTree("Special", specialBranchList);
 
-        BranchTree bt = new BranchTree(node);
+        BranchTree branchTree = new BranchTree(node, search);
+
+        search.addDocumentListener(new DocumentAdapter() {
+            @Override
+            protected void textChanged(@NotNull DocumentEvent e) {
+//                System.out.println(search.getText());
+                branchTree.update(search);
+            }
+        });
+
+        branchTree.getTreeComponent().addKeyListener(new KeyListener() {
+            @Override
+            public void keyTyped(KeyEvent e) {
+                System.out.println(e);
+                String text = search.getText();
+                if (e.getKeyChar() == KeyEvent.VK_BACK_SPACE) {
+                    System.out.println(removeLastChar(text));
+                    search.setText(removeLastChar(text));
+                    return;
+                }
+
+                if (e.getKeyChar() == KeyEvent.VK_DELETE) {
+                    return;
+                }
+
+                if (e.getKeyChar() == KeyEvent.VK_ENTER) {
+                    System.out.println("enter");
+                    return;
+                }
+
+                search.setText(text + e.getKeyChar());
+            }
+
+            @Override
+            public void keyPressed(KeyEvent keyEvent) {
+
+            }
+
+            @Override
+            public void keyReleased(KeyEvent keyEvent) {
+
+            }
+        });
 
         // apply
 //        JPanel panel = new JPanel();
 //        panel.setLayout(new VerticalStackLayout());
 //        panel.setBorder(JBUI.Borders.empty(JBUI.emptyInsets()));
 //        panel.add(special);
-//        panel.add(bt);
-        JBScrollPane scroll = new JBScrollPane(bt);
+//        panel.add(branchTree);
+        JBScrollPane scroll = new JBScrollPane(branchTree);
         scroll.setBorder(JBUI.Borders.empty(JBUI.emptyInsets()));
         rootPanel.add(search, BorderLayout.NORTH);
         rootPanel.add(scroll, BorderLayout.CENTER);
+    }
+
+    private String removeLastChar(String str) {
+        if (str != null && str.length() > 0) {
+            str = str.substring(0, str.length() - 1);
+        }
+        return str;
     }
 
     private void draw() {
