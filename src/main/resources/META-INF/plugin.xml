@@ -15,6 +15,7 @@
     <!-- https://plugins.jetbrains.com/docs/intellij/build-number-ranges.html#intellij-platform-based-products-of-recent-ide-versions-->
 
     <projectListeners>
+        <listener class="listener.ChangeActionListener" topic="event.ChangeActionNotifierInterface"/>
         <listener class="listener.MyToolWindowListener" topic="com.intellij.openapi.wm.ex.ToolWindowManagerListener"/>
         <listener class="listener.VcsStartup" topic="com.intellij.dvcs.repo.VcsRepositoryMappingListener"/>
         <!--        <listener class="listener.MouseListener" topic="com.intellij.openapi.editor.event.EditorMouseMotionListener"/>-->
@@ -44,6 +45,7 @@
                 icon="AllIcons.Actions.Diff"
                 anchor="left"
                 factoryClass="ui.ToolWindowUIFactory"
+                canCloseContents="true"
         />
 
         <!-- Config (Persistent) -->

@@ -2,16 +2,13 @@ package state;
 
 import com.intellij.openapi.components.PersistentStateComponent;
 import com.intellij.openapi.components.Storage;
-import com.intellij.openapi.project.Project;
 import com.intellij.util.xmlb.XmlSerializerUtil;
 import model.MyModel;
 import model.MyModelBase;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * PersistentStateComponent keeps project config values.
@@ -21,7 +18,7 @@ import java.util.Map;
         name = "GitScope",
         storages = {
                 @Storage(
-                        value = "GitScope.xml"
+                        value = "GitScopePro.xml"
                 )
         },
         reloadable = true
@@ -70,7 +67,7 @@ public class State implements PersistentStateComponent<State> {
         List<MyModelBase> persistList = new ArrayList<>();
         modelCollection.forEach(model -> {
             MyModelBase myModelBase = new MyModelBase();
-            myModelBase.setTargetBranch(model.getTargetBranch());
+            myModelBase.setTargetBranchMap(model.getTargetBranchMap());
             persistList.add(myModelBase);
         });
         MyModelConverter converter = new MyModelConverter();

@@ -14,17 +14,14 @@ import com.intellij.openapi.vfs.newvfs.BulkFileListener;
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent;
 import com.intellij.util.messages.MessageBus;
 import com.intellij.util.messages.MessageBusConnection;
-import listener.ChangeActionNotifierInterface;
+import event.ChangeActionNotifierInterface;
 import service.GitService;
-import state.State;
 import git4idea.repo.GitRepository;
 import implementation.compare.MyGitCompareWithBranchAction;
 import implementation.lineStatusTracker.MyLineStatusTrackerImpl;
 import implementation.scope.MyScope;
 import org.jetbrains.annotations.NotNull;
 import ui.ToolWindowUI;
-import implementation.targetBranchWidget.MyBranchAction;
-import utils.Git;
 
 import javax.swing.*;
 
@@ -384,8 +381,8 @@ public class Manager {
 //        this.updateScope();
 
         // PUBLISH to custom listener
-        ChangeActionNotifierInterface publisher = messageBus.syncPublisher(ChangeActionNotifierInterface.CHANGE_ACTION_TOPIC);
-        publisher.doAction("doAction");
+//        ChangeActionNotifierInterface publisher = messageBus.syncPublisher(ChangeActionNotifierInterface.CHANGE_ACTION_TOPIC);
+//        publisher.doAction("doAction");
 
     }
 
@@ -397,8 +394,8 @@ public class Manager {
         this.updateScope();
 
         // PUBLISH to custom listener
-        ChangeActionNotifierInterface publisher = messageBus.syncPublisher(ChangeActionNotifierInterface.CHANGE_ACTION_TOPIC);
-        publisher.doAction("doAction");
+//        ChangeActionNotifierInterface publisher = messageBus.syncPublisher(ChangeActionNotifierInterface.CHANGE_ACTION_TOPIC);
+//        publisher.doAction("doAction");
 
     }
 

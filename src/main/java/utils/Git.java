@@ -66,19 +66,4 @@ public class Git {
         return this.repository.getRoot();
     }
 
-    public String getBranchName() {
-
-        String currentBranchName = "";
-
-        List<String> branches = new ArrayList<String>();
-
-        this.getRepositories().forEach(repo -> {
-            branches.add(repo.getCurrentBranchName());
-        });
-
-        currentBranchName = String.join(", ", branches);
-
-        return currentBranchName;
-    }
-
 }

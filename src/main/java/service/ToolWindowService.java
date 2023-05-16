@@ -8,14 +8,11 @@ import com.intellij.openapi.wm.ToolWindowManager;
 import com.intellij.ui.content.Content;
 import com.intellij.ui.content.ContentFactory;
 import com.intellij.ui.content.ContentManager;
-import com.intellij.ui.content.ContentManagerListener;
 import listener.MyTabContentListener;
 import model.MyModel;
 import example.ToolWindowView;
 import org.jetbrains.annotations.NotNull;
-
-import java.beans.PropertyChangeEvent;
-import java.beans.PropertyChangeListener;
+import org.jetbrains.annotations.Nullable;
 
 @Service(Service.Level.PROJECT)
 public final class ToolWindowService implements ToolWindowServiceInterface {
@@ -38,15 +35,16 @@ public final class ToolWindowService implements ToolWindowServiceInterface {
         return getToolWindow().getContentManager();
     }
 
-    public void addTab(MyModel myModel, String tabName) {
+    public void addTab(MyModel myModel, String tabName, boolean closeable) {
         ToolWindowView toolWindowView = new ToolWindowView(project, myModel);
         Content content = ContentFactory.getInstance().createContent(toolWindowView.getRootPanel(), tabName, false);
-        content.setCloseable(true);
+        content.setCloseable(closeable);
         ContentManager contentManager = getContentManager();
 //        contentManager.getComponent();
         contentManager.addContent(content);
-//        int index = contentManager.getIndexOfContent(content);
-//        System.out.println("addTab " + tabName + "as index" + index);
+
+        int index = contentManager.getIndexOfContent(content);
+        System.out.println("addTab " + tabName + " with index " + index);
     }
 
 
@@ -57,6 +55,39 @@ public final class ToolWindowService implements ToolWindowServiceInterface {
     @Override
     public void changeTabName(String title) {
         getToolWindow().setTitle(title);
+//        setClosable();
     }
 
+//    public void setClosable() {
+//        @Nullable Content currentTabContent = getContentManager().getSelectedContent();
+//        if (currentTabContent == null) {
+//            return;
+//        }
+//        currentTabContent.setCloseable(true);
+//    }
+
+    public void removeTab(int index) {
+        @Nullable Content content = getContentManager().getContent(index);
+        if (content == null) {
+            return;
+        }
+        getContentManager().removeContent(content, false);
+    }
+
+    public void removeCurrentTab() {
+        @Nullable Content content = getContentManager().getSelectedContent();
+        if (content == null) {
+            return;
+        }
+        getContentManager().removeContent(content, false);
+    }
+
+    public void selectNewTab() {
+        int count = getContentManager().getContentCount();
+        @Nullable Content content = getContentManager().getContent(count - 2);
+        if (content == null) {
+            return;
+        }
+        getContentManager().setSelectedContent(content);
+    }
 }

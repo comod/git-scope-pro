@@ -1,48 +1,38 @@
 package service;
 
 import com.intellij.openapi.project.Project;
-import example.ViewService;
 import git4idea.repo.GitRepository;
-import implementation.Manager;
-import implementation.targetBranchWidget.MyBranchAction;
-import model.valueObject.TargetBranch;
-import state.State;
-import ui.ToolWindowUI;
+import model.valueObject.TargetBranchMap;
 import utils.Git;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Consumer;
 
 import static java.util.stream.Collectors.joining;
 
 public class TargetBranchService {
 
-    private final GitService git;
+    private final GitService gitService;
 
     public TargetBranchService(Project project) {
-        this.git = project.getService(GitService.class);
+        this.gitService = project.getService(GitService.class);
     }
 
-    public String getTargetBranchDisplay(TargetBranch targetBranch) {
+    public String getTargetBranchDisplay(TargetBranchMap targetBranch) {
+        List<String> branches = new ArrayList<String>();
 
-        Map<String, String> list = new HashMap<>();
+        gitService.getRepositories().forEach(repo -> {
+            String currentBranchName = getTargetBranchByRepositoryDisplay(repo, targetBranch);
 
-        git.getRepositories().forEach(repo -> {
-            String targetBranchByRepo = getTargetBranchByRepositoryDisplay(repo, targetBranch);
-            list.put(targetBranchByRepo, targetBranchByRepo);
+            if (!Objects.equals(currentBranchName, "HEAD")) {
+                branches.add(currentBranchName);
+            }
         });
 
-        return list
-                .entrySet()
-                .stream()
-                .map(Map.Entry::getValue)
-                .collect(joining(", "));
-
+        return String.join(", ", branches);
     }
 
-    public String getTargetBranchByRepositoryDisplay(GitRepository repo, TargetBranch targetBranch) {
+    public String getTargetBranchByRepositoryDisplay(GitRepository repo, TargetBranchMap targetBranch) {
 
 //        if (!isFeatureActive()) {
 //            return Git.BRANCH_HEAD;
@@ -57,7 +47,7 @@ public class TargetBranchService {
 
     }
 
-    public String getTargetBranchByRepository(GitRepository repo, TargetBranch repositoryTargetBranchMap) {
+    public String getTargetBranchByRepository(GitRepository repo, TargetBranchMap repositoryTargetBranchMap) {
 
         if (repositoryTargetBranchMap == null) {
             return null;
@@ -66,22 +56,22 @@ public class TargetBranchService {
         return repositoryTargetBranchMap.getValue().get(repo.toString());
 
     }
-
-    public Boolean isHeadActually(TargetBranch targetBranchByRepo) {
-
-        AtomicReference<Boolean> isHead = new AtomicReference<>(true);
-
-        // repo, git, changes, targetbranch cleanup @todo
-        git.getRepositories().forEach(repo -> {
-            String branchToCompare = targetBranchByRepo.getValue().get(repo.toString());
-//            String targetBranchByRepo = getTargetBranchByRepository(repo, t);
-            if (branchToCompare != null && !branchToCompare.equals(Git.BRANCH_HEAD)) {
-                isHead.set(false);
-            }
-        });
-
-        return isHead.get();
-    }
+//
+//    public Boolean isHeadActually(TargetBranchMap targetBranchByRepo) {
+//
+//        AtomicReference<Boolean> isHead = new AtomicReference<>(true);
+//
+//        // repo, git, changes, targetbranch cleanup @todo
+//        gitService.getRepositories().forEach(repo -> {
+//            String branchToCompare = targetBranchByRepo.getValue().get(repo.toString());
+////            String targetBranchByRepo = getTargetBranchByRepository(repo, t);
+//            if (branchToCompare != null && !branchToCompare.equals(Git.BRANCH_HEAD)) {
+//                isHead.set(false);
+//            }
+//        });
+//
+//        return isHead.get();
+//    }
 
 
 }

@@ -1,6 +1,7 @@
 package example;
 
 import com.intellij.icons.AllIcons;
+import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.VerticalFlowLayout;
 import com.intellij.ui.ColoredTreeCellRenderer;
 import com.intellij.ui.SearchTextField;
@@ -18,11 +19,11 @@ public class BranchTree extends JPanel {
 
     private final Tree myTree;
     private final SearchTextField search;
-    private final Map<String, List<FavLabel>> nodes;
+    private final Map<String, List<BranchTreeEntry>> nodes;
     private final DefaultTreeModel model;
     private final DefaultMutableTreeNode root;
 
-    public BranchTree(Map<String, List<FavLabel>> nodes, SearchTextField search) {
+    public BranchTree(Project project, Map<String, List<BranchTreeEntry>> nodes, SearchTextField search) {
         this.nodes = nodes;
         this.search = search;
         this.setLayout(new VerticalFlowLayout());
@@ -37,30 +38,39 @@ public class BranchTree extends JPanel {
         myTree.setBorder(JBUI.Borders.empty(JBUI.emptyInsets()));
         add(myTree);
         myTree.setCellRenderer(new MyColoredTreeCellRenderer());
-        myTree.addTreeSelectionListener(treeSelectionEvent -> {
-            DefaultMutableTreeNode node = (DefaultMutableTreeNode) myTree.getLastSelectedPathComponent();
-            if (node == null) return;
-            Object object = node.getUserObject();
-            if (object instanceof FavLabel favLabel) {
-                System.out.println(favLabel);
-            }
-        });
+        myTree.addTreeSelectionListener(new listener.MyTreeSelectionListener(project, myTree));
+//        myTree.addTreeSelectionListener(treeSelectionEvent -> {
+//            DefaultMutableTreeNode node = (DefaultMutableTreeNode) myTree.getLastSelectedPathComponent();
+//            if (node == null) return;
+//            Object object = node.getUserObject();
+//            if (object instanceof FavLabel favLabel) {
+//                System.out.println(favLabel);
+//            }
+//
+//            if (object instanceof String label) {
+//                System.out.println(label);
+//            }
+//        });
         update(search);
     }
 
     @NotNull
     private static DefaultMutableTreeNode createTreeStructure(
-            Map<String, List<FavLabel>> nodes, SearchTextField search
+            Map<String, List<BranchTreeEntry>> nodes,
+            SearchTextField search
     ) {
         DefaultMutableTreeNode root = new DefaultMutableTreeNode();
 //        this.setBorder(JBUI.Borders.empty(JBUI.emptyInsets()));
+
         nodes.forEach((nodeLabel, list) -> {
             DefaultMutableTreeNode node = new DefaultMutableTreeNode(nodeLabel);
-            list.forEach(e -> {
-                if (e.getName().contains(search.getText())) {
-                    node.add(new DefaultMutableTreeNode(e));
-                }
-            });
+            if (list != null) {
+                list.forEach(e -> {
+                    if (e.getName().contains(search.getText())) {
+                        node.add(new DefaultMutableTreeNode(e));
+                    }
+                });
+            }
             root.add(node);
         });
         return root;
@@ -110,8 +120,14 @@ public class BranchTree extends JPanel {
             if (userObject == null) {
                 return;
             }
-            if (userObject instanceof FavLabel projectTemplate) {
+            if (userObject instanceof BranchTreeEntry projectTemplate) {
                 setIcon((projectTemplate.isFav() ? AllIcons.Nodes.Favorite : AllIcons.Vcs.Branch));
+            }
+
+            if (userObject instanceof String label) {
+                switch (label) {
+                    case "HEAD", "Tag or Revision..." -> setIcon(AllIcons.Vcs.Branch);
+                }
             }
 
             String string = userObject.toString();
@@ -119,7 +135,7 @@ public class BranchTree extends JPanel {
 //            append(string, SimpleTextAttributes.SYNTHETIC_ATTRIBUTES);
 //            setVisible(false);
 
-//            SpeedSearchUtil.applySpeedSearchHighlightingFiltered(tree, value, (SimpleColoredComponent) this, false, selected);
+//            SpeedSearchUtil.applySpeedSearchHighlightingFiltered(tree, value, (SimpleColoredComponent) this, true, selected);
         }
     }
 }

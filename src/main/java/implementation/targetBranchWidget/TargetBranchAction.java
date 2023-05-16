@@ -8,7 +8,6 @@ import example.ViewService;
 import git4idea.branch.GitBranchType;
 import git4idea.repo.GitRepository;
 import git4idea.ui.branch.GitBranchManager;
-import model.valueObject.TargetBranch;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -81,7 +80,8 @@ public class TargetBranchAction extends MyBranchAction {
 //            MyBranchAction myBranchAction = (MyBranchAction) e;
         Map<String, String> repositoryTargetBranchMap = new HashMap<>();
         repositoryTargetBranchMap.put(myBranchAction.getRepoName(), myBranchAction.getBranchName());
-        viewService.getCurrent().setTargetBranch(new TargetBranch(repositoryTargetBranchMap));
+        // @todo delete reverse from here
+//        viewService.getCurrent().setTargetBranch(new TargetBranch(repositoryTargetBranchMap));
     }
 
     public Boolean getHide() {

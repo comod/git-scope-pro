@@ -8,9 +8,8 @@ import com.intellij.util.messages.MessageBus;
 import com.intellij.util.messages.MessageBusConnection;
 import git4idea.repo.GitRepository;
 import implementation.compare.MyGitCompareWithBranchAction;
-import implementation.lineStatusTracker.MyLineStatusTrackerImpl;
 import implementation.scope.MyScope;
-import model.valueObject.TargetBranch;
+import model.valueObject.TargetBranchMap;
 import ui.ToolWindowUI;
 
 import java.util.*;
@@ -22,7 +21,6 @@ public class ChangesService {
     private final Map<GitRepository, Collection<Change>> changesByRepoMap = new HashMap<>();
     private ToolWindowUI toolWindowUI;
     private MyScope myScope;
-    private MyLineStatusTrackerImpl myLineStatusTrackerImpl;
     private Project project;
 
     //    Map<String, String> repositoryTargetBranchMap = null;
@@ -74,89 +72,88 @@ public class ChangesService {
 //
 //    }
 
-    public Collection<Change> getOnlyLocalChanges() {
+//    public Collection<Change> getOnlyLocalChanges() {
+//
+////        Collection<Change> changes = new ArrayList<>();
+//
+//        ChangeListManager changeListManager = ChangeListManager.getInstance(project);
+//        Collection<Change> localChanges = changeListManager.getAllChanges();
+//
+////        for (Change localChange : localChanges) {
+////
+////            VirtualFile localChangeVirtualFile = localChange.getVirtualFile();
+////            if (localChangeVirtualFile == null) {
+////                continue;
+////            }
+////
+////            changes.add(localChange);
+////
+////        }
+//
+//        return localChanges;
+//    }
 
-//        Collection<Change> changes = new ArrayList<>();
-
-        ChangeListManager changeListManager = ChangeListManager.getInstance(project);
-        Collection<Change> localChanges = changeListManager.getAllChanges();
-
+//    public Collection<Change> addLocalChanges(Collection<Change> changes) {
+//
+////        if (changes == null) {
+////            return;
+////        }
+//
+//        ChangeListManager changeListManager = ChangeListManager.getInstance(project);
+//        Collection<Change> localChanges = changeListManager.getAllChanges();
+//
 //        for (Change localChange : localChanges) {
 //
 //            VirtualFile localChangeVirtualFile = localChange.getVirtualFile();
 //            if (localChangeVirtualFile == null) {
 //                continue;
 //            }
+//            String localChangePath = localChangeVirtualFile.getPath();
 //
-//            changes.add(localChange);
+////            System.out.println("=================================================================");
+////            System.out.println(localChangePath);
+////
+////            String repoPath = repo.toString();
+////            System.out.println(repoPath);
+////
+////            if (!isLocalChangeForThisRepo(localChangePath)) {
+////                System.out.println("not for this Repo - Skip!");
+////                continue;
+////            }
 //
-//        }
-
-        return localChanges;
-    }
-
-    public Collection<Change> addLocalChanges(Collection<Change> changes) {
-
-//        if (changes == null) {
-//            return;
-//        }
-
-        ChangeListManager changeListManager = ChangeListManager.getInstance(project);
-        Collection<Change> localChanges = changeListManager.getAllChanges();
-
-        for (Change localChange : localChanges) {
-
-            VirtualFile localChangeVirtualFile = localChange.getVirtualFile();
-            if (localChangeVirtualFile == null) {
-                continue;
-            }
-            String localChangePath = localChangeVirtualFile.getPath();
-
-//            System.out.println("=================================================================");
-//            System.out.println(localChangePath);
-//
-//            String repoPath = repo.toString();
-//            System.out.println(repoPath);
-//
-//            if (!isLocalChangeForThisRepo(localChangePath)) {
-//                System.out.println("not for this Repo - Skip!");
-//                continue;
+//            if (isLocalChangeOnly(localChangePath, changes)) {
+//                changes.add(localChange);
 //            }
+//
+//        }
+//
+//        return changes;
+//    }
 
-            if (isLocalChangeOnly(localChangePath, changes)) {
-                changes.add(localChange);
-            }
+//    private Boolean isLocalChangeOnly(String localChangePath, Collection<Change> changes) {
+//
+//        if (changes == null) {
+//            return false;
+//        }
+//
+//        for (Change change : changes) {
+//            VirtualFile vFile = change.getVirtualFile();
+//            if (vFile == null) {
+//                return false;
+//            }
+//            String changePath = change.getVirtualFile().getPath();
+//
+//            if (localChangePath.equals(changePath)) {
+//                // we have already this file in our changes-list
+//                return false;
+//            }
+//        }
+//
+//        return true;
+//
+//    }
 
-        }
-
-        return changes;
-    }
-
-    private Boolean isLocalChangeOnly(String localChangePath, Collection<Change> changes) {
-
-        if (changes == null) {
-            return false;
-        }
-
-        for (Change change : changes) {
-            VirtualFile vFile = change.getVirtualFile();
-            if (vFile == null) {
-                return false;
-            }
-            String changePath = change.getVirtualFile().getPath();
-
-            if (localChangePath.equals(changePath)) {
-                // we have already this file in our changes-list
-                return false;
-            }
-        }
-
-        return true;
-
-    }
-
-
-    public void collectChanges(TargetBranch targetBranchByRepo, Consumer<Collection<Change>> callBack) {
+    public void collectChanges(TargetBranchMap targetBranchByRepo, Consumer<Collection<Change>> callBack) {
         git.getRepositories().forEach(repo -> {
             String branchToCompare = null;
             if (targetBranchByRepo == null) {
@@ -171,6 +168,7 @@ public class ChangesService {
                 branchToCompare = GitService.BRANCH_HEAD;
             }
 
+            System.out.println("compare repo: " + repo + ", branch: " + branchToCompare);
             myGitCompareWithBranchAction.collectChangesAndProcess(project, repo, branchToCompare, callBack);
         });
     }

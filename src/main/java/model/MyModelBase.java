@@ -1,20 +1,24 @@
 package model;
 
-import com.intellij.openapi.vcs.changes.Change;
-import io.reactivex.rxjava3.core.Observable;
-import io.reactivex.rxjava3.subjects.PublishSubject;
-import model.valueObject.TargetBranch;
-
-import java.util.Collection;
+import git4idea.repo.GitRepository;
+import model.valueObject.TargetBranchMap;
 
 public class MyModelBase {
-    public TargetBranch targetBranch;
+    public TargetBranchMap targetBranchMap = null;
 
-    public TargetBranch getTargetBranch() {
-        return targetBranch;
+    public TargetBranchMap getTargetBranchMap() {
+        return targetBranchMap;
     }
 
-    public void setTargetBranch(TargetBranch targetBranch) {
-        this.targetBranch = targetBranch;
+    public void setTargetBranchMap(TargetBranchMap targetBranch) {
+        this.targetBranchMap = targetBranch;
+    }
+
+    public void addTargetBranch(GitRepository repo, String branch) {
+        if (targetBranchMap == null) {
+            System.out.println("create new targetBranchMap");
+            targetBranchMap = TargetBranchMap.create();
+        }
+        targetBranchMap.add(repo.toString(), branch);
     }
 }

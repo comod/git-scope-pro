@@ -4,7 +4,7 @@ import com.intellij.dvcs.DvcsUtil;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
-import example.FavLabel;
+import example.BranchTreeEntry;
 import git4idea.GitLocalBranch;
 import git4idea.GitUtil;
 import git4idea.branch.GitBranchType;
@@ -17,15 +17,12 @@ import implementation.compare.MyGitCompareWithBranchAction;
 import one.util.streamex.StreamEx;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 
 public class GitService {
 
     public static final String BRANCH_HEAD = "HEAD";
-    public static final Comparator<FavLabel> FAVORITE_BRANCH_COMPARATOR = Comparator.comparing(branch -> branch.isFav() ? -1 : 0);
+    public static final Comparator<BranchTreeEntry> FAVORITE_BRANCH_COMPARATOR = Comparator.comparing(branch -> branch.isFav() ? -1 : 0);
     private final GitRepositoryManager repositoryManager;
     private final Project project;
     private final MyGitCompareWithBranchAction myGitCompareWithBranchAction;
@@ -63,9 +60,9 @@ public class GitService {
 
     }
 
-    public GitBranchesCollection branchesCollection() {
-        return getRepository().getBranches();
-    }
+//    public GitBranchesCollection branchesCollection() {
+//        return getRepository().getBranches();
+//    }
 
     //    public List<FavLabel> iconLabelListOfLocalBranches() {
 //        Collection<GitLocalBranch> remoteBranches = branchesCollection().getLocalBranches();
@@ -79,14 +76,14 @@ public class GitService {
 //                .toList();
 //    }
     @NotNull
-    public List<FavLabel> iconLabelListOfLocalBranches() {
-        Collection<GitLocalBranch> remoteBranches = branchesCollection().getLocalBranches();
-        return StreamEx.of(remoteBranches)
+    public List<BranchTreeEntry> iconLabelListOfLocalBranches(GitRepository repo) {
+        Collection<GitLocalBranch> branches = repo.getBranches().getLocalBranches();
+        return StreamEx.of(branches)
 //                .filter(branch -> !branch.equals(currentBranch))
                 .map(branch -> {
                     String name = branch.getName();
-                    boolean isFav = gitBranchManager.isFavorite(GitBranchType.LOCAL, getRepository(), name);
-                    return new FavLabel(name, isFav);
+                    boolean isFav = gitBranchManager.isFavorite(GitBranchType.LOCAL, repo, name);
+                    return BranchTreeEntry.create(name, isFav, repo);
                 })
                 .sorted((b1, b2) -> {
                     int delta = FAVORITE_BRANCH_COMPARATOR.compare(b1, b2);
@@ -117,18 +114,19 @@ public class GitService {
 //    }
 
     public String getCurrentBranchName() {
-
-        String currentBranchName = "";
-
         List<String> branches = new ArrayList<String>();
 
         this.getRepositories().forEach(repo -> {
-            branches.add(repo.getCurrentBranchName());
+            String currentBranchName = repo.getCurrentBranchName();
+            if (!Objects.equals(currentBranchName, "HEAD")) {
+                branches.add(currentBranchName);
+            }
         });
 
-        currentBranchName = String.join(", ", branches);
-
-        return currentBranchName;
+        return String.join(", ", branches);
     }
 
+    public boolean isMulti() {
+        return repositoryManager.moreThanOneRoot();
+    }
 }
