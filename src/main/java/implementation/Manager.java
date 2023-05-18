@@ -14,10 +14,9 @@ import com.intellij.openapi.vfs.newvfs.BulkFileListener;
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent;
 import com.intellij.util.messages.MessageBus;
 import com.intellij.util.messages.MessageBusConnection;
-import event.ChangeActionNotifierInterface;
 import service.GitService;
 import git4idea.repo.GitRepository;
-import implementation.compare.MyGitCompareWithBranchAction;
+import implementation.compare.ChangesService;
 import implementation.lineStatusTracker.MyLineStatusTrackerImpl;
 import implementation.scope.MyScope;
 import org.jetbrains.annotations.NotNull;
@@ -47,7 +46,7 @@ public class Manager {
     private Collection<Change> changes;
     private Collection<Change> changesBefore;
     private Queue<String> queue;
-    private MyGitCompareWithBranchAction myGitCompareWithBranchAction;
+    private ChangesService myGitCompareWithBranchAction;
     private MessageBus messageBus;
     private MessageBusConnection messageBusConnection;
 

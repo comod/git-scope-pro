@@ -79,7 +79,7 @@ public final class ToolWindowService implements ToolWindowServiceInterface {
         if (content == null) {
             return;
         }
-        getContentManager().removeContent(content, false);
+        getContentManager().removeContent(content, true);
     }
 
     public void selectNewTab() {

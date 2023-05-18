@@ -52,6 +52,7 @@ public class MyModel extends MyModelBase {
     public boolean isNew() {
         TargetBranchMap targetBranchMap = getTargetBranchMap();
         if (targetBranchMap == null) {
+            System.out.println("isNew - null");
             return true;
         }
         return targetBranchMap.getValue().isEmpty();
@@ -62,7 +63,9 @@ public class MyModel extends MyModelBase {
     }
 
     public void setActive(boolean b) {
-        changeObservable.onNext(field.active);
+        if (b) {
+            changeObservable.onNext(field.active);
+        }
         this.isActive = b;
     }
 

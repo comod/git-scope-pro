@@ -1,37 +1,43 @@
 package example;
 
 import com.intellij.openapi.project.Project;
-import com.intellij.util.messages.MessageBus;
-import event.ChangeActionNotifierInterface;
+import com.intellij.openapi.vcs.changes.Change;
+import implementation.compare.ChangesService;
+import implementation.lineStatusTracker.MyLineStatusTrackerImpl;
+import io.reactivex.rxjava3.core.Observable;
+import model.Debounce;
 import model.MyModel;
 import model.MyModelBase;
-import service.ChangesService;
+import model.valueObject.TargetBranchMap;
 import service.TargetBranchService;
 import service.ToolWindowServiceInterface;
 import state.State;
 
 import javax.swing.*;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 public class ViewService {
 
     public static final String PLUS_TAB_LABEL = "+";
+    public static final int DEBOUNCE_MS = 50;
     private final Project project;
     private final ToolWindowServiceInterface toolWindowService;
     private final TargetBranchService targetBranchService;
     private final ChangesService changesService;
     private final State state;
-//    private final MessageBusConnection messageBusConnection;
-
+    //    private final MessageBusConnection messageBusConnection;
+//        private final MessageBusConnection messageBusConnection;
+//    private final MessageBus messageBus;
+    private final MyLineStatusTrackerImpl myLineStatusTrackerImpl;
+    private final Debounce debouncer;
+    //    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
     public List<MyModel> collection = new ArrayList<>();
-
     public Integer currentTabIndex = 0;
-
     private boolean vcsReady = false;
     private boolean toolWindowReady = false;
-
-    private MessageBus messageBus;
     private MyModel myHeadModel;
 
     public ViewService(Project project) {
@@ -40,20 +46,33 @@ public class ViewService {
         this.changesService = project.getService(ChangesService.class);
         this.targetBranchService = project.getService(TargetBranchService.class);
         this.state = project.getService(State.class);
-
-        this.messageBus = this.project.getMessageBus();
+        this.myLineStatusTrackerImpl = new MyLineStatusTrackerImpl(project);
+        this.debouncer = new Debounce();
+//        this.messageBus = this.project.getMessageBus();
 //        this.messageBusConnection = messageBus.connect();
     }
 
+    private void doUpdateDebounced(Collection<Change> changes) {
+        debouncer.debounce(Void.class, () -> doUpdate(changes), DEBOUNCE_MS, TimeUnit.MILLISECONDS);
+    }
+
     public void load() {
+        System.out.println("LOAD");
         List<MyModel> modelCollection = new ArrayList<>();
         List<MyModelBase> load = this.state.load();
         if (load == null) {
+            System.out.println("LOAD - null");
             return;
         }
         load.forEach(myModelBase -> {
             MyModel myModel = new MyModel();
-            myModel.setTargetBranchMap(myModelBase.targetBranchMap);
+            TargetBranchMap targetBranchMap = myModelBase.targetBranchMap;
+            if (targetBranchMap == null) {
+                System.out.println("LOAD - targetBranchMap null");
+                return;
+            }
+            System.out.println("LOAD! - " + targetBranchMap.getValue());
+            myModel.setTargetBranchMap(targetBranchMap);
             modelCollection.add(myModel);
         });
         setCollection(modelCollection);
@@ -73,10 +92,22 @@ public class ViewService {
         if (!vcsReady || !toolWindowReady) {
             return;
         }
+
+//        try {
+//            Thread.sleep(500);
+//        } catch (InterruptedException e) {
+//            e.printStackTrace();
+//        }
+
+//        Platform.runLater(() -> {
+//
+//                });
         SwingUtilities.invokeLater(this::initLater);
+//        initLater();
     }
 
     public void initLater() {
+
         load();
         List<MyModel> modelCollection = getCollection();
 //        if (collection.size() == 0) {
@@ -91,16 +122,17 @@ public class ViewService {
 //        }
         //            System.out.println("==");
         //            System.out.println(model.getTargetBranch().getValue());
-        modelCollection.forEach(this::collectChanges);
+        System.out.println("=== collectChanges, subscribeToObservable after load");
+//        modelCollection.forEach(this::collectChanges);
         modelCollection.forEach(this::subscribeToObservable);
 
         initTabs();
         setActiveModel();
     }
 
-
     public void initTabs() {
 
+        System.out.println("=== InitTabs");
         List<MyModel> collection = this.getCollection();
         int size = collection.size();
 //        if (size == 0) {
@@ -108,10 +140,7 @@ public class ViewService {
 //            return;
 //        }
 
-        this.myHeadModel = new MyModel(true);
-        toolWindowService.addTab(myHeadModel, "HEAD", false);
-        subscribeToObservable(myHeadModel);
-        collectChanges(myHeadModel);
+        initHeadTab();
 
         if (size > 0) {
             System.out.println("init " + size + " tabs");
@@ -125,6 +154,13 @@ public class ViewService {
         addPlusTab();
     }
 
+    private void initHeadTab() {
+        this.myHeadModel = new MyModel(true);
+        toolWindowService.addTab(myHeadModel, "HEAD", false);
+        subscribeToObservable(myHeadModel);
+        collectChanges(myHeadModel);
+    }
+
     private void addPlusTab() {
         toolWindowService.addTab(new MyModel(), PLUS_TAB_LABEL, false);
     }
@@ -134,31 +170,40 @@ public class ViewService {
 //        MyModel model = addModel();
         int currentIndexOfPlusTab = getTabIndex();
         toolWindowService.addTab(addModel(), "New*", true);
+//            toolWindowService.removeCurrentTab();
         addPlusTab();
-//        toolWindowService.removeCurrentTab();
         toolWindowService.selectNewTab();
-
-        SwingUtilities.invokeLater(() -> toolWindowService.removeTab(currentIndexOfPlusTab));
+        toolWindowService.removeTab(currentIndexOfPlusTab);
+        setTabIndex(collection.size());
+        setActiveModel();
+//        SwingUtilities.invokeLater(toolWindowService::selectNewTab);
+//        SwingUtilities.invokeLater(() -> toolWindowService.removeTab(currentIndexOfPlusTab));
 
     }
 
     private void subscribeToObservable(MyModel model) {
-        model.getObservable().subscribe(field -> {
-            System.out.println("model saved");
-            switch (field) {
-                case targetBranch -> {
-                    System.out.println("targetBranch");
+        Observable<MyModel.field> observable = model.getObservable();
+//        observable.onErrorComplete(e -> {
+//
+//        });
+        observable.
+//                debounce(500, TimeUnit.MILLISECONDS).
+        subscribe(field -> {
+    System.out.println("MODELEVENT " + field);
+    switch (field) {
+        case targetBranch -> {
+            System.out.println("targetBranch");
 //                    Boolean isHead = targetBranchService.isHeadActually(model.get());
 //                    System.out.println("isHed" + isHead);
-                    toolWindowService.changeTabName(getTargetBranchDisplay(model));
+            toolWindowService.changeTabName(getTargetBranchDisplay(model));
 //                    model.getTargetBranch().get()
 //                    Collection<Change> changes = changesService.getOnlyLocalChanges();
-                    collectChanges(model);
+            collectChanges(model);
 //                    model.setChanges(changes);
-                    save();
-                }
-                case changes -> {
-                    System.out.println("changes");
+            save();
+        }
+        case changes -> {
+//                            System.out.println("changes");
 //                    if (changesBefore != null && changesBefore.equals(changes)) {
 //                        changesAreTheSame = true;
 //                    }
@@ -166,25 +211,28 @@ public class ViewService {
 //                        return;
 //                    }
 //                    boolean isSameModel = model == getCurrent();
-                    if (model.isActive()) {
-                        System.out.println("!!!changes set and this model is active yay");
-                        dispatchChangesEvent(model);
-                    }
-                }
-                case active -> {
-                    System.out.println("!!!changes set and this model is active yay");
-                    dispatchChangesEvent(model);
-                }
+            if (model.isActive()) {
+
+                Collection<Change> changes = model.getChanges();
+                doUpdateDebounced(changes);
+//                this.currentModel.setChanges(changes);
+//                System.out.println("!!!doUpdate (case changes)");
+//                doUpdate(model);
             }
+        }
+        case active -> {
+//                            System.out.println("!!!doUpdate (case active)");
 
-        });
+            collectChanges(model);
+//                            doUpdate(model);
+        }
     }
 
-    private void dispatchChangesEvent(MyModel model) {
-        ChangeActionNotifierInterface publisher = messageBus.syncPublisher(ChangeActionNotifierInterface.CHANGE_ACTION_TOPIC);
-        publisher.doAction(model);
-    }
+}, (e -> {
+    System.out.println(">>> EXCEPTION: " + e.getMessage());
+}));
 
+    }
 
     private String getTargetBranchDisplay(MyModel model) {
         return this.targetBranchService.
@@ -192,7 +240,13 @@ public class ViewService {
     }
 
     private void collectChanges(MyModel model) {
-        changesService.collectChanges(model.getTargetBranchMap(), model::setChanges);
+        TargetBranchMap targetBranchMap = model.getTargetBranchMap();
+        if (targetBranchMap == null) {
+            System.out.println("CCC Collect Changes (null)");
+        } else {
+            System.out.println("CCC Collect Changes " + targetBranchMap.getValue());
+        }
+        changesService.collectChangesWithCallback(targetBranchMap, model::setChanges);
     }
 
     public MyModel addModel() {
@@ -203,11 +257,22 @@ public class ViewService {
     }
 
     public MyModel getCurrent() {
+        int currentModelIndex = getCurrentModelIndex();
+        List<MyModel> collection = this.getCollection();
+        System.out.println("getCurrent by ModelIndex " + currentModelIndex);
+        int size = collection.size();
+        System.out.println("size: " + size);
+//        if (size == 0) {
+//            return myHeadModel;
+//        }
+        if (currentModelIndex >= size) {
+            System.out.println("!WARNING: out of bound");
+            return myHeadModel;
+        }
         if (getTabIndex() == 0) {
             return myHeadModel;
         }
-        System.out.println("getCurrent by ModelIndex " + getCurrentModelIndex());
-        return this.getCollection().get(getCurrentModelIndex());
+        return collection.get(currentModelIndex);
     }
 
     public List<MyModel> getCollection() {
@@ -251,5 +316,20 @@ public class ViewService {
             myModel.setActive(false);
         });
         this.getCurrent().setActive(true);
+    }
+
+    public void doUpdate(Collection<Change> changes) {
+
+        System.out.println("@@@ doUpdate");
+//        Collection<Change> changes = model.getChanges();
+        System.out.println(changes);
+        if (changes == null) {
+            System.out.println("stop doUpdate");
+            return;
+        }
+
+        SwingUtilities.invokeLater(() -> {
+            myLineStatusTrackerImpl.update(changes, null);
+        });
     }
 }

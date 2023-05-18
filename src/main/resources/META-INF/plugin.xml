@@ -56,7 +56,7 @@
         <projectService serviceImplementation="example.ViewService"/>
         <projectService serviceImplementation="implementation.targetBranchWidget.PopUpFactory"/>
         <projectService serviceImplementation="service.TargetBranchService"/>
-        <projectService serviceImplementation="service.ChangesService"/>
+        <projectService serviceImplementation="implementation.compare.ChangesService"/>
         <projectService
                 serviceInterface="service.ToolWindowServiceInterface"
                 serviceImplementation="service.ToolWindowService"/>

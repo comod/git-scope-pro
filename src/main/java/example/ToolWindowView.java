@@ -104,7 +104,7 @@ public class ToolWindowView {
     private void render() {
         boolean myModelIsNew = myModel.isNew();
         boolean isHeadTab = myModel.isHeadTab();
-        System.out.println("render (myModelIsNew: " + myModelIsNew + " isHeadTab:" + isHeadTab);
+        System.out.println("===render toolWindowView (myModelIsNew: " + myModelIsNew + " isHeadTab:" + isHeadTab);
         boolean showSceneA = myModelIsNew && !isHeadTab;
         sceneA.setVisible(showSceneA);
         sceneB.setVisible(!showSceneA);

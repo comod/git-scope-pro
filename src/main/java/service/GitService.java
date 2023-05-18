@@ -8,12 +8,10 @@ import example.BranchTreeEntry;
 import git4idea.GitLocalBranch;
 import git4idea.GitUtil;
 import git4idea.branch.GitBranchType;
-import git4idea.branch.GitBranchesCollection;
 import git4idea.config.GitVcsSettings;
 import git4idea.repo.GitRepository;
 import git4idea.repo.GitRepositoryManager;
 import git4idea.ui.branch.GitBranchManager;
-import implementation.compare.MyGitCompareWithBranchAction;
 import one.util.streamex.StreamEx;
 import org.jetbrains.annotations.NotNull;
 
@@ -25,7 +23,7 @@ public class GitService {
     public static final Comparator<BranchTreeEntry> FAVORITE_BRANCH_COMPARATOR = Comparator.comparing(branch -> branch.isFav() ? -1 : 0);
     private final GitRepositoryManager repositoryManager;
     private final Project project;
-    private final MyGitCompareWithBranchAction myGitCompareWithBranchAction;
+    //    private final MyGitCompareWithBranchAction myGitCompareWithBranchAction;
     private final GitBranchManager gitBranchManager;
     private GitRepository repository;
     private VirtualFile rootGitFile;
@@ -36,7 +34,7 @@ public class GitService {
         this.project = project;
         repositoryManager = GitRepositoryManager.getInstance(this.project);
         this.gitBranchManager = project.getService(GitBranchManager.class);
-        this.myGitCompareWithBranchAction = new MyGitCompareWithBranchAction();
+//        this.myGitCompareWithBranchAction = new MyGitCompareWithBranchAction();
 
         this.repoChangedListener();
 
