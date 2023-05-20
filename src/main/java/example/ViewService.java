@@ -172,10 +172,10 @@ public class ViewService {
         toolWindowService.addTab(addModel(), "New*", true);
 //            toolWindowService.removeCurrentTab();
         addPlusTab();
-        toolWindowService.selectNewTab();
         toolWindowService.removeTab(currentIndexOfPlusTab);
         setTabIndex(collection.size());
         setActiveModel();
+        toolWindowService.selectNewTab();
 //        SwingUtilities.invokeLater(toolWindowService::selectNewTab);
 //        SwingUtilities.invokeLater(() -> toolWindowService.removeTab(currentIndexOfPlusTab));
 

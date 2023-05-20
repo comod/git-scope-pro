@@ -35,8 +35,6 @@ public class MyTabContentListener implements ContentManagerListener {
             this.viewService.setTabIndex(event.getIndex());
             @NlsContexts.TabTitle String tabName = event.getContent().getTabName();
             if (Objects.equals(tabName, PLUS_TAB_LABEL)) {
-                System.out.println("plus tab clicked");
-                //                    this.viewService.setTabIndex(event.getIndex());
                 SwingUtilities.invokeLater(this.viewService::plusTabClicked);
                 return;
             }

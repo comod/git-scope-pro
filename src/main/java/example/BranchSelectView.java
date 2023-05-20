@@ -54,6 +54,21 @@ public class BranchSelectView {
 //    }
 //
 
+        // main
+        JPanel main = new JPanel();
+//        main.setLayout(new VerticalFlowLayout());
+        main.setLayout(new VerticalStackLayout());
+
+
+//        SimpleColoredComponent simple = new SimpleColoredComponent();
+//        simple.append("HEAD (Current)");
+//        simple.setIcon(AllIcons.Vcs.Merge);
+//        simple.setIconTextGap(20);
+//        main.add(new SeparatorWithText());
+//        @NotNull JBInsets insets = JBUI.insets(100, 10, 0, 0);
+//        main.add(simple);
+//        main.add(new SeparatorWithText());
+
         this.search = new SearchTextField();
         search.setText("");
         // node
@@ -61,42 +76,66 @@ public class BranchSelectView {
 
         // branchTree
 
-        List<BranchTreeEntry> recentBranchList = new ArrayList<>();
-        recentBranchList.add(BranchTreeEntry.create("HEAD"));
-        recentBranchList.add(BranchTreeEntry.create("master"));
-
-        node.put("HEAD", null);
-        node.put("Tag or Revision...", null);
-        node.put("Recent", recentBranchList);
+//        List<BranchTreeEntry> recentBranchList = new ArrayList<>();
+//        recentBranchList.add(BranchTreeEntry.create("HEAD"));
+//        recentBranchList.add(BranchTreeEntry.create("master"));
+//
+//        node.put("HEAD", null);
+//        node.put("Tag or Revision...", null);
+//        node.put("Recent", recentBranchList);
         boolean isMulti = gitService.isMulti();
-        if (isMulti) {
-            gitService.getRepositories().forEach(gitRepository -> {
-                List<BranchTreeEntry> localBranchList = gitService.iconLabelListOfLocalBranches(gitRepository);
-                node.put(gitRepository.getRoot().getName() + "/Local", localBranchList);
-            });
-        } else {
+        gitService.getRepositories().forEach(gitRepository -> {
+            if (isMulti) {
+                SeparatorWithText sep = new SeparatorWithText();
+                sep.setCaption(gitRepository.getRoot().getName());
+                main.add(sep);
+            }
+            List<BranchTreeEntry> localBranchList = gitService.iconLabelListOfLocalBranches(gitRepository);
+            node.put("Local", localBranchList);
 
-            gitService.getRepositories().forEach(gitRepository -> {
-                List<BranchTreeEntry> localBranchList = gitService.iconLabelListOfLocalBranches(gitRepository);
-                node.put("Local", localBranchList);
-            });
-        }
+            BranchTree branchTree = createBranchTree(project, node);
+            main.add(branchTree);
+        });
+
+//        BranchTree branchTree2 = createBranchTree(project, node);
+//        } else {
+
+//            gitService.getRepositories().forEach(gitRepository -> {
+//                List<BranchTreeEntry> localBranchList = gitService.iconLabelListOfLocalBranches(gitRepository);
+//                node.put("Local", localBranchList);
+//            });
+//        }
 //        node.put("Remote", localBranchList);
 
 //        List<IconLabel> remoteBranchList = gitService.iconLabelListOfRemoteBranches();
 //        BranchTree special = new BranchTree("Special", specialBranchList);
 
+
+        // root = search + scroll (main)
+        JBScrollPane scroll = new JBScrollPane(main);
+        scroll.setBorder(JBUI.Borders.empty(JBUI.emptyInsets()));
+        rootPanel.add(search, BorderLayout.NORTH);
+        rootPanel.add(scroll, BorderLayout.CENTER);
+    }
+
+    @NotNull
+    private BranchTree createBranchTree(Project project, Map<String, List<BranchTreeEntry>> node) {
         BranchTree branchTree = new BranchTree(project, node, search);
 
         search.addDocumentListener(new DocumentAdapter() {
             @Override
             protected void textChanged(@NotNull DocumentEvent e) {
-//                System.out.println(search.getText());
                 branchTree.update(search);
             }
         });
 
-        branchTree.getTreeComponent().addKeyListener(new KeyListener() {
+        branchTree.getTreeComponent().addKeyListener(getKeyListener());
+        return branchTree;
+    }
+
+    @NotNull
+    private KeyListener getKeyListener() {
+        return new KeyListener() {
             @Override
             public void keyTyped(KeyEvent e) {
                 System.out.println(e);
@@ -128,31 +167,7 @@ public class BranchSelectView {
             public void keyReleased(KeyEvent keyEvent) {
 
             }
-        });
-
-        // main
-        JPanel main = new JPanel();
-//        main.setLayout(new VerticalFlowLayout());
-        main.setLayout(new VerticalStackLayout());
-
-        SeparatorWithText sep = new SeparatorWithText();
-        sep.setCaption("Hey");
-        SimpleColoredComponent simple = new SimpleColoredComponent();
-        simple.append("HEAD (Current)");
-        simple.setIcon(AllIcons.Vcs.Merge);
-        simple.setIconTextGap(20);
-        main.add(new SeparatorWithText());
-//        @NotNull JBInsets insets = JBUI.insets(100, 10, 0, 0);
-        main.add(simple);
-        main.add(new SeparatorWithText());
-        main.add(branchTree);
-        main.add(sep);
-
-        // root = search + scroll (main)
-        JBScrollPane scroll = new JBScrollPane(main);
-        scroll.setBorder(JBUI.Borders.empty(JBUI.emptyInsets()));
-        rootPanel.add(search, BorderLayout.NORTH);
-        rootPanel.add(scroll, BorderLayout.CENTER);
+        };
     }
 
     private String removeLastChar(String str) {

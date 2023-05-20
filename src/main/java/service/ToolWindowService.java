@@ -89,5 +89,17 @@ public final class ToolWindowService implements ToolWindowServiceInterface {
             return;
         }
         getContentManager().setSelectedContent(content);
+        getContentManager().requestFocus(content, true);
     }
+
+//    public void selectHeadTab() {
+//        int count = getContentManager().getContentCount();
+//        @Nullable Content content = getContentManager().getContent(0);
+//        if (content == null) {
+//            return;
+//        }
+//        getContentManager().setSelectedContent(content);
+//        getContentManager().requestFocus(content, true);
+//    }
+
 }
