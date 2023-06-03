@@ -1,7 +1,6 @@
 package model;
 
 import git4idea.repo.GitRepository;
-import model.valueObject.TargetBranchMap;
 
 public class MyModelBase {
     public TargetBranchMap targetBranchMap = null;

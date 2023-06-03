@@ -8,10 +8,11 @@ import io.reactivex.rxjava3.core.Observable;
 import model.Debounce;
 import model.MyModel;
 import model.MyModelBase;
-import model.valueObject.TargetBranchMap;
+import model.TargetBranchMap;
 import service.TargetBranchService;
 import service.ToolWindowServiceInterface;
 import state.State;
+import implementation.scope.MyScope;
 
 import javax.swing.*;
 import java.util.ArrayList;
@@ -33,6 +34,7 @@ public class ViewService {
 //    private final MessageBus messageBus;
     private final MyLineStatusTrackerImpl myLineStatusTrackerImpl;
     private final Debounce debouncer;
+    private final MyScope myScope;
     //    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
     public List<MyModel> collection = new ArrayList<>();
     public Integer currentTabIndex = 0;
@@ -47,6 +49,7 @@ public class ViewService {
         this.targetBranchService = project.getService(TargetBranchService.class);
         this.state = project.getService(State.class);
         this.myLineStatusTrackerImpl = new MyLineStatusTrackerImpl(project);
+        this.myScope = new MyScope(project);
         this.debouncer = new Debounce();
 //        this.messageBus = this.project.getMessageBus();
 //        this.messageBusConnection = messageBus.connect();
@@ -338,6 +341,7 @@ public class ViewService {
 
         SwingUtilities.invokeLater(() -> {
             myLineStatusTrackerImpl.update(changes, null);
+            this.myScope.update(changes);
         });
     }
 }

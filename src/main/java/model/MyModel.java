@@ -4,7 +4,6 @@ import com.intellij.openapi.vcs.changes.Change;
 import git4idea.repo.GitRepository;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.subjects.PublishSubject;
-import model.valueObject.TargetBranchMap;
 
 import java.util.Collection;
 

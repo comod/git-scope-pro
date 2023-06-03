@@ -9,7 +9,7 @@ import com.intellij.openapi.vcs.changes.ChangeListManager;
 import com.intellij.openapi.vfs.VirtualFile;
 import git4idea.actions.GitCompareWithBranchAction;
 import git4idea.repo.GitRepository;
-import model.valueObject.TargetBranchMap;
+import model.TargetBranchMap;
 import org.jetbrains.annotations.NotNull;
 import service.GitService;
 import system.Defs;

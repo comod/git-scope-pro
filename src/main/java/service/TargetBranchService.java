@@ -2,11 +2,10 @@ package service;
 
 import com.intellij.openapi.project.Project;
 import git4idea.repo.GitRepository;
-import model.valueObject.TargetBranchMap;
-import utils.Git;
+import model.TargetBranchMap;
+//import utils.Git;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.stream.Collectors.joining;
 
@@ -43,7 +42,7 @@ public class TargetBranchService {
             return branch;
         }
 
-        return Git.BRANCH_HEAD;
+        return GitService.BRANCH_HEAD;
 
     }
 

@@ -9,7 +9,8 @@ public class ToggleHeadAction extends AnAction {
 
     @Override
     public void actionPerformed(AnActionEvent e) {
-        Manager manager = ServiceManager.getService(e.getProject(), Manager.class);
-        manager.toggleHeadAction();
+//        Manager manager = ServiceManager.getService(e.getProject(), Manager.class);
+        System.out.println("action");
+//        manager.toggleHeadAction();
     }
 }
