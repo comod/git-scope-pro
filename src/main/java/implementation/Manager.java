@@ -1,5 +1,7 @@
 package implementation;
 
+import com.intellij.openapi.application.ModalityState;
+import com.intellij.openapi.editor.EditorFactory;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
@@ -94,15 +96,6 @@ public class Manager {
 
     }
 
-    public void initQueue() {
-        queue = new LinkedList<>();
-//        QueueWorker queueWorker = new QueueWorker(queue);
-//        queueWorker.start();
-    }
-
-//    public Git getGit() {
-//        return this.git;
-//    }
 
     public ToolWindowUI getToolWindowUI() {
         return toolWindowUI;
@@ -150,43 +143,6 @@ public class Manager {
 
     private void editorListener() {
 
-//        EditorFactory.getInstance().
-
-        //        ChangeListManager.getInstance(this.project)
-        //            .invokeAfterUpdate(new Runnable() {
-        //                @Override
-        //                public void run() {
-        //                    System.out.println("OK");
-        //                    doCompareAndUpdate();
-        //                }
-        //            },
-        //            InvokeAfterUpdateMode.BACKGROUND_NOT_CANCELLABLE,
-        //            "",
-        //            ModalityState.NON_MODAL
-        //        );
-
-
-        //
-        //        VirtualFileManager.getInstance().addVirtualFileListener(new VirtualFileListener() {
-        //            public void contentsChanged(@NotNull VirtualFileEvent event) {
-        //                System.out.println("contentsChanged");
-        //            }
-        //        }, this.project);
-
-        //        messageBusConnection.subscribe(VirtualFileManager.VFS_CHANGES, new BulkFileListener() {
-
-        messageBusConnection.subscribe(VirtualFileManager.VFS_CHANGES, new BulkFileListener() {
-            //            @Override
-            //            public void before(@NotNull List<? extends VFileEvent> events) {
-            //                System.out.println("::::: before");
-            //            }
-
-            @Override
-            public void after(@NotNull List<? extends VFileEvent> events) {
-//                System.out.println("::::: doCompareAndUpdate after VFS_CHANGES");
-                doCompareAndUpdate();
-            }
-        });
 
         //        messageBusConnection.subscribe(ChangeListManagerImpl.LISTS_LOADED, lists -> {
         //            if (lists.isEmpty()) return;

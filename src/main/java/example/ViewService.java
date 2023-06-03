@@ -53,7 +53,7 @@ public class ViewService {
     }
 
     private void doUpdateDebounced(Collection<Change> changes) {
-        debouncer.debounce(Void.class, () -> doUpdate(changes), DEBOUNCE_MS, TimeUnit.MILLISECONDS);
+        debouncer.debounce(Void.class, () -> onUpdate(changes), DEBOUNCE_MS, TimeUnit.MILLISECONDS);
     }
 
     public void load() {
@@ -239,7 +239,15 @@ public class ViewService {
                 getTargetBranchDisplay(model.getTargetBranchMap());
     }
 
-    private void collectChanges(MyModel model) {
+    public void collectChanges() {
+        collectChanges(getCurrent());
+    }
+
+    public void collectChanges(MyModel model) {
+        if (model == null) {
+            System.out.println("Model is null");
+            return;
+        }
         TargetBranchMap targetBranchMap = model.getTargetBranchMap();
         if (targetBranchMap == null) {
             System.out.println("CCC Collect Changes (null)");
@@ -318,13 +326,13 @@ public class ViewService {
         this.getCurrent().setActive(true);
     }
 
-    public void doUpdate(Collection<Change> changes) {
+    public void onUpdate(Collection<Change> changes) {
 
-        System.out.println("@@@ doUpdate");
+        System.out.println("@@@ onUpdate");
 //        Collection<Change> changes = model.getChanges();
         System.out.println(changes);
         if (changes == null) {
-            System.out.println("stop doUpdate");
+            System.out.println("stop onUpdate");
             return;
         }
 
