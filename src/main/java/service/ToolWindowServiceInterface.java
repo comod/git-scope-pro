@@ -16,4 +16,6 @@ public interface ToolWindowServiceInterface {
     void removeCurrentTab();
 
     void selectNewTab();
+
+    void selectTabByIndex(int index);
 }

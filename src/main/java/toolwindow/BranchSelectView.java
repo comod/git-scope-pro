@@ -1,13 +1,15 @@
-package example;
+package toolwindow;
 
-import com.intellij.icons.AllIcons;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ui.componentsList.layout.VerticalStackLayout;
 import com.intellij.ui.*;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.util.ui.JBUI;
+import git4idea.branch.GitBranchType;
 import org.jetbrains.annotations.NotNull;
 import service.GitService;
+import toolwindow.elements.BranchTree;
+import toolwindow.elements.BranchTreeEntry;
 
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
@@ -21,6 +23,7 @@ import java.util.Map;
 
 public class BranchSelectView {
 
+    public static final String TAG_OR_REVISION = "Tag or Revision...";
     //    private final JPanel rootPanel = new JPanel(new VerticalStackLayout());
     private final JPanel rootPanel = new JPanel(new BorderLayout());
     //    private final JPanel rootPanel = new JPanel(new VerticalFlowLayout());
@@ -72,26 +75,46 @@ public class BranchSelectView {
         this.search = new SearchTextField();
         search.setText("");
         // node
-        Map<String, List<BranchTreeEntry>> node = new LinkedHashMap<>();
 
         // branchTree
 
 //        List<BranchTreeEntry> recentBranchList = new ArrayList<>();
 //        recentBranchList.add(BranchTreeEntry.create("HEAD"));
 //        recentBranchList.add(BranchTreeEntry.create("master"));
-//
-//        node.put("HEAD", null);
-//        node.put("Tag or Revision...", null);
+
+//        List<BranchTreeEntry> specialBranchList = new ArrayList<>();
+//        specialBranchList.add(BranchTreeEntry.create("Tag or Revision..."));
+//        Map<String, List<BranchTreeEntry>> specialNodes = new LinkedHashMap<>();
+//        specialNodes.put(null, specialBranchList);
+
+        Map<String, List<BranchTreeEntry>> specialNodes = new LinkedHashMap<>();
+        specialNodes.put(TAG_OR_REVISION, null);
+        BranchTree specialBranchTree = createBranchTree(project, specialNodes);
+        main.add(specialBranchTree);
+
+        Map<String, List<BranchTreeEntry>> node = new LinkedHashMap<>();
 //        node.put("Recent", recentBranchList);
         boolean isMulti = gitService.isMulti();
+//        if (isMulti) {
+//            SeparatorWithText sep = new SeparatorWithText();
+//            sep.setCaption("Repos");
+//            main.add(sep);
+//        }
         gitService.getRepositories().forEach(gitRepository -> {
             if (isMulti) {
                 SeparatorWithText sep = new SeparatorWithText();
                 sep.setCaption(gitRepository.getRoot().getName());
                 main.add(sep);
             }
-            List<BranchTreeEntry> localBranchList = gitService.iconLabelListOfLocalBranches(gitRepository);
-            node.put("Local", localBranchList);
+            List<BranchTreeEntry> localBranchList = gitService.listOfLocalBranches(gitRepository);
+            if (!localBranchList.isEmpty()) {
+                node.put(GitBranchType.LOCAL.getName(), localBranchList);
+            }
+
+            List<BranchTreeEntry> remoteBranchList = gitService.listOfRemoteBranches(gitRepository);
+            if (!remoteBranchList.isEmpty()) {
+                node.put(GitBranchType.REMOTE.getName(), remoteBranchList);
+            }
 
             BranchTree branchTree = createBranchTree(project, node);
             main.add(branchTree);

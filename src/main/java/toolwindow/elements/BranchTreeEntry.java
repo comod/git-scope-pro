@@ -1,4 +1,4 @@
-package example;
+package toolwindow.elements;
 
 import git4idea.repo.GitRepository;
 import org.jetbrains.annotations.NotNull;

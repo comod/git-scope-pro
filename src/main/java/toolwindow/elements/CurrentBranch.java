@@ -1,12 +1,10 @@
-package ui.elements;
+package toolwindow.elements;
 
 import com.intellij.openapi.project.Project;
-import com.intellij.ui.JBColor;
+import model.MyModel;
 import service.GitService;
-import utils.Git;
 
 import javax.swing.*;
-import java.awt.*;
 
 public class CurrentBranch extends JLabel {
 

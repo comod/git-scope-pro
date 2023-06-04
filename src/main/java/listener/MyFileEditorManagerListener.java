@@ -4,7 +4,7 @@ import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
-import example.ViewService;
+import service.ViewService;
 import org.jetbrains.annotations.NotNull;
 
 public class MyFileEditorManagerListener implements FileEditorManagerListener {

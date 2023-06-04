@@ -1,9 +1,8 @@
-package ui.elements;
+package toolwindow.elements;
 
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.changes.Change;
 import com.intellij.openapi.vcs.changes.ui.SimpleChangesBrowser;
-import ui.MySimpleChangesBrowser;
 
 import javax.swing.*;
 import java.awt.*;

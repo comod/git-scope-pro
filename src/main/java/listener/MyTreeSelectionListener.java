@@ -7,8 +7,9 @@ import javax.swing.event.TreeSelectionListener;
 import javax.swing.tree.DefaultMutableTreeNode;
 
 import com.intellij.ui.treeStructure.Tree;
-import example.BranchTreeEntry;
-import example.ViewService;
+import toolwindow.BranchSelectView;
+import toolwindow.elements.BranchTreeEntry;
+import service.ViewService;
 
 public class MyTreeSelectionListener implements TreeSelectionListener {
     private final Tree tree;
@@ -31,10 +32,16 @@ public class MyTreeSelectionListener implements TreeSelectionListener {
 //            currentModel.setTargetBranch(favLabel.getName());
             System.out.println(favLabel);
             this.viewService.getCurrent().addTargetBranch(favLabel.getGitRepo(), favLabel.getName());
+//            this.viewService.getCurrent().addTargetBranch(favLabel.getGitRepo(), favLabel.getName() + "..HEAD");
+//            this.viewService.getCurrent().addTargetBranch(favLabel.getGitRepo(), ".." + favLabel.getName());
         }
 
         if (object instanceof String label) {
-            System.out.println(label);
+            if (label.equals(BranchSelectView.TAG_OR_REVISION)) {
+                System.out.println("yolo");
+
+            }
+//            System.out.println(label);
         }
     }
 }

@@ -1,12 +1,9 @@
 package listener;
 
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.vcs.changes.Change;
 import event.ChangeActionNotifierInterface;
-import example.ViewService;
+import service.ViewService;
 import model.MyModel;
-
-import java.util.Collection;
 
 public class ChangeActionListener implements ChangeActionNotifierInterface {
 

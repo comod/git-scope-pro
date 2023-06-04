@@ -4,13 +4,13 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.ui.content.ContentManagerEvent;
 import com.intellij.ui.content.ContentManagerListener;
-import example.ViewService;
+import service.ViewService;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
 import java.util.Objects;
 
-import static example.ViewService.PLUS_TAB_LABEL;
+import static service.ViewService.PLUS_TAB_LABEL;
 
 public class MyTabContentListener implements ContentManagerListener {
 

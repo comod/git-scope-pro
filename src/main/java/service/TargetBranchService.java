@@ -18,12 +18,15 @@ public class TargetBranchService {
     }
 
     public String getTargetBranchDisplay(TargetBranchMap targetBranch) {
+        if (targetBranch == null) {
+            return GitService.BRANCH_HEAD;
+        }
         List<String> branches = new ArrayList<String>();
 
         gitService.getRepositories().forEach(repo -> {
             String currentBranchName = getTargetBranchByRepositoryDisplay(repo, targetBranch);
 
-            if (!Objects.equals(currentBranchName, "HEAD")) {
+            if (!Objects.equals(currentBranchName, GitService.BRANCH_HEAD)) {
                 branches.add(currentBranchName);
             }
         });

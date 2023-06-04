@@ -10,7 +10,7 @@ import com.intellij.ui.content.ContentFactory;
 import com.intellij.ui.content.ContentManager;
 import listener.MyTabContentListener;
 import model.MyModel;
-import example.ToolWindowView;
+import toolwindow.ToolWindowView;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -84,7 +84,13 @@ public final class ToolWindowService implements ToolWindowServiceInterface {
 
     public void selectNewTab() {
         int count = getContentManager().getContentCount();
-        @Nullable Content content = getContentManager().getContent(count - 2);
+        int index = count - 2;
+        selectTabByIndex(index);
+    }
+
+    @Override
+    public void selectTabByIndex(int index) {
+        @Nullable Content content = getContentManager().getContent(index);
         if (content == null) {
             return;
         }

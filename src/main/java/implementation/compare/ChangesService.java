@@ -52,9 +52,7 @@ public class ChangesService extends GitCompareWithBranchAction {
 //                                           @NotNull String branchToCompare,
 //                                           Consumer<Collection<Change>> callBack) {
 //
-    public void collectChangesWithCallback(
-            TargetBranchMap targetBranchByRepo,
-            Consumer<Collection<Change>> callBack) {
+    public void collectChangesWithCallback(TargetBranchMap targetBranchByRepo, Consumer<Collection<Change>> callBack) {
 //        SwingUtilities.invokeLater(() -> {
 //            Collection<Change> changes = doCollectChanges(project, repo, branchToCompare);
 //            callBack.accept(changes);
@@ -79,6 +77,10 @@ public class ChangesService extends GitCompareWithBranchAction {
                 callBack.accept(this.changes);
             }
 
+            @Override
+            public void onThrowable(@NotNull Throwable error) {
+                callBack.accept(this.changes);
+            }
         };
         task.queue();
     }

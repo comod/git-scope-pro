@@ -2,7 +2,7 @@ package listener;
 
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.changes.ChangeListListener;
-import example.ViewService;
+import service.ViewService;
 
 public class MyChangeListListener implements ChangeListListener {
 

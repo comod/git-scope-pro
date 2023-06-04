@@ -2,7 +2,7 @@ package listener;
 
 import com.intellij.dvcs.repo.VcsRepositoryMappingListener;
 import com.intellij.openapi.project.Project;
-import example.ViewService;
+import service.ViewService;
 //import implementation.EventManager;
 //import implementation.Manager;
 //import service.ToolWindowServiceInterface;

@@ -24,7 +24,7 @@
                   topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"/>
 
         <!--        <listener class="listener.MouseListener" topic="com.intellij.openapi.editor.event.EditorMouseMotionListener"/>-->
-        <!--        <listener class="listener.MyTabContentListener" topic="com.intellij.ui.content.ContentManagerListener"/>-->
+        <!--        <listener class="listener.MyTabContentListener" topic="com.intellij.toolwindow.content.ContentManagerListener"/>-->
     </projectListeners>
 
     <!--    <applicationListeners>-->
@@ -35,8 +35,8 @@
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
     <extensions defaultExtensionNs="com.intellij">
 
-        <!--        <statusBarWidgetFactory-->
-        <!--                implementation="git4idea.ui.branch.GitBranchWidget$Factory"/>-->
+        <statusBarWidgetFactory
+                implementation="statusBar.MyStatusBarWidgetFactory"/>
         <!--        <editorFactoryMouseMotionListener-->
         <!--                implementation="listener.MouseListener"/>-->
         <!--        <postStartupActivity implementation="listener.Startup"/>-->
@@ -48,21 +48,22 @@
                 secondary="true"
                 icon="AllIcons.Actions.Diff"
                 anchor="left"
-                factoryClass="ui.ToolWindowUIFactory"
+                factoryClass="toolwindow.ToolWindowUIFactory"
                 canCloseContents="true"
         />
 
         <!-- Config (Persistent) -->
         <projectService serviceImplementation="state.State"/>
 
+        <projectService serviceImplementation="service.StatusBarService"/>
         <projectService serviceImplementation="service.GitService"/>
-        <projectService serviceImplementation="example.ViewService"/>
+        <projectService serviceImplementation="service.ViewService"/>
         <projectService serviceImplementation="service.TargetBranchService"/>
         <projectService serviceImplementation="implementation.compare.ChangesService"/>
         <projectService
                 serviceInterface="service.ToolWindowServiceInterface"
                 serviceImplementation="service.ToolWindowService"/>
-        <!--        <statusBarWidgetProvider implementation="ui.TargetBranchStatusWidgetProvider"/>-->
+        <!--        <statusBarWidgetProvider implementation="toolwindow.TargetBranchStatusWidgetProvider"/>-->
 
     </extensions>
 
@@ -70,6 +71,10 @@
         <action id="ToggleHead" class="system.ToggleHeadAction" text="ToggleHead" description="ToggleHead">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
             <keyboard-shortcut keymap="$default" first-keystroke="alt H"/>
+        </action>
+        <action id="listener.VcsContextMenuAction" class="listener.VcsContextMenuAction" text="Add to Git Scope">
+            <add-to-group group-id="Vcs.Log.ContextMenu" anchor="after"
+                          relative-to-action="Vcs.CopyRevisionNumberAction"/>
         </action>
     </actions>
 </idea-plugin>

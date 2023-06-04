@@ -1,4 +1,4 @@
-package example;
+package toolwindow.elements;
 
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.project.Project;

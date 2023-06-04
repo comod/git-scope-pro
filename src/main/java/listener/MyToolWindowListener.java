@@ -4,7 +4,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.wm.ToolWindowManager;
 import com.intellij.openapi.wm.ex.ToolWindowManagerListener;
 //import implementation.EventManager;
-import example.ViewService;
+import service.ViewService;
 import org.jetbrains.annotations.NotNull;
 
 public class MyToolWindowListener implements ToolWindowManagerListener {

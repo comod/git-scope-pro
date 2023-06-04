@@ -1,4 +1,4 @@
-package example;
+package service;
 
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.changes.Change;
@@ -9,10 +9,9 @@ import model.Debounce;
 import model.MyModel;
 import model.MyModelBase;
 import model.TargetBranchMap;
-import service.TargetBranchService;
-import service.ToolWindowServiceInterface;
 import state.State;
 import implementation.scope.MyScope;
+import system.Defs;
 
 import javax.swing.*;
 import java.util.ArrayList;
@@ -35,17 +34,22 @@ public class ViewService {
     private final MyLineStatusTrackerImpl myLineStatusTrackerImpl;
     private final Debounce debouncer;
     private final MyScope myScope;
+    private final GitService gitService;
+    private final StatusBarService statusBarService;
     //    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
     public List<MyModel> collection = new ArrayList<>();
     public Integer currentTabIndex = 0;
     private boolean vcsReady = false;
     private boolean toolWindowReady = false;
     private MyModel myHeadModel;
+    private boolean isInit;
 
     public ViewService(Project project) {
         this.project = project;
         this.toolWindowService = project.getService(ToolWindowServiceInterface.class);
         this.changesService = project.getService(ChangesService.class);
+        this.statusBarService = project.getService(StatusBarService.class);
+        this.gitService = project.getService(GitService.class);
         this.targetBranchService = project.getService(TargetBranchService.class);
         this.state = project.getService(State.class);
         this.myLineStatusTrackerImpl = new MyLineStatusTrackerImpl(project);
@@ -92,9 +96,10 @@ public class ViewService {
     }
 
     public void init() {
-        if (!vcsReady || !toolWindowReady) {
+        if (!vcsReady || !toolWindowReady || isInit) {
             return;
         }
+        isInit = true;
 
 //        try {
 //            Thread.sleep(500);
@@ -159,9 +164,20 @@ public class ViewService {
 
     private void initHeadTab() {
         this.myHeadModel = new MyModel(true);
-        toolWindowService.addTab(myHeadModel, "HEAD", false);
+        toolWindowService.addTab(myHeadModel, GitService.BRANCH_HEAD, false);
         subscribeToObservable(myHeadModel);
         collectChanges(myHeadModel);
+    }
+
+    public void addRevisionTab(String revision) {
+        String tabName = revision;
+        MyModel myModel = addTabAndModel(tabName);
+        TargetBranchMap tbm = TargetBranchMap.create();
+        gitService.getRepositories().forEach(repo -> {
+            tbm.add(repo.toString(), revision);
+        });
+        myModel.setTargetBranchMap(tbm);
+//        collectChanges(myModel);
     }
 
     private void addPlusTab() {
@@ -169,19 +185,27 @@ public class ViewService {
     }
 
     public void plusTabClicked() {
-//        toolWindowService.changeTabName("New*");
-//        MyModel model = addModel();
-        int currentIndexOfPlusTab = getTabIndex();
-        toolWindowService.addTab(addModel(), "New*", true);
-//            toolWindowService.removeCurrentTab();
+        String tabName = "New*";
+        addTabAndModel(tabName);
+    }
+
+    public MyModel addTabAndModel(String tabName) {
+        int currentIndexOfPlusTab = collection.size() + 1;
+        MyModel myModel = addModel();
+        toolWindowService.addTab(myModel, tabName, true);
         addPlusTab();
         toolWindowService.removeTab(currentIndexOfPlusTab);
         setTabIndex(collection.size());
         setActiveModel();
         toolWindowService.selectNewTab();
-//        SwingUtilities.invokeLater(toolWindowService::selectNewTab);
-//        SwingUtilities.invokeLater(() -> toolWindowService.removeTab(currentIndexOfPlusTab));
+        return myModel;
+    }
 
+    public void toggleActionInvoked() {
+        int index = 0;
+        setTabIndex(index);
+        setActiveModel();
+        toolWindowService.selectTabByIndex(index);
     }
 
     private void subscribeToObservable(MyModel model) {
@@ -235,6 +259,11 @@ public class ViewService {
     System.out.println(">>> EXCEPTION: " + e.getMessage());
 }));
 
+    }
+
+    private String getTargetBranchDisplayCurrent() {
+        MyModel current = getCurrent();
+        return getTargetBranchDisplay(current);
     }
 
     private String getTargetBranchDisplay(MyModel model) {
@@ -332,6 +361,7 @@ public class ViewService {
     public void onUpdate(Collection<Change> changes) {
 
         System.out.println("@@@ onUpdate");
+        updateStatusBarWidget();
 //        Collection<Change> changes = model.getChanges();
         System.out.println(changes);
         if (changes == null) {
@@ -343,5 +373,9 @@ public class ViewService {
             myLineStatusTrackerImpl.update(changes, null);
             this.myScope.update(changes);
         });
+    }
+
+    private void updateStatusBarWidget() {
+        this.statusBarService.updateText(Defs.Arrow + " " + Defs.APPLICATION_NAME + ": " + getTargetBranchDisplayCurrent());
     }
 }

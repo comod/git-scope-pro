@@ -1,15 +1,16 @@
-package example;
+package toolwindow;
 
-import X.K.X.B;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ui.componentsList.layout.VerticalStackLayout;
 import com.intellij.openapi.ui.VerticalFlowLayout;
+import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.panels.HorizontalBox;
 import com.intellij.ui.components.panels.VerticalBox;
 import model.MyModel;
 import org.jdesktop.swingx.StackLayout;
-import ui.elements.CurrentBranch;
-import ui.elements.VcsTree;
+import toolwindow.elements.CurrentBranch;
+import toolwindow.elements.TargetBranch;
+import toolwindow.elements.VcsTree;
 
 import javax.swing.*;
 import java.awt.*;
@@ -24,6 +25,7 @@ public class ToolWindowView {
 //    private final JPanel rootPanel = new JPanel(new VerticalFlowLayout());
 
     private final JPanel rootPanel = new JPanel(new StackLayout());
+    private final TargetBranch targetBranch;
 
     private VcsTree vcsTree;
     private JPanel sceneA;
@@ -36,6 +38,7 @@ public class ToolWindowView {
 //        this.targetBranchService = project.getService(TargetBranchService.class);
 
         this.currentBranch = new CurrentBranch(project);
+        this.targetBranch = new TargetBranch(project);
 
         myModel.getObservable().subscribe(model -> {
             render();
@@ -81,12 +84,14 @@ public class ToolWindowView {
         HorizontalBox hBox = new HorizontalBox();
         hBox.setLayout(new GridBagLayout());
 //        hBox.setAlignmentX(HorizontalBox.LEFT_ALIGNMENT);
-        JPanel toolBarPanel = new JPanel();
-        toolBarPanel.setLayout(new GridBagLayout());
-
+//        JPanel toolBarPanel = new JPanel();
+//        toolBarPanel.setLayout(new GridBagLayout());
+//
 //        toolBarPanel.setAlignmentX(JPanel.LEFT_ALIGNMENT);
-        toolBarPanel.add(currentBranch);
-        hBox.add(toolBarPanel);
+//        toolBarPanel.add(currentBranch);
+//        toolBarPanel.add(new JBLabel(" ➙ "));
+//        toolBarPanel.add(targetBranch);
+//        hBox.add(toolBarPanel);
 
         vcsTree = new VcsTree(this.project);
         vcsTree.setLayout(new VerticalFlowLayout());
@@ -120,6 +125,9 @@ public class ToolWindowView {
         }
         System.out.println("render/update changes" + myModel.getChanges().toString());
         vcsTree.update(myModel.getChanges());
+//        if (!showSceneA) {
+//            this.targetBranch.update(myModel);
+//        }
     }
 
     public JPanel getRootPanel() {
