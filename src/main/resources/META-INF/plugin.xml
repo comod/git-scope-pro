@@ -1,25 +1,24 @@
 <!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
-<idea-plugin>
+<idea-plugin
+        require-restart="true">
     <!-- Public plugin name should be written in Title Case.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-name -->
     <!-- Unique identifier of the plugin. It should be FQN. It cannot be changed between the plugin versions. -->
     <id>Git Scope</id>
-    <name>Git Scope</name>
-    <vendor>Michael Wölk</vendor>
+    <vendor>WOELKIT</vendor>
+    <!--    <product-descriptor code="PGITSCOPE" release-date="20230612" release-version="20231"/>-->
 
     <!-- Product and plugin compatibility requirements.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
     <depends>com.intellij.modules.platform</depends>
     <depends>Git4Idea</depends>
 
-    <!-- https://plugins.jetbrains.com/docs/intellij/build-number-ranges.html#intellij-platform-based-products-of-recent-ide-versions-->
-
     <projectListeners>
-        <listener class="listener.ChangeActionListener" topic="event.ChangeActionNotifierInterface"/>
         <listener class="listener.MyToolWindowListener" topic="com.intellij.openapi.wm.ex.ToolWindowManagerListener"/>
         <listener class="listener.VcsStartup" topic="com.intellij.dvcs.repo.VcsRepositoryMappingListener"/>
         <listener class="listener.MyVirtualFileListener" topic="com.intellij.openapi.vfs.VirtualFileListener"/>
         <listener class="listener.MyChangeListListener" topic="com.intellij.openapi.vcs.changes.ChangeListListener"/>
+        <listener class="listener.MyDynamicPluginListener" topic="com.intellij.ide.plugins.DynamicPluginListener"/>
         <listener class="listener.MyFileEditorManagerListener"
                   topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"/>
 
@@ -68,13 +67,17 @@
     </extensions>
 
     <actions>
-        <action id="ToggleHead" class="system.ToggleHeadAction" text="ToggleHead" description="ToggleHead">
+        <!--        <action id="actions.MakeCoffeeAction" class="actions.MakeCoffeeAction">-->
+        <!--            <add-to-group group-id="ToolsMenu" anchor="last"/>-->
+        <!--        </action>-->
+        <action id="ToggleHead" class="listener.ToggleHeadAction" text="GitScope: Toggle Head" description="ToggleHead">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
             <keyboard-shortcut keymap="$default" first-keystroke="alt H"/>
         </action>
-        <action id="listener.VcsContextMenuAction" class="listener.VcsContextMenuAction" text="Add to Git Scope">
-            <add-to-group group-id="Vcs.Log.ContextMenu" anchor="after"
-                          relative-to-action="Vcs.CopyRevisionNumberAction"/>
-        </action>
+        <!--        <action id="listener.VcsContextMenuAction" class="listener.VcsContextMenuAction" text="Add to Git Scope">-->
+        <!--            <add-to-group group-id="Vcs.Log.ContextMenu" anchor="after"-->
+        <!--                          relative-to-action="Vcs.CopyRevisionNumberAction"/>-->
+        <!--        </action>-->
     </actions>
+
 </idea-plugin>

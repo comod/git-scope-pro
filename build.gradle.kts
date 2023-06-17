@@ -85,16 +85,27 @@ tasks {
                 }.joinToString("\n").let { markdownToHTML(it) }
         )
 
+        changeNotes.set(
+                file("README.md").readText().lines().run {
+                    val start = "<!-- Plugin changelog -->"
+                    val end = "<!-- Plugin changelog end -->"
+
+                    if (!containsAll(listOf(start, end))) {
+                        throw GradleException("Plugin description section not found in README.md:\n$start ... $end")
+                    }
+                    subList(indexOf(start) + 1, indexOf(end))
+                }.joinToString("\n").let { markdownToHTML(it) }
+        )
         // Get the latest available change notes from the changelog file
-        changeNotes.set(provider {
-            with(changelog) {
-                renderItem(
-                        getOrNull(properties("pluginVersion"))
-                                ?: runCatching { getLatest() }.getOrElse { getUnreleased() },
-                        Changelog.OutputType.HTML,
-                )
-            }
-        })
+//        changeNotes.set(provider {
+//            with(changelog) {
+//                renderItem(
+//                        getOrNull(properties("pluginVersion"))
+//                                ?: runCatching { getLatest() }.getOrElse { getUnreleased() },
+//                        Changelog.OutputType.HTML,
+//                )
+//            }
+//        })
 
     }
 //    patchPluginXml {

@@ -16,14 +16,14 @@ import javax.swing.event.DocumentEvent;
 import java.awt.*;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
-import java.util.ArrayList;
+//import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 public class BranchSelectView {
 
-    public static final String TAG_OR_REVISION = "Tag or Revision...";
+    //    public static final String TAG_OR_REVISION = "Tag or Revision...";
     //    private final JPanel rootPanel = new JPanel(new VerticalStackLayout());
     private final JPanel rootPanel = new JPanel(new BorderLayout());
     //    private final JPanel rootPanel = new JPanel(new VerticalFlowLayout());
@@ -87,10 +87,10 @@ public class BranchSelectView {
 //        Map<String, List<BranchTreeEntry>> specialNodes = new LinkedHashMap<>();
 //        specialNodes.put(null, specialBranchList);
 
-        Map<String, List<BranchTreeEntry>> specialNodes = new LinkedHashMap<>();
-        specialNodes.put(TAG_OR_REVISION, null);
-        BranchTree specialBranchTree = createBranchTree(project, specialNodes);
-        main.add(specialBranchTree);
+//        Map<String, List<BranchTreeEntry>> specialNodes = new LinkedHashMap<>();
+//        specialNodes.put(TAG_OR_REVISION, null);
+//        BranchTree specialBranchTree = createBranchTree(project, specialNodes);
+//        main.add(specialBranchTree);
 
         Map<String, List<BranchTreeEntry>> node = new LinkedHashMap<>();
 //        node.put("Recent", recentBranchList);

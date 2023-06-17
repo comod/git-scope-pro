@@ -14,6 +14,7 @@ import org.jetbrains.annotations.NotNull;
 import service.GitService;
 import system.Defs;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.function.Consumer;
 
@@ -63,13 +64,21 @@ public class ChangesService extends GitCompareWithBranchAction {
 
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
+                Collection<Change> _changes = new ArrayList<>();
                 git.getRepositories().forEach(repo -> {
                     String branchToCompare = getBranchToCompare(targetBranchByRepo, repo);
 
-                    System.out.println("compare repo: " + repo + ", branch: " + branchToCompare);
+                    Collection<Change> changesPerRepo = doCollectChanges(project, repo, branchToCompare);
 
-                    this.changes = doCollectChanges(project, repo, branchToCompare);
+                    // Simple "merge" logic
+                    for (Change change : changesPerRepo) {
+                        System.out.println(change);
+                        if (!_changes.contains(change)) {
+                            _changes.add(change);
+                        }
+                    }
                 });
+                changes = _changes;
             }
 
             @Override
@@ -84,6 +93,16 @@ public class ChangesService extends GitCompareWithBranchAction {
         };
         task.queue();
     }
+
+//    private void merge(Collection<Change> firstChanges, Collection<Change> secondChanges) {
+//
+//        for (Change change : secondChanges) {
+//            if (!firstChanges.contains(change)) {
+//                firstChanges.add(change);
+//            }
+//        }
+//
+//    }
 
     private Boolean isLocalChangeOnly(String localChangePath, Collection<Change> changes) {
 

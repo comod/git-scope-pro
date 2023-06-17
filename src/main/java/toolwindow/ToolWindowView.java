@@ -7,6 +7,7 @@ import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.panels.HorizontalBox;
 import com.intellij.ui.components.panels.VerticalBox;
 import model.MyModel;
+import org.jdesktop.swingx.HorizontalLayout;
 import org.jdesktop.swingx.StackLayout;
 import toolwindow.elements.CurrentBranch;
 import toolwindow.elements.TargetBranch;
@@ -74,35 +75,14 @@ public class ToolWindowView {
 
 
     private JPanel getChangesPanel() {
-        VerticalStackLayout verticalStackLayout = new VerticalStackLayout();
         JPanel panel = new JPanel();
-        panel.setLayout(verticalStackLayout);
-        VerticalBox vBox = new VerticalBox();
-//        vBox.setAlignmentX(VerticalBox.LEFT_ALIGNMENT);
-//        currentBranch.setAlignmentX(JLabel.LEFT_ALIGNMENT);
-//        panel.setAlignmentX(JPanel.LEFT_ALIGNMENT);
-        HorizontalBox hBox = new HorizontalBox();
-        hBox.setLayout(new GridBagLayout());
-//        hBox.setAlignmentX(HorizontalBox.LEFT_ALIGNMENT);
-//        JPanel toolBarPanel = new JPanel();
-//        toolBarPanel.setLayout(new GridBagLayout());
-//
-//        toolBarPanel.setAlignmentX(JPanel.LEFT_ALIGNMENT);
-//        toolBarPanel.add(currentBranch);
-//        toolBarPanel.add(new JBLabel(" ➙ "));
-//        toolBarPanel.add(targetBranch);
-//        hBox.add(toolBarPanel);
+//        panel.setLayout(new VerticalStackLayout());
+        panel.setLayout(new StackLayout());
 
         vcsTree = new VcsTree(this.project);
-        vcsTree.setLayout(new VerticalFlowLayout());
+        vcsTree.setLayout(new BorderLayout());
 
-//        ActionGroup b = branchPicker();
-//        b.getChildren()
-        vBox.add(hBox);
-        vBox.add(vcsTree);
-        panel.add(vBox);
-//        panel.add(hBox);
-//        panel.add(vcsTree);
+        panel.add(vcsTree);
         return panel;
     }
 

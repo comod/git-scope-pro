@@ -24,7 +24,7 @@ public class VcsTree extends JPanel {
     public void createElement() {
 //        this.setLayout(new BorderLayout());
 
-        this.setLoading();
+//        this.setLoading();
 
     }
 
@@ -38,6 +38,7 @@ public class VcsTree extends JPanel {
 
     public void update(Collection<Change> changes) {
 
+        setLoading();
         // Build the Diff-Tool-Window
         // SimpleChangesBrowser changesBrowser = new SimpleChangesBrowser(
         SimpleChangesBrowser changesBrowser = new MySimpleChangesBrowser(

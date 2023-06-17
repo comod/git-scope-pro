@@ -5,6 +5,7 @@ import com.intellij.openapi.vcs.changes.Change;
 import implementation.compare.ChangesService;
 import implementation.lineStatusTracker.MyLineStatusTrackerImpl;
 import io.reactivex.rxjava3.core.Observable;
+import license.CheckLicense;
 import model.Debounce;
 import model.MyModel;
 import model.MyModelBase;
@@ -12,8 +13,10 @@ import model.TargetBranchMap;
 import state.State;
 import implementation.scope.MyScope;
 import system.Defs;
+import license.CheckLicense;
 
 import javax.swing.*;
+import java.awt.*;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -23,29 +26,37 @@ public class ViewService {
 
     public static final String PLUS_TAB_LABEL = "+";
     public static final int DEBOUNCE_MS = 50;
-    private final Project project;
-    private final ToolWindowServiceInterface toolWindowService;
-    private final TargetBranchService targetBranchService;
-    private final ChangesService changesService;
-    private final State state;
-    //    private final MessageBusConnection messageBusConnection;
-//        private final MessageBusConnection messageBusConnection;
-//    private final MessageBus messageBus;
-    private final MyLineStatusTrackerImpl myLineStatusTrackerImpl;
-    private final Debounce debouncer;
-    private final MyScope myScope;
-    private final GitService gitService;
-    private final StatusBarService statusBarService;
     //    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
     public List<MyModel> collection = new ArrayList<>();
     public Integer currentTabIndex = 0;
+    private Project project;
+    private ToolWindowServiceInterface toolWindowService;
+    private TargetBranchService targetBranchService;
+    private ChangesService changesService;
+    private State state;
+    //    private final MessageBusConnection messageBusConnection;
+//        private final MessageBusConnection messageBusConnection;
+//    private final MessageBus messageBus;
+    private MyLineStatusTrackerImpl myLineStatusTrackerImpl;
+    private Debounce debouncer;
+    private MyScope myScope;
+    private GitService gitService;
+    private StatusBarService statusBarService;
     private boolean vcsReady = false;
     private boolean toolWindowReady = false;
     private MyModel myHeadModel;
     private boolean isInit;
+    private int lastTabIndex;
 
     public ViewService(Project project) {
         this.project = project;
+
+        EventQueue.invokeLater(this::initDependencies);
+
+    }
+
+    public void initDependencies() {
+
         this.toolWindowService = project.getService(ToolWindowServiceInterface.class);
         this.changesService = project.getService(ChangesService.class);
         this.statusBarService = project.getService(StatusBarService.class);
@@ -55,8 +66,6 @@ public class ViewService {
         this.myLineStatusTrackerImpl = new MyLineStatusTrackerImpl(project);
         this.myScope = new MyScope(project);
         this.debouncer = new Debounce();
-//        this.messageBus = this.project.getMessageBus();
-//        this.messageBusConnection = messageBus.connect();
     }
 
     private void doUpdateDebounced(Collection<Change> changes) {
@@ -110,7 +119,8 @@ public class ViewService {
 //        Platform.runLater(() -> {
 //
 //                });
-        SwingUtilities.invokeLater(this::initLater);
+        EventQueue.invokeLater(this::initLater);
+//        SwingUtilities.invokeLater(this::initLater);
 //        initLater();
     }
 
@@ -172,12 +182,12 @@ public class ViewService {
     public void addRevisionTab(String revision) {
         String tabName = revision;
         MyModel myModel = addTabAndModel(tabName);
-        TargetBranchMap tbm = TargetBranchMap.create();
+//        TargetBranchMap tbm = TargetBranchMap.create();
         gitService.getRepositories().forEach(repo -> {
-            tbm.add(repo.toString(), revision);
+//            tbm.add(repo.toString(), revision);
+            System.out.println("rev tab + " + repo + " - " + revision);
+            myModel.addTargetBranch(repo, revision);
         });
-        myModel.setTargetBranchMap(tbm);
-//        collectChanges(myModel);
     }
 
     private void addPlusTab() {
@@ -202,10 +212,13 @@ public class ViewService {
     }
 
     public void toggleActionInvoked() {
-        int index = 0;
-        setTabIndex(index);
+        System.out.println("currrrr" + currentTabIndex);
+        System.out.println("lastTabIndex" + lastTabIndex);
+        int toggleToIndex = (currentTabIndex == 0) ? lastTabIndex : 0;
+        System.out.println("toggle to " + toggleToIndex);
+        setTabIndex(toggleToIndex);
         setActiveModel();
-        toolWindowService.selectTabByIndex(index);
+        toolWindowService.selectTabByIndex(toggleToIndex);
     }
 
     private void subscribeToObservable(MyModel model) {
@@ -340,7 +353,12 @@ public class ViewService {
 
     public void setTabIndex(int index) {
         System.out.println("tab index " + index);
-        this.currentTabIndex = index;
+        // @todo need ID instead of index
+        if (currentTabIndex > 0) {
+            lastTabIndex = currentTabIndex;
+        }
+        System.out.println("set lastTab" + currentTabIndex);
+        currentTabIndex = index;
     }
 
     public int getCurrentModelIndex() {
@@ -372,10 +390,21 @@ public class ViewService {
         SwingUtilities.invokeLater(() -> {
             myLineStatusTrackerImpl.update(changes, null);
             this.myScope.update(changes);
+//            licenseCheck();
         });
     }
 
     private void updateStatusBarWidget() {
         this.statusBarService.updateText(Defs.Arrow + " " + Defs.APPLICATION_NAME + ": " + getTargetBranchDisplayCurrent());
+    }
+
+    public void licenseCheck() {
+        final Boolean isLicensed = CheckLicense.isLicensed();
+
+        if (!Boolean.TRUE.equals(isLicensed)) {
+            final String message = "Unfortunately, you have not obtain the license for GitScope yet.";
+            JOptionPane.showMessageDialog(JOptionPane.getRootFrame(), message, "GitScope requires a License", JOptionPane.INFORMATION_MESSAGE);
+            CheckLicense.requestLicense("Please register our plugin!");
+        }
     }
 }

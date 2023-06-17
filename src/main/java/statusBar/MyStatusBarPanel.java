@@ -9,7 +9,7 @@ public class MyStatusBarPanel extends JPanel {
     private final JBLabel hi;
 
     public MyStatusBarPanel() {
-        this.hi = new JBLabel("Hi");
+        this.hi = new JBLabel("");
         this.add(hi);
     }
 

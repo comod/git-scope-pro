@@ -36,12 +36,12 @@ public class MyTreeSelectionListener implements TreeSelectionListener {
 //            this.viewService.getCurrent().addTargetBranch(favLabel.getGitRepo(), ".." + favLabel.getName());
         }
 
-        if (object instanceof String label) {
-            if (label.equals(BranchSelectView.TAG_OR_REVISION)) {
-                System.out.println("yolo");
-
-            }
+//        if (object instanceof String label) {
+//            if (label.equals(BranchSelectView.TAG_OR_REVISION)) {
+//                System.out.println("yolo");
+//
+//            }
 //            System.out.println(label);
-        }
+//        }
     }
 }
