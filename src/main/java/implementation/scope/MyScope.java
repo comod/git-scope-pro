@@ -14,8 +14,8 @@ import java.util.List;
 
 public class MyScope {
 
-    public static final String OLD_SCOPE_NAME = Defs.APPLICATION_NAME;
-    public static final String SCOPE_ID = "GitScope";
+    public static final String OLD_SCOPE_NAME = "GitScope";
+    public static final String SCOPE_ID = "GitScopePro";
 
     private final NamedScopeManager scopeManager;
     private MyPackageSet myPackageSet;
@@ -23,7 +23,6 @@ public class MyScope {
     public MyScope(Project project) {
 
         this.scopeManager = NamedScopeManager.getInstance(project);
-
         this.createScope();
 
     }
@@ -56,7 +55,7 @@ public class MyScope {
 
     }
 
-    public void update(Collection<Change> changes){
+    public void update(Collection<Change> changes) {
         this.myPackageSet.setChanges(changes);
     }
 
