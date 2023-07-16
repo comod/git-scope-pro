@@ -13,7 +13,7 @@ public class MyChangeListListener implements ChangeListListener {
     }
 
     public void changeListUpdateDone() {
-        System.out.println("changeListUpdateDone");
+        //System.out.println("changeListUpdateDone");
         viewService.collectChanges();
     }
 }

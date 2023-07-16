@@ -161,10 +161,10 @@ public class BranchSelectView {
         return new KeyListener() {
             @Override
             public void keyTyped(KeyEvent e) {
-                System.out.println(e);
+                //System.out.println(e);
                 String text = search.getText();
                 if (e.getKeyChar() == KeyEvent.VK_BACK_SPACE) {
-                    System.out.println(removeLastChar(text));
+                    //System.out.println(removeLastChar(text));
                     search.setText(removeLastChar(text));
                     return;
                 }
@@ -174,7 +174,7 @@ public class BranchSelectView {
                 }
 
                 if (e.getKeyChar() == KeyEvent.VK_ENTER) {
-                    System.out.println("enter");
+                    //System.out.println("enter");
                     return;
                 }
 

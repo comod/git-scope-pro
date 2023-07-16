@@ -81,7 +81,7 @@ public class State implements PersistentStateComponent<State> {
 //            myModelBase.setTargetBranch(model.getTargetBranch());
 //
 //            String modelAsString = converter.toString(myModelBase);
-//            System.out.println(modelAsString);
+//            //System.out.println(modelAsString);
 //            newCollection.add(modelAsString);
 //        });
 //        setCollection(newCollection);

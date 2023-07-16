@@ -69,7 +69,7 @@ public class MyLineStatusTrackerImpl {
                     public void fileOpened(@NotNull FileEditorManager fileEditorManager, @NotNull VirtualFile virtualFile) {
 
                         Editor editor = getEditorFromVirtualFile(virtualFile);
-                        System.out.println("LST FileOpened " + editor);
+//                        //System.out.println("LST FileOpened " + editor);
                         createLineStatus(editor);
                     }
                 }
@@ -97,7 +97,7 @@ public class MyLineStatusTrackerImpl {
 
     public void update(Collection<Change> changes, @Nullable VirtualFile virtualFile) {
 
-        System.out.println("LST update");
+//        //System.out.println("LST update");
 
         this.changes = changes;
         if (virtualFile != null) {
@@ -127,25 +127,25 @@ public class MyLineStatusTrackerImpl {
 
     public void showLstGutterMarkers(Boolean showLstGutterMarkers) {
         // Deactivate/Activate VCS Line Status as it is for now
-//        System.out.println("showLstGutterMarkers" + showLstGutterMarkers);
+//        //System.out.println("showLstGutterMarkers" + showLstGutterMarkers);
         VcsApplicationSettings vcsApplicationSettings = VcsApplicationSettings.getInstance();
         vcsApplicationSettings.SHOW_LST_GUTTER_MARKERS = showLstGutterMarkers;
     }
 
     private void initOpenTabs() {
         Editor[] editors = EditorFactory.getInstance().getAllEditors();
-        System.out.println("LST editors>");
+        //System.out.println("LST editors>");
         for (Editor editor : editors) {
-            System.out.println("LST" + editor);
+//            //System.out.println("LST" + editor);
             createLineStatus(editor);
         }
-        System.out.println("LST <editors");
+        //System.out.println("LST <editors");
     }
 
     private void updateOpenTabs() {
         Editor[] editors = EditorFactory.getInstance().getAllEditors();
         if (editors.length == 0) {
-            System.out.println("LST No Editors");
+            //System.out.println("LST No Editors");
             return;
         }
         for (Editor editor : editors) {
@@ -156,7 +156,7 @@ public class MyLineStatusTrackerImpl {
     private void updateLineStatusByChangesForEditor(Editor editor) {
 
         if (changes == null) {
-            System.out.println("LST No Changes");
+            //System.out.println("LST No Changes");
             return;
         }
 
@@ -164,7 +164,7 @@ public class MyLineStatusTrackerImpl {
             // Load Revision
 
             if (editor == null) {
-                System.out.println("LST Editor NULL");
+                //System.out.println("LST Editor NULL");
                 return;
             }
 
@@ -208,11 +208,11 @@ public class MyLineStatusTrackerImpl {
                 }
             }
 
-            System.out.println("LST setContent: " + editor + content);
+            //System.out.println("LST setContent: " + editor + content);
             setContent(editor, content);
 
         } catch (VcsException e) {
-            System.out.println("XXX (LineStatus) Exc: " + e.getMessage());
+            //System.out.println("XXX (LineStatus) Exc: " + e.getMessage());
         }
     }
 
@@ -222,9 +222,9 @@ public class MyLineStatusTrackerImpl {
         content = StringUtil.convertLineSeparators(content);
         MyLineStatusTrackerManager myLineStatusTrackerManager = myLineStatusTrackerManagerCollection.get(getPathFromEditor(editor));
 
-//        System.out.println("get " + getPathFromEditor(editor));
+//        //System.out.println("get " + getPathFromEditor(editor));
         if (myLineStatusTrackerManager == null) {
-//            System.out.println("null");
+//            //System.out.println("null");
             return;
         }
 
@@ -255,7 +255,7 @@ public class MyLineStatusTrackerImpl {
 
         MyLineStatusTrackerManager myLineStatusTrackerManagerCache = myLineStatusTrackerManagerCollection.get(getPathFromEditor(editor));
         if (myLineStatusTrackerManagerCache != null) {
-//            System.out.println("cache");
+//            //System.out.println("cache");
             return;
         }
 
@@ -265,7 +265,7 @@ public class MyLineStatusTrackerImpl {
                 document
         );
 
-//        System.out.println("put " + getPathFromEditor(editor));
+//        //System.out.println("put " + getPathFromEditor(editor));
         myLineStatusTrackerManagerCollection.put(getPathFromEditor(editor), myLineStatusTrackerManager);
 
     }

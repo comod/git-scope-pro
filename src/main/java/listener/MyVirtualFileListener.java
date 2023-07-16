@@ -8,6 +8,6 @@ public class MyVirtualFileListener implements VirtualFileListener {
 
     public void contentsChanged(@NotNull VirtualFileEvent event) {
         // nothing happens?
-        System.out.println("contentsChanged" + event);
+        //System.out.println("contentsChanged" + event);
     }
 }

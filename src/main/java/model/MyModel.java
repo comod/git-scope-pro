@@ -51,7 +51,7 @@ public class MyModel extends MyModelBase {
     public boolean isNew() {
         TargetBranchMap targetBranchMap = getTargetBranchMap();
         if (targetBranchMap == null) {
-            System.out.println("isNew - null");
+            //System.out.println("isNew - null");
             return true;
         }
         return targetBranchMap.getValue().isEmpty();

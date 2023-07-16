@@ -15,7 +15,7 @@ public class MyModelBase {
 
     public void addTargetBranch(GitRepository repo, String branch) {
         if (targetBranchMap == null) {
-            System.out.println("create new targetBranchMap");
+            //System.out.println("create new targetBranchMap");
             targetBranchMap = TargetBranchMap.create();
         }
         targetBranchMap.add(repo.toString(), branch);

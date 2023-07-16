@@ -25,17 +25,17 @@ class MyLineStatusTrackerManager {
 
     void setBaseRevision(CharSequence vcsContent) {
 //        SwingUtilities.invokeLater(() -> {
-//            System.out.println("setBaseRevision!");
-            if (vcsContent == null) {
+//            //System.out.println("setBaseRevision!");
+        if (vcsContent == null) {
 
-                System.out.println("vcsContent == null");
-                return;
-            }
-            try {
-                this.myLineStatusTracker.setBaseRevision(vcsContent);
-            } catch (Exception e) {
-            System.out.println("avoid exception be thrown!");
-            }
+            //System.out.println("vcsContent == null");
+            return;
+        }
+        try {
+            this.myLineStatusTracker.setBaseRevision(vcsContent);
+        } catch (Exception e) {
+            //System.out.println("avoid exception be thrown!");
+        }
 //        });
     }
 

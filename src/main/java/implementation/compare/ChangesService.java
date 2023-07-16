@@ -72,7 +72,7 @@ public class ChangesService extends GitCompareWithBranchAction {
 
                     // Simple "merge" logic
                     for (Change change : changesPerRepo) {
-                        System.out.println(change);
+//                        //System.out.println(change);
                         if (!_changes.contains(change)) {
                             _changes.add(change);
                         }
@@ -134,7 +134,7 @@ public class ChangesService extends GitCompareWithBranchAction {
 //                    e.printStackTrace();
 //                }
         VirtualFile file = repo.getRoot();
-        System.out.println("file " + file);
+//        //System.out.println("file " + file);
         Collection<Change> _changes = null;
         try {
 
@@ -144,7 +144,7 @@ public class ChangesService extends GitCompareWithBranchAction {
 
             // Diff Changes
             _changes = getDiffChanges(project, file, branchToCompare);
-            System.out.println("diffChanges (repo: " + repo + ") changes: " + _changes);
+//            //System.out.println("diffChanges (repo: " + repo + ") changes: " + _changes);
 
             for (Change localChange : localChanges) {
                 VirtualFile localChangeVirtualFile = localChange.getVirtualFile();
@@ -161,7 +161,7 @@ public class ChangesService extends GitCompareWithBranchAction {
             }
 
         } catch (VcsException e) {
-            System.out.println("EEE Exception while collecting _changes " + e.getMessage());
+//            //System.out.println("EEE Exception while collecting _changes " + e.getMessage());
             // silent
         }
         return _changes;

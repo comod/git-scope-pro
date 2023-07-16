@@ -14,7 +14,7 @@ public class VcsStartup implements VcsRepositoryMappingListener {
 
     @Override
     public void mappingChanged() {
-        System.out.println("VcsStartup");
+        //System.out.println("VcsStartup");
 
         ViewService viewService = project.getService(ViewService.class);
         viewService.eventVcsReady();

@@ -44,11 +44,11 @@ public class BranchTree extends JPanel {
 //            if (node == null) return;
 //            Object object = node.getUserObject();
 //            if (object instanceof FavLabel favLabel) {
-//                System.out.println(favLabel);
+//                //System.out.println(favLabel);
 //            }
 //
 //            if (object instanceof String label) {
-//                System.out.println(label);
+//                //System.out.println(label);
 //            }
 //        });
         update(search);

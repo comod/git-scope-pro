@@ -17,7 +17,7 @@ public class MyFileEditorManagerListener implements FileEditorManagerListener {
 
     @Override
     public void fileOpened(@NotNull FileEditorManager source, @NotNull VirtualFile vFile) {
-        System.out.println("fileOpened doCompareAndUpdate");
+        //System.out.println("fileOpened doCompareAndUpdate");
         viewService.collectChanges();
     }
 }

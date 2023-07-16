@@ -44,7 +44,7 @@ public final class ToolWindowService implements ToolWindowServiceInterface {
         contentManager.addContent(content);
 
         int index = contentManager.getIndexOfContent(content);
-        System.out.println("addTab " + tabName + " with index " + index);
+        //System.out.println("addTab " + tabName + " with index " + index);
     }
 
 

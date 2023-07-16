@@ -19,13 +19,13 @@ public class MyToolWindowListener implements ToolWindowManagerListener {
     @Override
     public void stateChanged(@NotNull ToolWindowManager toolWindowManager, @NotNull ToolWindowManagerEventType changeType) {
         if (changeType.equals(ToolWindowManagerEventType.RegisterToolWindow)) {
-            System.out.println("RegisterToolWindow");
+//            //System.out.println("RegisterToolWindow");
             viewService.eventToolWindowReady();
         }
 
-//        System.out.println(changeType);
+//        //System.out.println(changeType);
 //        if (changeType.equals(ToolWindowManagerEventType.ActivateToolWindow)) {
-//            System.out.println("ActivateToolWindow");
+//            //System.out.println("ActivateToolWindow");
 //            viewService.eventActivateToolWindow();
 //        }
     }

@@ -23,14 +23,14 @@ public class MyTabContentListener implements ContentManagerListener {
     }
 
     public void contentAdded(@NotNull ContentManagerEvent event) {
-        System.out.println("contentAdded");
+        //System.out.println("contentAdded");
     }
 
     public void selectionChanged(@NotNull ContentManagerEvent event) {
 
         ContentManagerEvent.ContentOperation operation = event.getOperation();
         ContentManagerEvent.ContentOperation add = ContentManagerEvent.ContentOperation.add;
-        System.out.println("selectionChanged " + operation);
+        //System.out.println("selectionChanged " + operation);
         if (operation.equals(add)) {
             this.viewService.setTabIndex(event.getIndex());
             @NlsContexts.TabTitle String tabName = event.getContent().getTabName();

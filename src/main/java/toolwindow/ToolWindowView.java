@@ -89,7 +89,7 @@ public class ToolWindowView {
     private void render() {
         boolean myModelIsNew = myModel.isNew();
         boolean isHeadTab = myModel.isHeadTab();
-        System.out.println("===render toolWindowView (myModelIsNew: " + myModelIsNew + " isHeadTab:" + isHeadTab);
+        //System.out.println("===render toolWindowView (myModelIsNew: " + myModelIsNew + " isHeadTab:" + isHeadTab);
         boolean showSceneA = myModelIsNew && !isHeadTab;
         sceneA.setVisible(showSceneA);
         sceneB.setVisible(!showSceneA);
@@ -100,10 +100,10 @@ public class ToolWindowView {
 //            tbp.hide();
 //        }
         if (myModel.getChanges() == null) {
-            System.out.println("no changes to show");
+            //System.out.println("no changes to show");
             return;
         }
-        System.out.println("render/update changes" + myModel.getChanges().toString());
+        //System.out.println("render/update changes" + myModel.getChanges().toString());
         vcsTree.update(myModel.getChanges());
 //        if (!showSceneA) {
 //            this.targetBranch.update(myModel);

@@ -5,9 +5,32 @@
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-name -->
     <!-- Unique identifier of the plugin. It should be FQN. It cannot be changed between the plugin versions. -->
     <id>Git Scope</id>
+    <name>Git Scope</name>
     <vendor>WOELKIT</vendor>
-    <!--    <product-descriptor code="PGITSCOPE" release-date="20230612" release-version="20231"/>-->
+    <product-descriptor code="PGITSCOPE" release-date="20230622" release-version="20231"/>
+    <description><![CDATA[
+        Create custom "scopes" for any target branch. Selectable in a tool window, which is then called **GIT SCOPE**.
+        The Current "scope" is displayed as
 
+        <ul>
+          <li>diff in the tool window
+          <li>"line status" in the "line gutter"
+          <li>custom "scope" and finally as a
+          <li>status bar widget
+        </ul>
+    ]]></description>
+
+    <change-notes><![CDATA[
+        <ul>
+        <li>Complete overhaul of the plugin
+        <li>Cleaner UI
+        <li>Tab-based tool window
+        <li>HEAD tab is always present by default
+        <li>Add new tab to create a new *GitScope*
+        <li>Tabs are persisted. This way you can keep "favorites" like a "main" branch tab
+        <li>Use the "ToggleHead" action to switch between HEAD and the (last) selected tab (Alt+H)
+        </ul>
+    ]]></change-notes>
     <!-- Product and plugin compatibility requirements.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
     <depends>com.intellij.modules.platform</depends>

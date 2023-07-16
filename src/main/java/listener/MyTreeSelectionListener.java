@@ -30,7 +30,7 @@ public class MyTreeSelectionListener implements TreeSelectionListener {
 //        MyModel currentModel = viewService.getCurrent();
         if (object instanceof BranchTreeEntry favLabel) {
 //            currentModel.setTargetBranch(favLabel.getName());
-            System.out.println(favLabel);
+            //System.out.println(favLabel);
             this.viewService.getCurrent().addTargetBranch(favLabel.getGitRepo(), favLabel.getName());
 //            this.viewService.getCurrent().addTargetBranch(favLabel.getGitRepo(), favLabel.getName() + "..HEAD");
 //            this.viewService.getCurrent().addTargetBranch(favLabel.getGitRepo(), ".." + favLabel.getName());
@@ -38,10 +38,10 @@ public class MyTreeSelectionListener implements TreeSelectionListener {
 
 //        if (object instanceof String label) {
 //            if (label.equals(BranchSelectView.TAG_OR_REVISION)) {
-//                System.out.println("yolo");
+//                //System.out.println("yolo");
 //
 //            }
-//            System.out.println(label);
+//            //System.out.println(label);
 //        }
     }
 }
