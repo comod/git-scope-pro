@@ -37,7 +37,8 @@ kotlin {
 //// Read more: https://plugins.jetbrains.com/docs/intellij/tools-gradle-intellij-plugin.html
 intellij {
     pluginName.set(properties("pluginName"))
-    version.set(properties("platformVersion"))
+//    version.set(properties("platformVersion"))
+    version.set("LATEST-EAP-SNAPSHOT")
     type.set(properties("platformType"))
 
     // Plugin Dependencies. Uses `platformPlugins` property from the gradle.properties file.
@@ -108,16 +109,17 @@ tasks {
 //        })
 
 //    }
-//    patchPluginXml {
-//        // https://plugins.jetbrains.com/docs/intellij/build-number-ranges.html#intellij-platform-based-products-of-recent-ide-versions
-//        // keep in sync with resources/META-INF/plugin.xml
-//        // 305
-////        sinceBuild.set("211")
-////        untilBuild.set("222")
-//
-//        // 306
-//        sinceBuild.set("223")
-//    }
+    patchPluginXml {
+        // https://plugins.jetbrains.com/docs/intellij/build-number-ranges.html#intellij-platform-based-products-of-recent-ide-versions
+        // keep in sync with resources/META-INF/plugin.xml
+        // 305
+//        sinceBuild.set("211")
+//        untilBuild.set("222")
+
+        // 306
+        sinceBuild.set(properties("pluginSinceBuild"))
+        untilBuild.set(properties("pluginUntilBuild"))
+    }
 
 //    signPlugin {
 //        certificateChain.set(System.getenv("CERTIFICATE_CHAIN"))

@@ -8,6 +8,7 @@
     <name>Git Scope</name>
     <vendor>WOELKIT</vendor>
     <product-descriptor code="PGITSCOPE" release-date="20230622" release-version="20231"/>
+    <version>2023.1.2</version>
     <description><![CDATA[
         Create custom "scopes" for any target branch. Selectable in a tool window, which is then called **GIT SCOPE**.
         The Current "scope" is displayed as
@@ -21,6 +22,11 @@
     ]]></description>
 
     <change-notes><![CDATA[
+      2023.1.2
+        <ul>
+        <li>Fix compatibility issues</li>
+        </ul>
+      2023.1.1
         <ul>
         <li>Complete overhaul of the plugin
         <li>Cleaner UI
