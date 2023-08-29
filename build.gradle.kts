@@ -1,4 +1,5 @@
-//import org.jetbrains.changelog.Changelog
+import org.jetbrains.changelog.Changelog
+
 //import org.jetbrains.changelog.markdownToHTML
 
 fun properties(key: String) = project.findProperty(key).toString()
@@ -46,10 +47,10 @@ intellij {
     plugins.set(listOf("Git4Idea"))
 }
 // Configure Gradle Changelog Plugin - read more: https://github.com/JetBrains/gradle-changelog-plugin
-changelog {
-    groups.set(emptyList())
-    repositoryUrl.set(properties("pluginRepositoryUrl"))
-}
+//changelog {
+//    groups.set(emptyList())
+//    repositoryUrl.set(properties("pluginRepositoryUrl"))
+//}
 dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
     implementation("io.reactivex.rxjava3:rxjava:3.1.6")
