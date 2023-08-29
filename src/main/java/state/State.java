@@ -36,10 +36,6 @@ public class State implements PersistentStateComponent<State> {
 
     public Boolean ThreeDotsCheckBox = true;
 
-    public String getData() {
-        return data;
-    }
-
     public void setData(String data) {
         this.data = data;
     }
@@ -57,7 +53,7 @@ public class State implements PersistentStateComponent<State> {
 
     public List<MyModelBase> load() {
         MyModelConverter converter = new MyModelConverter();
-        return converter.fromString(getData());
+        return converter.fromString(data);
     }
 
     @Nullable
