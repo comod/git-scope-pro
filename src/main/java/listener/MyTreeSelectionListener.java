@@ -7,6 +7,7 @@ import javax.swing.event.TreeSelectionListener;
 import javax.swing.tree.DefaultMutableTreeNode;
 
 import com.intellij.ui.treeStructure.Tree;
+import state.State;
 import toolwindow.BranchSelectView;
 import toolwindow.elements.BranchTreeEntry;
 import service.ViewService;
@@ -14,11 +15,13 @@ import service.ViewService;
 public class MyTreeSelectionListener implements TreeSelectionListener {
     private final Tree tree;
     private final ViewService viewService;
+    private final State state;
 
     public MyTreeSelectionListener(Project project, Tree myTree) {
         this.tree = myTree;
 
         this.viewService = project.getService(ViewService.class);
+        this.state = project.getService(State.class);
     }
 
     @Override
@@ -31,7 +34,11 @@ public class MyTreeSelectionListener implements TreeSelectionListener {
         if (object instanceof BranchTreeEntry favLabel) {
 //            currentModel.setTargetBranch(favLabel.getName());
             //System.out.println(favLabel);
-            this.viewService.getCurrent().addTargetBranch(favLabel.getGitRepo(), favLabel.getName());
+            String branchName = favLabel.getName();
+            if (this.state.getThreeDotsCheckBox()) {
+                branchName = favLabel.getName() + "...HEAD";
+            }
+            this.viewService.getCurrent().addTargetBranch(favLabel.getGitRepo(), branchName);
 //            this.viewService.getCurrent().addTargetBranch(favLabel.getGitRepo(), favLabel.getName() + "..HEAD");
 //            this.viewService.getCurrent().addTargetBranch(favLabel.getGitRepo(), ".." + favLabel.getName());
         }

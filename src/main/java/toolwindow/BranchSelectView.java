@@ -2,12 +2,15 @@ package toolwindow;
 
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ui.componentsList.layout.VerticalStackLayout;
-import com.intellij.ui.*;
+import com.intellij.ui.DocumentAdapter;
+import com.intellij.ui.SearchTextField;
+import com.intellij.ui.SeparatorWithText;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.util.ui.JBUI;
 import git4idea.branch.GitBranchType;
 import org.jetbrains.annotations.NotNull;
 import service.GitService;
+import state.State;
 import toolwindow.elements.BranchTree;
 import toolwindow.elements.BranchTreeEntry;
 
@@ -16,7 +19,6 @@ import javax.swing.event.DocumentEvent;
 import java.awt.*;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
-//import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,12 +34,13 @@ public class BranchSelectView {
     //    private final TargetBranchService targetBranchService;
 //    private final CurrentBranch currentBranch;
     private final GitService gitService;
+    private final State state;
 
     private SearchTextField search;
 
     public BranchSelectView(Project project) {
         this.project = project;
-////        this.state = State.getInstance(project);
+        this.state = project.getService(State.class);
 //        this.myModel = myModel;
 //        this.targetBranchService = project.getService(TargetBranchService.class);
         this.gitService = project.getService(GitService.class);
@@ -62,7 +65,11 @@ public class BranchSelectView {
 //        main.setLayout(new VerticalFlowLayout());
         main.setLayout(new VerticalStackLayout());
 
-
+        JCheckBox checkBox = new JCheckBox("Show Changes Since Common Ancestor (git diff A...B)");
+        checkBox.setSelected(this.state.getThreeDotsCheckBox());
+        checkBox.setBorder(JBUI.Borders.empty(10)); // top, left, bottom, right padding
+        checkBox.addActionListener(e -> this.state.setThreeDotsCheckBox(checkBox.isSelected()));
+        main.add(checkBox);
 //        SimpleColoredComponent simple = new SimpleColoredComponent();
 //        simple.append("HEAD (Current)");
 //        simple.setIcon(AllIcons.Vcs.Merge);
