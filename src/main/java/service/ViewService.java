@@ -26,7 +26,6 @@ public class ViewService {
 
     public static final String PLUS_TAB_LABEL = "+";
     public static final int DEBOUNCE_MS = 50;
-    //    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
     public List<MyModel> collection = new ArrayList<>();
     public Integer currentTabIndex = 0;
     private Project project;
@@ -34,9 +33,6 @@ public class ViewService {
     private TargetBranchService targetBranchService;
     private ChangesService changesService;
     private State state;
-    //    private final MessageBusConnection messageBusConnection;
-//        private final MessageBusConnection messageBusConnection;
-//    private final MessageBus messageBus;
     private MyLineStatusTrackerImpl myLineStatusTrackerImpl;
     private Debounce debouncer;
     private MyScope myScope;
@@ -74,8 +70,8 @@ public class ViewService {
 
     public void load() {
         //System.out.println("LOAD");
-        List<MyModel> modelCollection = new ArrayList<>();
-        List<MyModelBase> load = this.state.load();
+        List<MyModel> collection = new ArrayList<>();
+        List<MyModelBase> load = this.state.getModelData();
         if (load == null) {
             //System.out.println("LOAD - null");
             return;
@@ -89,10 +85,37 @@ public class ViewService {
             }
             //System.out.println("LOAD! - " + targetBranchMap.getValue());
             myModel.setTargetBranchMap(targetBranchMap);
-            modelCollection.add(myModel);
+            collection.add(myModel);
         });
-        setCollection(modelCollection);
+        setCollection(collection);
     }
+
+    public void save() {
+        if (collection == null) {
+            // Add console log if needed
+            //System.out.println("SAVE - null");
+            return;
+        }
+        List<MyModelBase> modelData = new ArrayList<>();
+        collection.forEach(myModel -> {
+            MyModelBase myModelBase = new MyModelBase();
+            TargetBranchMap targetBranchMap = myModel.getTargetBranchMap();
+            if (targetBranchMap == null) {
+                // Add console log if needed
+                //System.out.println("SAVE - targetBranchMap null");
+                return;
+            }
+            //System.out.println("SAVE! - " + targetBranchMap.getValue());
+            myModelBase.targetBranchMap = targetBranchMap;
+            modelData.add(myModelBase);
+        });
+        this.state.setModelData(modelData);
+    }
+//    public void save() {
+    //System.out.println("save");
+    // @todo
+//        state.setModelData(this.collection);
+//    }
 
     public void eventVcsReady() {
         this.vcsReady = true;
@@ -336,10 +359,6 @@ public class ViewService {
         this.collection = collection;
     }
 
-    public void save() {
-        //System.out.println("save");
-        state.save(this.collection);
-    }
 
     public void removeTab(int tabIndex) {
         //System.out.println("removed by tabIndex " + tabIndex);

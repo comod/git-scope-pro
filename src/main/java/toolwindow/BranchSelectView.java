@@ -3,11 +3,13 @@ package toolwindow;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ui.componentsList.layout.VerticalStackLayout;
 import com.intellij.ui.DocumentAdapter;
+import com.intellij.ui.JBColor;
 import com.intellij.ui.SearchTextField;
 import com.intellij.ui.SeparatorWithText;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.util.ui.JBUI;
 import git4idea.branch.GitBranchType;
+import org.jdesktop.swingx.StackLayout;
 import org.jetbrains.annotations.NotNull;
 import service.GitService;
 import state.State;
@@ -19,6 +21,8 @@ import javax.swing.event.DocumentEvent;
 import java.awt.*;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -62,14 +66,26 @@ public class BranchSelectView {
 
         // main
         JPanel main = new JPanel();
-//        main.setLayout(new VerticalFlowLayout());
         main.setLayout(new VerticalStackLayout());
 
-        JCheckBox checkBox = new JCheckBox("Show Changes Since Common Ancestor (git diff A...B)");
+        // Checkbox and Help-Icon
+        JPanel help = new JPanel();
+        help.setLayout(new FlowLayout(FlowLayout.LEFT));
+
+        JCheckBox checkBox = new JCheckBox("Only Changes Since Common Ancestor (git diff A...B)");
         checkBox.setSelected(this.state.getThreeDotsCheckBox());
         checkBox.setBorder(JBUI.Borders.empty(10)); // top, left, bottom, right padding
         checkBox.addActionListener(e -> this.state.setThreeDotsCheckBox(checkBox.isSelected()));
-        main.add(checkBox);
+
+        // Add a mouse listener to the help icon label to show the tool tip on hover
+        checkBox.addMouseListener(new MouseAdapter() {
+            public void mouseEntered(MouseEvent me) {
+                checkBox.setToolTipText("Tick this box if you want to see the changes that were made only on this branch");
+            }
+        });
+
+        help.add(checkBox);
+        main.add(help);
 //        SimpleColoredComponent simple = new SimpleColoredComponent();
 //        simple.append("HEAD (Current)");
 //        simple.setIcon(AllIcons.Vcs.Merge);

@@ -12,6 +12,7 @@ import java.lang.reflect.Type;
 import java.util.List;
 
 class MyModelConverter extends Converter<List<MyModelBase>> {
+    @Override
     public List<MyModelBase> fromString(@NotNull String value) {
         Gson gson = new Gson();
         Type listType = new TypeToken<List<MyModelBase>>() {
@@ -19,6 +20,7 @@ class MyModelConverter extends Converter<List<MyModelBase>> {
         return gson.fromJson(value, listType);
     }
 
+    @Override
     public String toString(@NotNull List<MyModelBase> object) {
         Gson gson = new Gson();
         return gson.toJson(object);

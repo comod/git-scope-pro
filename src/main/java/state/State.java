@@ -3,6 +3,7 @@ package state;
 import com.intellij.openapi.components.PersistentStateComponent;
 import com.intellij.openapi.components.Storage;
 import com.intellij.util.xmlb.XmlSerializerUtil;
+import com.intellij.util.xmlb.annotations.OptionTag;
 import model.MyModel;
 import model.MyModelBase;
 import org.jetbrains.annotations.NotNull;
@@ -19,9 +20,7 @@ import java.util.List;
  * --- By using the setter the data is saved
  * --- Map<String, String> possible
  * --- Map<String, Object> not possible
- */
-
-/**
+ * <p>
  * PersistentStateComponent keeps project config values.
  * Similar notion of 'preference' in Android
  */
@@ -32,34 +31,16 @@ import java.util.List;
 )
 public class State implements PersistentStateComponent<State> {
 
-    public String data;
-
+    @OptionTag(converter = MyModelConverter.class)
+    public List<MyModelBase> modelData;
     public Boolean ThreeDotsCheckBox = true;
 
-    public void setData(String data) {
-        this.data = data;
+    public List<MyModelBase> getModelData() {
+        return modelData;
     }
 
-    public void save(List<MyModel> modelCollection) {
-        List<MyModelBase> persistList = new ArrayList<>();
-        modelCollection.forEach(model -> {
-            MyModelBase myModelBase = new MyModelBase();
-            myModelBase.setTargetBranchMap(model.getTargetBranchMap());
-            persistList.add(myModelBase);
-        });
-        MyModelConverter converter = new MyModelConverter();
-        setData(converter.toString(persistList));
-    }
-
-    public List<MyModelBase> load() {
-        MyModelConverter converter = new MyModelConverter();
-        return converter.fromString(data);
-    }
-
-    @Nullable
-    @Override
-    public State getState() {
-        return this;
+    public void setModelData(List<MyModelBase> modelData) {
+        this.modelData = modelData;
     }
 
     public Boolean getThreeDotsCheckBox() {
@@ -68,6 +49,12 @@ public class State implements PersistentStateComponent<State> {
 
     public void setThreeDotsCheckBox(Boolean threeDotsCheckBox) {
         ThreeDotsCheckBox = threeDotsCheckBox;
+    }
+
+    @Nullable
+    @Override
+    public State getState() {
+        return this;
     }
 
     @Override
