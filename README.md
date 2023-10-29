@@ -11,11 +11,63 @@ The Current "scope" is displayed/available as
 - custom "scope" and finally as a
 - status bar widget
 
+### Story
+
+Most developers enjoy using version control to inspect code changes before a commit. However, after committing, all
+version control changes and line statuses are lost. Since branches often consist of multiple commits, this plugin makes
+those commits intuitively visible again.
+
+### Modifications in Detail
+
+**Change Browser:**
+
+Adds a tool window with a "change browser" (similar to version control) that displays the current diff of the **GIT
+SCOPE**.
+
+**Line Status Gutter:**
+
+Adjusts the line status according to your **GIT SCOPE**. Normally this built-in feature shows only the current "HEAD"
+changes
+
+READ: https://www.jetbrains.com/help/phpstorm/file-status-highlights.html
+
+**Scope:**
+
+Adds a custom *Scope* (used to do inspections, search/replace, ect), i.e. search results are filtered by **GIT SCOPE**.
+
+READ: https://www.jetbrains.com/help/phpstorm/scopes.html
+
+**Status Bar Widget**
+
+To see the current selection of the Git Scope even when the tool window is not open, you can look at the status bar
+widget.
+
+## Shortcuts (Added by this Plugin)
+
+| Shortcut | Description                                      |
+|----------|--------------------------------------------------|
+| Alt+H    | Toggle between HEAD and last git scope selection |
+
+## More Useful Shortcuts
+
+| Shortcut                                  | Description                    |
+|-------------------------------------------|--------------------------------|
+| Ctrl+D (on any file in a changes browser) | Open diff window               |
+| F7                                        | step forward (in diff window)  |
+| Shift+F7                                  | step backward (in diff window) |
+
 <!-- Plugin description end -->
 
 # Changelog
 
 <!-- Plugin changelog -->
+
+### 2023.1.5
+
+# Fixed
+
+- "Only Changes Since Common Ancestor": Improved Git comparison accuracy by using GitHistoryUtils.history() with a
+  two-dot syntax (git diff A..B)
 
 ### 2023.1.4
 

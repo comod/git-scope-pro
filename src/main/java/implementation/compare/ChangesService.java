@@ -3,19 +3,23 @@ package implementation.compare;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.vcs.FilePath;
 import com.intellij.openapi.vcs.VcsException;
 import com.intellij.openapi.vcs.changes.Change;
 import com.intellij.openapi.vcs.changes.ChangeListManager;
+import com.intellij.openapi.vcs.changes.ChangesUtil;
 import com.intellij.openapi.vfs.VirtualFile;
+import git4idea.GitCommit;
+import git4idea.GitUtil;
 import git4idea.actions.GitCompareWithBranchAction;
+import git4idea.history.GitHistoryUtils;
 import git4idea.repo.GitRepository;
 import model.TargetBranchMap;
 import org.jetbrains.annotations.NotNull;
 import service.GitService;
 import system.Defs;
 
-import java.util.ArrayList;
-import java.util.Collection;
+import java.util.*;
 import java.util.function.Consumer;
 
 public class ChangesService extends GitCompareWithBranchAction {
@@ -68,7 +72,10 @@ public class ChangesService extends GitCompareWithBranchAction {
                 git.getRepositories().forEach(repo -> {
                     String branchToCompare = getBranchToCompare(targetBranchByRepo, repo);
 
-                    Collection<Change> changesPerRepo = doCollectChanges(project, repo, branchToCompare);
+//                    Collection<Change> changesPerRepo = doCollectChanges(project, repo, branchToCompare);
+                    Collection<Change> changesPerRepo = null;
+                    changesPerRepo = doCollectChanges(project, repo, branchToCompare);
+
 
                     // Simple "merge" logic
                     for (Change change : changesPerRepo) {
@@ -127,6 +134,29 @@ public class ChangesService extends GitCompareWithBranchAction {
 
     }
 
+    @NotNull
+    public Collection<Change> getChangesByHistory(Project project, GitRepository repo, String branchToCompare) throws VcsException {
+//        GitRepository repository = GitUtil.getRepositoryManager(project).getRepositoryForRootQuick(project.getBaseDir());
+//        if (repository == null) {
+//            throw new IllegalStateException("Git repository not found");
+//        }
+//
+//        branchToCompare = "main..feature/add-sorting";
+        List<GitCommit> commits = GitHistoryUtils.history(project, repo.getRoot(), branchToCompare);
+
+        Map<FilePath, Change> changeMap = new HashMap<>();
+        for (GitCommit commit : commits) {
+            System.out.println(commit);
+            for (Change change : commit.getChanges()) {
+                FilePath path = ChangesUtil.getFilePath(change);
+                changeMap.put(path, change);
+            }
+        }
+
+        return new ArrayList<>(changeMap.values());
+    }
+
+
     public Collection<Change> doCollectChanges(Project project, GitRepository repo, String branchToCompare) {
         //                try {
 //                    Thread.sleep(3000);
@@ -143,7 +173,11 @@ public class ChangesService extends GitCompareWithBranchAction {
             Collection<Change> localChanges = changeListManager.getAllChanges();
 
             // Diff Changes
-            _changes = getDiffChanges(project, file, branchToCompare);
+            if (branchToCompare.contains("..")) {
+                _changes = getChangesByHistory(project, repo, branchToCompare);
+            } else {
+                _changes = getDiffChanges(project, file, branchToCompare);
+            }
 //            //System.out.println("diffChanges (repo: " + repo + ") changes: " + _changes);
 
             for (Change localChange : localChanges) {

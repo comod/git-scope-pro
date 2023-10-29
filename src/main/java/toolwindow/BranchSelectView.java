@@ -72,7 +72,7 @@ public class BranchSelectView {
         JPanel help = new JPanel();
         help.setLayout(new FlowLayout(FlowLayout.LEFT));
 
-        JCheckBox checkBox = new JCheckBox("Only Changes Since Common Ancestor (git diff A...B)");
+        JCheckBox checkBox = new JCheckBox("Only Changes Since Common Ancestor (git diff A..B)");
         checkBox.setSelected(this.state.getThreeDotsCheckBox());
         checkBox.setBorder(JBUI.Borders.empty(10)); // top, left, bottom, right padding
         checkBox.addActionListener(e -> this.state.setThreeDotsCheckBox(checkBox.isSelected()));

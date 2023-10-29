@@ -208,11 +208,11 @@ public class MyLineStatusTrackerImpl {
                 }
             }
 
-            //System.out.println("LST setContent: " + editor + content);
+//            System.out.println("LST setContent: " + editor + content);
             setContent(editor, content);
 
         } catch (VcsException e) {
-            //System.out.println("XXX (LineStatus) Exc: " + e.getMessage());
+//            System.out.println("XXX (LineStatus) Exc: " + e.getMessage());
         }
     }
 
