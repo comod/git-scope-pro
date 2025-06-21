@@ -207,9 +207,7 @@ public class MyLineStatusTrackerImpl {
         content = StringUtil.convertLineSeparators(content);
         MyLineStatusTrackerManager myLineStatusTrackerManager = myLineStatusTrackerManagerCollection.get(getPathFromEditor(editor));
 
-        System.out.println("FOO: get " + getPathFromEditor(editor));
         if (myLineStatusTrackerManager == null) {
-           System.out.println("FOO: Content is null");
             return;
         }
 

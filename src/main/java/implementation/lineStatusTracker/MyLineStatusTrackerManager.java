@@ -25,10 +25,8 @@ class MyLineStatusTrackerManager {
 
     void setBaseRevision(CharSequence vcsContent) {
         if (vcsContent == null) {
-            System.out.println("vcsContent == null");
             return;
         }
-        System.out.println("vcsContent:" + vcsContent);
         try {
             this.myLineStatusTracker.setBaseRevision(vcsContent);
         } catch (Exception e) {

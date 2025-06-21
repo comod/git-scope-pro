@@ -160,24 +160,24 @@ public class ChangesService extends GitCompareWithRefAction {
 
             // Diff Changes
             if (branchToCompare.contains("..")) {
-                System.out.println("branchToCompare: " + branchToCompare);
                 _changes = getChangesByHistory(project, repo, branchToCompare);
             } else {
                 GitReference gitReference;
 
                 if (branchToCompare.equals(GitService.BRANCH_HEAD)) {
                     gitReference = repo.getCurrentBranch();
-                } else  {
+                } else {
                     gitReference = repo.getBranches().findBranchByName(branchToCompare);
+                    if (gitReference == null) {
+                        gitReference = repo.getTagHolder().getTag(branchToCompare);
+                    }
                 }
 
                 if (gitReference != null) {
                     _changes = getDiffChanges(repo, file, gitReference);
                 }
             }
-
-            System.out.println("diffChanges (repo: " + repo + ") changes: " + _changes);
-
+            System.out.println("diffChanges: repo: " + repo + ", branchToCompare: " + branchToCompare);
             for (Change localChange : localChanges) {
                 VirtualFile localChangeVirtualFile = localChange.getVirtualFile();
                 if (localChangeVirtualFile == null) {
