@@ -1,5 +1,6 @@
 package implementation.compare;
 
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
@@ -10,8 +11,9 @@ import com.intellij.openapi.vcs.changes.ChangeListManager;
 import com.intellij.openapi.vcs.changes.ChangesUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import git4idea.GitCommit;
+import git4idea.GitReference;
 import git4idea.GitUtil;
-import git4idea.actions.GitCompareWithBranchAction;
+import git4idea.actions.GitCompareWithRefAction;
 import git4idea.history.GitHistoryUtils;
 import git4idea.repo.GitRepository;
 import model.TargetBranchMap;
@@ -22,7 +24,7 @@ import system.Defs;
 import java.util.*;
 import java.util.function.Consumer;
 
-public class ChangesService extends GitCompareWithBranchAction {
+public class ChangesService extends GitCompareWithRefAction {
 
     private final Project project;
     private GitRepository repo;
@@ -43,25 +45,13 @@ public class ChangesService extends GitCompareWithBranchAction {
         } else {
             branchToCompare = targetBranchByRepo.getValue().get(repo.toString());
         }
-//            String targetBranchByRepo = getTargetBranchByRepository(repo);
         if (branchToCompare == null) {
-            // Notification.notify(Defs.NAME, "Choose a Branch");
-//                toolWindowUI.showTargetBranchPopupAtToolWindow();
             branchToCompare = GitService.BRANCH_HEAD;
         }
         return branchToCompare;
     }
 
-    //    public void collectChangesWithCallback(@NotNull Project project,
-//                                           @NotNull GitRepository repo,
-//                                           @NotNull String branchToCompare,
-//                                           Consumer<Collection<Change>> callBack) {
-//
     public void collectChangesWithCallback(TargetBranchMap targetBranchByRepo, Consumer<Collection<Change>> callBack) {
-//        SwingUtilities.invokeLater(() -> {
-//            Collection<Change> changes = doCollectChanges(project, repo, branchToCompare);
-//            callBack.accept(changes);
-//        });
         task = new Task.Backgroundable(this.project, Defs.APPLICATION_NAME + ": Collecting Changes...", true) {
 
             private Collection<Change> changes;
@@ -72,14 +62,11 @@ public class ChangesService extends GitCompareWithBranchAction {
                 git.getRepositories().forEach(repo -> {
                     String branchToCompare = getBranchToCompare(targetBranchByRepo, repo);
 
-//                    Collection<Change> changesPerRepo = doCollectChanges(project, repo, branchToCompare);
                     Collection<Change> changesPerRepo = null;
                     changesPerRepo = doCollectChanges(project, repo, branchToCompare);
 
-
                     // Simple "merge" logic
                     for (Change change : changesPerRepo) {
-//                        //System.out.println(change);
                         if (!_changes.contains(change)) {
                             _changes.add(change);
                         }
@@ -90,7 +77,12 @@ public class ChangesService extends GitCompareWithBranchAction {
 
             @Override
             public void onSuccess() {
-                callBack.accept(this.changes);
+                // Ensure `changes` is accessed only on the UI thread to update the UI component
+                ApplicationManager.getApplication().invokeLater(() -> {
+                    if (callBack != null) {
+                        callBack.accept(this.changes);
+                    }
+                });
             }
 
             @Override
@@ -146,7 +138,7 @@ public class ChangesService extends GitCompareWithBranchAction {
 
         Map<FilePath, Change> changeMap = new HashMap<>();
         for (GitCommit commit : commits) {
-            System.out.println(commit);
+            //System.out.println(commit);
             for (Change change : commit.getChanges()) {
                 FilePath path = ChangesUtil.getFilePath(change);
                 changeMap.put(path, change);
@@ -158,13 +150,7 @@ public class ChangesService extends GitCompareWithBranchAction {
 
 
     public Collection<Change> doCollectChanges(Project project, GitRepository repo, String branchToCompare) {
-        //                try {
-//                    Thread.sleep(3000);
-//                } catch (InterruptedException e) {
-//                    e.printStackTrace();
-//                }
         VirtualFile file = repo.getRoot();
-//        //System.out.println("file " + file);
         Collection<Change> _changes = null;
         try {
 
@@ -174,11 +160,23 @@ public class ChangesService extends GitCompareWithBranchAction {
 
             // Diff Changes
             if (branchToCompare.contains("..")) {
+                System.out.println("branchToCompare: " + branchToCompare);
                 _changes = getChangesByHistory(project, repo, branchToCompare);
             } else {
-                _changes = getDiffChanges(project, file, branchToCompare);
+                GitReference gitReference;
+
+                if (branchToCompare.equals(GitService.BRANCH_HEAD)) {
+                    gitReference = repo.getCurrentBranch();
+                } else  {
+                    gitReference = repo.getBranches().findBranchByName(branchToCompare);
+                }
+
+                if (gitReference != null) {
+                    _changes = getDiffChanges(repo, file, gitReference);
+                }
             }
-//            //System.out.println("diffChanges (repo: " + repo + ") changes: " + _changes);
+
+            System.out.println("diffChanges (repo: " + repo + ") changes: " + _changes);
 
             for (Change localChange : localChanges) {
                 VirtualFile localChangeVirtualFile = localChange.getVirtualFile();
@@ -195,8 +193,7 @@ public class ChangesService extends GitCompareWithBranchAction {
             }
 
         } catch (VcsException e) {
-//            //System.out.println("EEE Exception while collecting _changes " + e.getMessage());
-            // silent
+          //System.out.println("EEE Exception while collecting _changes " + e.getMessage());
         }
         return _changes;
     }

@@ -1,5 +1,6 @@
 package toolwindow.elements;
 
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.changes.Change;
 import com.intellij.openapi.vcs.changes.ui.SimpleChangesBrowser;
@@ -9,70 +10,55 @@ import java.awt.*;
 import java.util.Collection;
 
 public class VcsTree extends JPanel {
-
     private final Project project;
 
     public VcsTree(Project project) {
-
         this.project = project;
-
         this.createElement();
         this.addListener();
-
     }
 
     public void createElement() {
-//        this.setLayout(new BorderLayout());
-
-//        this.setLoading();
-
     }
 
     public void addListener() {
-
     }
 
     public void setLoading() {
-        this.setComponent(centeredLoadingPanel(loadingIcon()));
+        ApplicationManager.getApplication().invokeLater(() -> 
+            this.setComponent(centeredLoadingPanel(loadingIcon()))
+        );
     }
 
     public void update(Collection<Change> changes) {
-
         setLoading();
-        // Build the Diff-Tool-Window
-        // SimpleChangesBrowser changesBrowser = new SimpleChangesBrowser(
-        SimpleChangesBrowser changesBrowser = new MySimpleChangesBrowser(
-                project,
-                changes
-        );
-
-        setComponent(changesBrowser);
-
+        
+        // Create and update browser in EDT
+        ApplicationManager.getApplication().invokeLater(() -> {
+            if (!project.isDisposed()) {
+                SimpleChangesBrowser changesBrowser = new MySimpleChangesBrowser(project, changes);
+                setComponent(changesBrowser);
+            }
+        });
     }
 
-    public void setComponent(Component component) {
-
+    private void setComponent(Component component) {
+        // Since this is called from invokeLater, we're already on EDT
         for (Component c : this.getComponents()) {
             this.remove(c);
         }
-
         this.add(component);
-
+        this.revalidate();
+        this.repaint();
     }
 
-    public JPanel centeredLoadingPanel(Component component) {
+    private JPanel centeredLoadingPanel(Component component) {
         JPanel masterPane = new JPanel(new GridBagLayout());
-
-        JPanel centerPane = new JPanel();
-        centerPane.setLayout(new BoxLayout(centerPane, BoxLayout.Y_AXIS));
-
         masterPane.add(component);
-
         return masterPane;
     }
 
     private Component loadingIcon() {
-
         ClassLoader cldr = this.getClass().getClassLoader();
         java.net.URL imageURL = cldr.getResource("loading.png");
         assert imageURL != null;
@@ -80,9 +66,6 @@ public class VcsTree extends JPanel {
         JLabel iconLabel = new JLabel();
         iconLabel.setIcon(imageIcon);
         imageIcon.setImageObserver(iconLabel);
-
         return iconLabel;
-
     }
-
 }

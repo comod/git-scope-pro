@@ -19,33 +19,19 @@
 
     <projectListeners>
         <listener class="listener.MyToolWindowListener" topic="com.intellij.openapi.wm.ex.ToolWindowManagerListener"/>
-        <listener class="listener.VcsStartup" topic="com.intellij.dvcs.repo.VcsRepositoryMappingListener"/>
+        <listener class="listener.VcsStartup" topic="com.intellij.openapi.vcs.VcsMappingListener"/>
         <listener class="listener.MyVirtualFileListener" topic="com.intellij.openapi.vfs.VirtualFileListener"/>
         <listener class="listener.MyChangeListListener" topic="com.intellij.openapi.vcs.changes.ChangeListListener"/>
         <listener class="listener.MyDynamicPluginListener" topic="com.intellij.ide.plugins.DynamicPluginListener"/>
         <listener class="listener.MyFileEditorManagerListener"
                   topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"/>
-
         <!--        <listener class="listener.MouseListener" topic="com.intellij.openapi.editor.event.EditorMouseMotionListener"/>-->
         <!--        <listener class="listener.MyTabContentListener" topic="com.intellij.toolwindow.content.ContentManagerListener"/>-->
     </projectListeners>
-
-    <!--    <applicationListeners>-->
-    <!--        <listener class="listener.MyVfsListener" topic="com.intellij.openapi.vfs.newvfs.BulkFileListener"/>-->
-    <!--    </applicationListeners>-->
-
-    <!-- Extension points defined by the plugin.
-         Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
     <extensions defaultExtensionNs="com.intellij">
 
         <statusBarWidgetFactory
-                implementation="statusBar.MyStatusBarWidgetFactory" id=""/>
-        <!--        <editorFactoryMouseMotionListener-->
-        <!--                implementation="listener.MouseListener"/>-->
-        <!--        <postStartupActivity implementation="listener.Startup"/>-->
-        <!--        <vcsRepositoryCreator implementation="listener.VcsStartup"/>-->
-        <!-- ToolWindow -->
-        <!--                canCloseContents="true"-->
+                implementation="statusBar.MyStatusBarWidgetFactory" id="Git Scope Widget"/>
         <toolWindow
                 id="Git Scope"
                 secondary="true"
@@ -57,7 +43,6 @@
 
         <!-- Config (Persistent) -->
         <projectService serviceImplementation="state.State"/>
-
         <projectService serviceImplementation="service.StatusBarService"/>
         <projectService serviceImplementation="service.GitService"/>
         <projectService serviceImplementation="service.ViewService"/>
@@ -66,14 +51,9 @@
         <projectService
                 serviceInterface="service.ToolWindowServiceInterface"
                 serviceImplementation="service.ToolWindowService"/>
-        <!--        <statusBarWidgetProvider implementation="toolwindow.TargetBranchStatusWidgetProvider"/>-->
-
     </extensions>
 
     <actions>
-        <!--        <action id="actions.MakeCoffeeAction" class="actions.MakeCoffeeAction">-->
-        <!--            <add-to-group group-id="ToolsMenu" anchor="last"/>-->
-        <!--        </action>-->
         <action id="ToggleHead" class="listener.ToggleHeadAction" text="GitScope: Toggle Head" description="ToggleHead">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
             <keyboard-shortcut keymap="$default" first-keystroke="alt H"/>

@@ -17,14 +17,9 @@ public class TargetBranch extends JLabel {
         this.git = project.getService(GitService.class);
 
         this.targetBranchService = project.getService(TargetBranchService.class);
-//        this.createElement();
         this.addListener();
 
     }
-
-//    public void createElement() {
-//        update();
-//    }
 
     public void addListener() {
 

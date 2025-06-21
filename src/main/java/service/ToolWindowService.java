@@ -40,11 +40,9 @@ public final class ToolWindowService implements ToolWindowServiceInterface {
         Content content = ContentFactory.getInstance().createContent(toolWindowView.getRootPanel(), tabName, false);
         content.setCloseable(closeable);
         ContentManager contentManager = getContentManager();
-//        contentManager.getComponent();
         contentManager.addContent(content);
 
         int index = contentManager.getIndexOfContent(content);
-        //System.out.println("addTab " + tabName + " with index " + index);
     }
 
 
@@ -55,16 +53,7 @@ public final class ToolWindowService implements ToolWindowServiceInterface {
     @Override
     public void changeTabName(String title) {
         getToolWindow().setTitle(title);
-//        setClosable();
     }
-
-//    public void setClosable() {
-//        @Nullable Content currentTabContent = getContentManager().getSelectedContent();
-//        if (currentTabContent == null) {
-//            return;
-//        }
-//        currentTabContent.setCloseable(true);
-//    }
 
     public void removeTab(int index) {
         @Nullable Content content = getContentManager().getContent(index);
@@ -97,15 +86,5 @@ public final class ToolWindowService implements ToolWindowServiceInterface {
         getContentManager().setSelectedContent(content);
         getContentManager().requestFocus(content, true);
     }
-
-//    public void selectHeadTab() {
-//        int count = getContentManager().getContentCount();
-//        @Nullable Content content = getContentManager().getContent(0);
-//        if (content == null) {
-//            return;
-//        }
-//        getContentManager().setSelectedContent(content);
-//        getContentManager().requestFocus(content, true);
-//    }
 
 }

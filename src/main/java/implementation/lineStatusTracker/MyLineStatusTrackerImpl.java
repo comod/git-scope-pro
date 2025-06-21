@@ -1,5 +1,6 @@
 package implementation.lineStatusTracker;
 
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.EditorFactory;
@@ -8,6 +9,9 @@ import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vcs.VcsApplicationSettings;
@@ -96,19 +100,10 @@ public class MyLineStatusTrackerImpl {
     }
 
     public void update(Collection<Change> changes, @Nullable VirtualFile virtualFile) {
-
-//        //System.out.println("LST update");
-
         this.changes = changes;
         if (virtualFile != null) {
             // @todo
         }
-
-//        releaseAll();
-//
-//        // Initialize for open Tabs
-//        initOpenTabs();
-
         updateOpenTabs();
 
     }
@@ -126,28 +121,19 @@ public class MyLineStatusTrackerImpl {
     }
 
     public void showLstGutterMarkers(Boolean showLstGutterMarkers) {
-        // Deactivate/Activate VCS Line Status as it is for now
-//        //System.out.println("showLstGutterMarkers" + showLstGutterMarkers);
         VcsApplicationSettings vcsApplicationSettings = VcsApplicationSettings.getInstance();
         vcsApplicationSettings.SHOW_LST_GUTTER_MARKERS = showLstGutterMarkers;
     }
 
     private void initOpenTabs() {
         Editor[] editors = EditorFactory.getInstance().getAllEditors();
-        //System.out.println("LST editors>");
         for (Editor editor : editors) {
-//            //System.out.println("LST" + editor);
             createLineStatus(editor);
         }
-        //System.out.println("LST <editors");
     }
 
     private void updateOpenTabs() {
         Editor[] editors = EditorFactory.getInstance().getAllEditors();
-        if (editors.length == 0) {
-            //System.out.println("LST No Editors");
-            return;
-        }
         for (Editor editor : editors) {
             updateLineStatusByChangesForEditor(editor);
         }
@@ -202,7 +188,6 @@ public class MyLineStatusTrackerImpl {
 
             if (contentRevision != null) {
                 content = contentRevision.getContent();
-
                 if (content == null) {
                     return;
                 }
@@ -222,9 +207,9 @@ public class MyLineStatusTrackerImpl {
         content = StringUtil.convertLineSeparators(content);
         MyLineStatusTrackerManager myLineStatusTrackerManager = myLineStatusTrackerManagerCollection.get(getPathFromEditor(editor));
 
-//        //System.out.println("get " + getPathFromEditor(editor));
+        System.out.println("FOO: get " + getPathFromEditor(editor));
         if (myLineStatusTrackerManager == null) {
-//            //System.out.println("null");
+           System.out.println("FOO: Content is null");
             return;
         }
 
@@ -248,26 +233,31 @@ public class MyLineStatusTrackerImpl {
     }
 
     private void createLineStatus(@Nullable Editor editor) {
+    if (editor == null || getPathFromEditor(editor) == null) {
+        return;
+    }
+    
+    String editorPath = getPathFromEditor(editor);
+    MyLineStatusTrackerManager myLineStatusTrackerManagerCache = myLineStatusTrackerManagerCollection.get(editorPath);
+    if (myLineStatusTrackerManagerCache != null) {
+        return;
+    }
 
-        if (editor == null) {
-            return;
-        }
-
-        MyLineStatusTrackerManager myLineStatusTrackerManagerCache = myLineStatusTrackerManagerCollection.get(getPathFromEditor(editor));
-        if (myLineStatusTrackerManagerCache != null) {
-//            //System.out.println("cache");
-            return;
-        }
-
-        Document document = editor.getDocument();
-        MyLineStatusTrackerManager myLineStatusTrackerManager = new MyLineStatusTrackerManager(
+    Document document = editor.getDocument();
+    
+    ProgressManager.getInstance().run(new Task.Backgroundable(project, "Creating Line Status Tracker", false) {
+        @Override
+        public void run(@NotNull ProgressIndicator indicator) {
+            MyLineStatusTrackerManager myLineStatusTrackerManager = new MyLineStatusTrackerManager(
                 project,
                 document
-        );
-
-//        //System.out.println("put " + getPathFromEditor(editor));
-        myLineStatusTrackerManagerCollection.put(getPathFromEditor(editor), myLineStatusTrackerManager);
-
-    }
+            );
+            
+            ApplicationManager.getApplication().invokeLater(() -> {
+                myLineStatusTrackerManagerCollection.put(editorPath, myLineStatusTrackerManager);
+            });
+        }
+    });
+}
 
 }

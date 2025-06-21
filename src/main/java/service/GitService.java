@@ -1,6 +1,5 @@
 package service;
 
-import com.intellij.dvcs.DvcsUtil;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -15,12 +14,11 @@ import git4idea.repo.GitRepositoryManager;
 import git4idea.ui.branch.GitBranchManager;
 import one.util.streamex.StreamEx;
 import org.jetbrains.annotations.NotNull;
+import git4idea.GitTag;
 
 import java.util.*;
 
 public class GitService {
-
-    //    public static final String BRANCH_HEAD = "HEAD";
     public static final String BRANCH_HEAD = "HEAD";
     public static final String TAB_NAME_HEAD = "~";
     public static final Comparator<BranchTreeEntry> FAVORITE_BRANCH_COMPARATOR = Comparator.comparing(branch -> branch.isFav() ? -1 : 0);

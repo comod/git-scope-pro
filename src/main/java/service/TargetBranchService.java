@@ -3,8 +3,6 @@ package service;
 import com.intellij.openapi.project.Project;
 import git4idea.repo.GitRepository;
 import model.TargetBranchMap;
-//import utils.Git;
-
 import java.util.*;
 
 import static java.util.stream.Collectors.joining;
@@ -35,10 +33,6 @@ public class TargetBranchService {
     }
 
     public String getTargetBranchByRepositoryDisplay(GitRepository repo, TargetBranchMap targetBranch) {
-
-//        if (!isFeatureActive()) {
-//            return Git.BRANCH_HEAD;
-//        }
 
         String branch = getTargetBranchByRepository(repo, targetBranch);
         if (branch != null) {
