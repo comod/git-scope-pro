@@ -21,7 +21,6 @@ public class MyTreeSelectionListener implements TreeSelectionListener {
 
     public MyTreeSelectionListener(Project project, Tree myTree) {
         this.tree = myTree;
-
         this.viewService = project.getService(ViewService.class);
         this.state = project.getService(State.class);
         this.gitService = project.getService(GitService.class);
@@ -29,41 +28,19 @@ public class MyTreeSelectionListener implements TreeSelectionListener {
 
     @Override
     public void valueChanged(TreeSelectionEvent treeSelectionEvent) {
-
         DefaultMutableTreeNode node = (DefaultMutableTreeNode) tree.getLastSelectedPathComponent();
         if (node == null) return;
         Object object = node.getUserObject();
-//        MyModel currentModel = viewService.getCurrent();
         if (object instanceof BranchTreeEntry favLabel) {
-//            currentModel.setTargetBranch(favLabel.getName());
-            //System.out.println(favLabel);
             String branchName = favLabel.getName();
-            if (this.state.getThreeDotsCheckBox()) {
+            if (this.state.getTwoDotsCheckbox()) {
                 String currentBranch = this.gitService.getCurrentBranchName();
-//                branchName = branchName + ".." + currentBranch;
                 String twoDots = "..";
-                String threeDots = "...";
                 String head = "HEAD";
                 branchName = branchName + twoDots + head;
-//                branchName = branchName + threeDots + head;
-//                branchName = branchName + threeDots + currentBranch;
-//                branchName = branchName + twoDots + currentBranch;
-//                branchName = currentBranch + twoDots + branchName;
-//                branchName = currentBranch + threeDots + branchName;
-//                branchName = favLabel.getName() + "..HEAD";
-//                branchName = "HEAD..." + favLabel.getName();
             }
             this.viewService.getCurrent().addTargetBranch(favLabel.getGitRepo(), branchName);
-//            this.viewService.getCurrent().addTargetBranch(favLabel.getGitRepo(), favLabel.getName() + "..HEAD");
-//            this.viewService.getCurrent().addTargetBranch(favLabel.getGitRepo(), ".." + favLabel.getName());
         }
 
-//        if (object instanceof String label) {
-//            if (label.equals(BranchSelectView.TAG_OR_REVISION)) {
-//                //System.out.println("yolo");
-//
-//            }
-//            //System.out.println(label);
-//        }
     }
 }

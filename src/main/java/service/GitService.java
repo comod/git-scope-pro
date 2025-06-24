@@ -1,5 +1,6 @@
 package service;
 
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.LocalFileSystem;
@@ -19,6 +20,8 @@ import org.jetbrains.annotations.NotNull;
 import git4idea.GitTag;
 
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 public class GitService {
@@ -30,11 +33,9 @@ public class GitService {
     private final GitBranchManager gitBranchManager;
 
     public GitService(Project project) {
-
         this.project = project;
         repositoryManager = GitRepositoryManager.getInstance(this.project);
         this.gitBranchManager = project.getService(GitBranchManager.class);
-
     }
 
     @NotNull
@@ -58,7 +59,6 @@ public class GitService {
     public List<BranchTreeEntry> listOfRemoteBranches(GitRepository repo) {
         Collection<GitRemoteBranch> branches = repo.getBranches().getRemoteBranches();
         return StreamEx.of(branches)
-//                .filter(branch -> !branch.equals(currentBranch))
                 .map(branch -> {
                     String name = branch.getName();
                     boolean isFav = gitBranchManager.isFavorite(GitBranchType.REMOTE, repo, name);
@@ -70,6 +70,43 @@ public class GitService {
                     return StringUtil.naturalCompare(b1.getName(), b2.getName());
                 })
                 .toList();
+    }
+
+    /**
+     * Retrieves repositories asynchronously and calls the consumer with the result on the EDT
+     * @param callback Consumer to receive the list of repositories
+     */
+    public void getRepositoriesAsync(Consumer<List<GitRepository>> callback) {
+        ApplicationManager.getApplication().executeOnPooledThread(() -> {
+            List<GitRepository> repositories = repositoryManager.getRepositories();
+            String basePath = project.getBasePath();
+            GitRepository mainRepo = null;
+            if (basePath != null) {
+                VirtualFile projectRoot = LocalFileSystem.getInstance().findFileByPath(basePath);
+                if (projectRoot != null) {
+                    mainRepo = repositoryManager.getRepositoryForRoot(projectRoot);
+                }
+            }
+
+            List<GitRepository> ordered = new ArrayList<>(repositories.size());
+            if (mainRepo != null) {
+                ordered.add(mainRepo);
+                for (GitRepository repo : repositories) {
+                    if (!repo.equals(mainRepo)) {
+                        ordered.add(repo);
+                    }
+                }
+            } else {
+                ordered.addAll(repositories);
+            }
+
+            final List<GitRepository> result = ordered;
+            ApplicationManager.getApplication().invokeLater(() -> {
+                if (!project.isDisposed()) {
+                    callback.accept(result);
+                }
+            });
+        });
     }
 
     public List<GitRepository> getRepositories() {
@@ -111,5 +148,18 @@ public class GitService {
 
     public boolean isMulti() {
         return repositoryManager.moreThanOneRoot();
+    }
+
+    public void getCurrentBranchNameAsync(Consumer<String> callback) {
+        getRepositoriesAsync(repositories -> {
+            List<String> branches = new ArrayList<>();
+            repositories.forEach(repo -> {
+                String currentBranchName = repo.getCurrentBranchName();
+                if (!Objects.equals(currentBranchName, GitService.BRANCH_HEAD)) {
+                    branches.add(currentBranchName);
+                }
+            });
+            callback.accept(String.join(", ", branches));
+        });
     }
 }

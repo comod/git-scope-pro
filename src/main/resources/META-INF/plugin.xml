@@ -7,14 +7,14 @@
     <id>Git Scope</id>
     <name>Git Scope</name>
     <vendor>WOELKIT</vendor>
-    <product-descriptor code="PGITSCOPE" release-date="20230622" release-version="20231"/>
+    <product-descriptor code="PGITSCOPE" release-date="20250629" release-version="20251"/>
     <version>auto</version>
-    <description>auto</description>
+    <description>Create custom Git "scopes" for any target branch.</description>
     <change-notes>auto</change-notes>
 
-    <!-- Product and plugin compatibility requirements.
-         Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
     <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.lang</depends>
+    <depends>com.intellij.modules.vcs</depends>
     <depends>Git4Idea</depends>
 
     <projectListeners>

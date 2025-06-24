@@ -9,6 +9,7 @@ import com.intellij.ui.SeparatorWithText;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.JBUI;
+import com.intellij.ui.SeparatorFactory;
 import git4idea.branch.GitBranchType;
 import com.intellij.ui.treeStructure.Tree;
 import git4idea.repo.GitRepository;
@@ -102,10 +103,10 @@ private JPanel createManualInputPanel(GitRepository repository, BranchTree branc
         JPanel help = new JPanel();
         help.setLayout(new FlowLayout(FlowLayout.LEFT));
 
-        JCheckBox checkBox = new JCheckBox("Only Changes Since Common Ancestor (git diff A..B)");
-        checkBox.setSelected(this.state.getThreeDotsCheckBox());
+        JCheckBox checkBox = new JCheckBox("Only Changes Since Common Ancestor (git diff <selection>..HEAD)");
+        checkBox.setSelected(this.state.getTwoDotsCheckbox());
         checkBox.setBorder(JBUI.Borders.empty(1)); // top, left, bottom, right padding
-        checkBox.addActionListener(e -> this.state.setThreeDotsCheckBox(checkBox.isSelected()));
+        checkBox.addActionListener(e -> this.state.setTwoDotsCheckbox(checkBox.isSelected()));
 
         // Add a mouse listener to the help icon label to show the tool tip on hover
         checkBox.addMouseListener(new MouseAdapter() {
@@ -119,46 +120,30 @@ private JPanel createManualInputPanel(GitRepository repository, BranchTree branc
 
         this.search = new SearchTextField();
         search.setText("");
-        // node
 
-        // branchTree
+        boolean isMulti = gitService.isMulti();  // More than one repo
+        gitService.getRepositoriesAsync(repositories -> {
+            repositories.forEach(gitRepository -> {
+                if (isMulti) {
+                    JComponent sep = SeparatorFactory.createSeparator(gitRepository.getRoot().getName(), null);
+                    main.add(sep);
+                }
 
-//        List<BranchTreeEntry> recentBranchList = new ArrayList<>();
-//        recentBranchList.add(BranchTreeEntry.create("HEAD"));
-//        recentBranchList.add(BranchTreeEntry.create("master"));
+                Map<String, List<BranchTreeEntry>> node = new LinkedHashMap<>();
+                List<BranchTreeEntry> localBranchList = gitService.listOfLocalBranches(gitRepository);
+                if (!localBranchList.isEmpty()) {
+                    node.put(GitBranchType.LOCAL.getName(), localBranchList);
+                }
 
-//        List<BranchTreeEntry> specialBranchList = new ArrayList<>();
-//        specialBranchList.add(BranchTreeEntry.create("Tag or Revision..."));
-//        Map<String, List<BranchTreeEntry>> specialNodes = new LinkedHashMap<>();
-//        specialNodes.put(null, specialBranchList);
+                List<BranchTreeEntry> remoteBranchList = gitService.listOfRemoteBranches(gitRepository);
+                if (!remoteBranchList.isEmpty()) {
+                    node.put(GitBranchType.REMOTE.getName(), remoteBranchList);
+                }
 
-//        Map<String, List<BranchTreeEntry>> specialNodes = new LinkedHashMap<>();
-//        specialNodes.put(TAG_OR_REVISION, null);
-//        BranchTree specialBranchTree = createBranchTree(project, specialNodes);
-//        main.add(specialBranchTree);
-
-        boolean isMulti = gitService.isMulti();  // More than one repo (ex: main repo + subrepos)
-        gitService.getRepositories().forEach(gitRepository -> {
-            if (isMulti) {
-                SeparatorWithText sep = new SeparatorWithText();
-                sep.setCaption(gitRepository.getRoot().getName());
-                main.add(sep);
-            }
-
-            Map<String, List<BranchTreeEntry>> node = new LinkedHashMap<>();
-            List<BranchTreeEntry> localBranchList = gitService.listOfLocalBranches(gitRepository);
-            if (!localBranchList.isEmpty()) {
-                node.put(GitBranchType.LOCAL.getName(), localBranchList);
-            }
-
-            List<BranchTreeEntry> remoteBranchList = gitService.listOfRemoteBranches(gitRepository);
-            if (!remoteBranchList.isEmpty()) {
-                node.put(GitBranchType.REMOTE.getName(), remoteBranchList);
-            }
-
-            BranchTree branchTree = createBranchTree(project, node);
-            main.add(createManualInputPanel(gitRepository, branchTree));
-            main.add(branchTree);
+                BranchTree branchTree = createBranchTree(project, node);
+                main.add(createManualInputPanel(gitRepository, branchTree));
+                main.add(branchTree);
+            });
         });
 
         // root = search + scroll (main)

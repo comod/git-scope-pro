@@ -3,6 +3,7 @@ package service;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.changes.Change;
+import git4idea.repo.GitRepository;
 import implementation.compare.ChangesService;
 import implementation.lineStatusTracker.MyLineStatusTrackerImpl;
 import io.reactivex.rxjava3.core.Observable;
@@ -15,11 +16,16 @@ import implementation.scope.MyScope;
 import system.Defs;
 import license.CheckLicense;
 
+import javax.swing.*;
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 public class ViewService {
 
@@ -42,6 +48,7 @@ public class ViewService {
     private MyModel myHeadModel;
     private boolean isInit;
     private int lastTabIndex;
+    private final AtomicBoolean tabInitializationInProgress = new AtomicBoolean(false);
 
     public ViewService(Project project) {
         this.project = project;
@@ -49,7 +56,6 @@ public class ViewService {
     }
 
     public void initDependencies() {
-
         this.toolWindowService = project.getService(ToolWindowServiceInterface.class);
         this.changesService = project.getService(ChangesService.class);
         this.statusBarService = project.getService(StatusBarService.class);
@@ -73,11 +79,13 @@ public class ViewService {
     }
 
     public void load() {
+        //System.out.println("LOAD");
         List<MyModel> collection = new ArrayList<>();
         List<MyModelBase> load = this.state.getModelData();
         if (load == null) {
             return;
         }
+
         load.forEach(myModelBase -> {
             MyModel myModel = new MyModel();
             TargetBranchMap targetBranchMap = myModelBase.targetBranchMap;
@@ -87,6 +95,7 @@ public class ViewService {
             myModel.setTargetBranchMap(targetBranchMap);
             collection.add(myModel);
         });
+
         setCollection(collection);
     }
 
@@ -94,6 +103,7 @@ public class ViewService {
         if (collection == null) {
             return;
         }
+
         List<MyModelBase> modelData = new ArrayList<>();
         collection.forEach(myModel -> {
             MyModelBase myModelBase = new MyModelBase();
@@ -104,6 +114,7 @@ public class ViewService {
             myModelBase.targetBranchMap = targetBranchMap;
             modelData.add(myModelBase);
         });
+
         this.state.setModelData(modelData);
     }
 
@@ -121,49 +132,94 @@ public class ViewService {
         if (!vcsReady || !toolWindowReady || isInit) {
             return;
         }
+
         isInit = true;
         EventQueue.invokeLater(this::initLater);
     }
 
     public void initLater() {
+        // First, ensure all tabs are removed to prevent duplicates
+        toolWindowService.removeAllTabs();
 
+        // Then load models and subscribe to their observables
         load();
+
         List<MyModel> modelCollection = getCollection();
         modelCollection.forEach(this::subscribeToObservable);
-        initTabs();
+
+        // Initialize tabs in a synchronized manner
+        initTabsSequentially();
+
+        // Set the active model
         setActiveModel();
     }
 
-    public void initTabs() {
-        List<MyModel> collection = this.getCollection();
-        int size = collection.size();
-        initHeadTab();
-
-        if (size > 0) {
-            collection.forEach(model -> {
-                String tabName = getTargetBranchDisplay(model);
-                toolWindowService.addTab(model, tabName, true);
-            });
+    public void initTabsSequentially() {
+        // If tab initialization is already in progress, don't start another one
+        if (!tabInitializationInProgress.compareAndSet(false, true)) {
+            return;
         }
-        toolWindowService.addListener();
-        addPlusTab();
+
+        try {
+            // Step 1: First remove all tabs to start clean
+            toolWindowService.removeAllTabs();
+
+            // Step 2: Init head tab first
+            initHeadTab();
+
+            // Step 3: Process each model sequentially but use the synchronous method for reliability
+            List<MyModel> modelCollection = this.getCollection();
+            if (!modelCollection.isEmpty()) {
+                for (MyModel model : modelCollection) {
+                    String tabName = model.getDisplayName();
+                    toolWindowService.addTab(model, tabName, true);
+                }
+            }
+
+            // Step 4: Add the listener after all tabs are initialized
+            toolWindowService.addListener();
+
+            // Step 5: Finally add the plus tab (which should not be closeable)
+            addPlusTab();
+
+        } finally {
+            tabInitializationInProgress.set(false);
+        }
     }
 
     private void initHeadTab() {
         this.myHeadModel = new MyModel(true);
         toolWindowService.addTab(myHeadModel, GitService.BRANCH_HEAD, false);
-        gitService.getRepositories().forEach(repo -> {
-            myHeadModel.addTargetBranch(repo, null);
+
+        // Wait for repositories to be loaded before proceeding
+        CountDownLatch latch = new CountDownLatch(1);
+
+        gitService.getRepositoriesAsync(repositories -> {
+            repositories.forEach(repo -> {
+                myHeadModel.addTargetBranch(repo, null);
+            });
+
+            subscribeToObservable(myHeadModel);
+            collectChanges(myHeadModel);
+            latch.countDown();
         });
-        subscribeToObservable(myHeadModel);
-        collectChanges(myHeadModel);
+
+        try {
+            // Wait for the head tab initialization to complete with a timeout
+            latch.await(5, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            // Handle interruption if necessary
+        }
     }
 
     public void addRevisionTab(String revision) {
         String tabName = revision;
         MyModel myModel = addTabAndModel(tabName);
-        gitService.getRepositories().forEach(repo -> {
-            myModel.addTargetBranch(repo, revision);
+
+        gitService.getRepositoriesAsync(repositories -> {
+            repositories.forEach(repo -> {
+                myModel.addTargetBranch(repo, revision);
+            });
         });
     }
 
@@ -179,12 +235,23 @@ public class ViewService {
     public MyModel addTabAndModel(String tabName) {
         int currentIndexOfPlusTab = collection.size() + 1;
         MyModel myModel = addModel();
+
+        // Make sure to add the tab with closeable set to true
         toolWindowService.addTab(myModel, tabName, true);
+
+        // Add plus tab after the new tab
         addPlusTab();
+
+        // Remove the old plus tab
         toolWindowService.removeTab(currentIndexOfPlusTab);
+
+        // Set the current tab index and active model
         setTabIndex(collection.size());
         setActiveModel();
+
+        // Select the new tab
         toolWindowService.selectNewTab();
+
         return myModel;
     }
 
@@ -200,7 +267,9 @@ public class ViewService {
         observable.subscribe(field -> {
             switch (field) {
                 case targetBranch -> {
-                    toolWindowService.changeTabName(getTargetBranchDisplay(model));
+                    getTargetBranchDisplayAsync(model, tabName -> {
+                        toolWindowService.changeTabName(tabName);
+                    });
                     collectChanges(model);
                     save();
                 }
@@ -217,17 +286,26 @@ public class ViewService {
 
         }, (e -> {
         }));
-
     }
 
+    private void getTargetBranchDisplayCurrent(Consumer<String> callback) {
+        MyModel current = getCurrent();
+        getTargetBranchDisplayAsync(current, callback);
+    }
+
+    private void getTargetBranchDisplayAsync(MyModel model, Consumer<String> callback) {
+        this.targetBranchService.getTargetBranchDisplayAsync(model.getTargetBranchMap(), callback);
+    }
+
+    @Deprecated
     private String getTargetBranchDisplayCurrent() {
         MyModel current = getCurrent();
         return getTargetBranchDisplay(current);
     }
 
+    @Deprecated
     private String getTargetBranchDisplay(MyModel model) {
-        return this.targetBranchService.
-                getTargetBranchDisplay(model.getTargetBranchMap());
+        return this.targetBranchService.getTargetBranchDisplay(model.getTargetBranchMap());
     }
 
     public void collectChanges() {
@@ -238,9 +316,13 @@ public class ViewService {
         if (model == null) {
             return;
         }
-        TargetBranchMap targetBranchMap = model.getTargetBranchMap();
 
-        // Run potentially slow operations in background
+        TargetBranchMap targetBranchMap = model.getTargetBranchMap();
+        if (targetBranchMap == null) {
+            return;
+        }
+
+        // Run potentially slow operations in the background
         ApplicationManager.getApplication().executeOnPooledThread(() -> {
             changesService.collectChangesWithCallback(targetBranchMap, changes -> {
                 // Update UI on EDT
@@ -283,8 +365,12 @@ public class ViewService {
 
 
     public void removeTab(int tabIndex) {
-        this.collection.remove(getModelIndex(tabIndex));
-        save();
+        int modelIndex = getModelIndex(tabIndex);
+        // Check if the index is valid before removing
+        if (modelIndex >= 0 && modelIndex < collection.size()) {
+            this.collection.remove(modelIndex);
+            save();
+        }
     }
 
     public int getTabIndex() {
@@ -315,7 +401,7 @@ public class ViewService {
     }
 
     public void onUpdate(Collection<Change> changes) {
-        if (changes == null) {
+        if (changes == null || changes.isEmpty()) {
             return;
         }
 
@@ -328,6 +414,8 @@ public class ViewService {
     }
 
     private void updateStatusBarWidget() {
-        this.statusBarService.updateText(Defs.APPLICATION_NAME + ": " + getTargetBranchDisplayCurrent());
+        getTargetBranchDisplayCurrent(branchName -> {
+            this.statusBarService.updateText(Defs.APPLICATION_NAME + ": " + branchName);
+        });
     }
 }

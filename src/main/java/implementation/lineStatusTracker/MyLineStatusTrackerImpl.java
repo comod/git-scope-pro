@@ -142,7 +142,6 @@ public class MyLineStatusTrackerImpl {
     private void updateLineStatusByChangesForEditor(Editor editor) {
 
         if (changes == null) {
-            //System.out.println("LST No Changes");
             return;
         }
 

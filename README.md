@@ -62,6 +62,13 @@ widget.
 
 <!-- Plugin changelog -->
 
+### 2025.1
+
+- Major rework to fix issues with slow operation blocking GUI EDT thread. This aligns to new IntelliJ plugin
+  requirements
+- Ensure opened files will retain last known cursor location
+- For multi-repo layouts, display main repo first in list
+
 ### 2023.1.5
 
 # Fixed

@@ -112,11 +112,6 @@ public class BranchTree extends JPanel {
         @Override
         public void customizeCellRenderer(@NotNull JTree tree, Object value, boolean selected, boolean expanded, boolean leaf, int row, boolean hasFocus) {
             Object userObject = ((DefaultMutableTreeNode) value).getUserObject();
-//            String mySearch = search.getText();
-//            if (!string.contains(mySearch)) {
-//                tree.isVisible();
-//                return;
-//            }
             if (userObject == null) {
                 return;
             }
