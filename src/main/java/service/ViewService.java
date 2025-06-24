@@ -45,9 +45,7 @@ public class ViewService {
 
     public ViewService(Project project) {
         this.project = project;
-
         EventQueue.invokeLater(this::initDependencies);
-
     }
 
     public void initDependencies() {
@@ -101,7 +99,6 @@ public class ViewService {
             MyModelBase myModelBase = new MyModelBase();
             TargetBranchMap targetBranchMap = myModel.getTargetBranchMap();
             if (targetBranchMap == null) {
-                // Add console log if needed
                 return;
             }
             myModelBase.targetBranchMap = targetBranchMap;
@@ -125,7 +122,6 @@ public class ViewService {
             return;
         }
         isInit = true;
-
         EventQueue.invokeLater(this::initLater);
     }
 

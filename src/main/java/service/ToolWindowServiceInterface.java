@@ -9,7 +9,7 @@ public interface ToolWindowServiceInterface {
 
     void addListener();
 
-//    void setClosable();
+    void removeAllTabs();
 
     void removeTab(int index);
 

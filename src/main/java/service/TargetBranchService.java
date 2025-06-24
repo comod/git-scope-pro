@@ -52,22 +52,4 @@ public class TargetBranchService {
         return repositoryTargetBranchMap.getValue().get(repo.toString());
 
     }
-//
-//    public Boolean isHeadActually(TargetBranchMap targetBranchByRepo) {
-//
-//        AtomicReference<Boolean> isHead = new AtomicReference<>(true);
-//
-//        // repo, git, changes, targetbranch cleanup @todo
-//        gitService.getRepositories().forEach(repo -> {
-//            String branchToCompare = targetBranchByRepo.getValue().get(repo.toString());
-////            String targetBranchByRepo = getTargetBranchByRepository(repo, t);
-//            if (branchToCompare != null && !branchToCompare.equals(Git.BRANCH_HEAD)) {
-//                isHead.set(false);
-//            }
-//        });
-//
-//        return isHead.get();
-//    }
-
-
 }

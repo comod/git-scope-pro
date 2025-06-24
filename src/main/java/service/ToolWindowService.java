@@ -20,7 +20,11 @@ public final class ToolWindowService implements ToolWindowServiceInterface {
 
     public ToolWindowService(Project project) {
         this.project = project;
+    }
 
+    @Override
+    public void removeAllTabs() {
+        getContentManager().removeAllContents(true);
     }
 
     public ToolWindow getToolWindow() {
@@ -44,7 +48,6 @@ public final class ToolWindowService implements ToolWindowServiceInterface {
 
         int index = contentManager.getIndexOfContent(content);
     }
-
 
     public void addListener() {
         getContentManager().addContentManagerListener(new MyTabContentListener(project));
