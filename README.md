@@ -11,6 +11,13 @@ The Current "scope" is displayed/available as
 - custom "scope" and finally as a
 - status bar widget
 
+### Note
+
+When upgrading from a previous version of this plugin, make sure that you enable the native gutter highlighting via
+`Tools -> Diff & Merge -> Highlight modified lines in gutter`
+
+Previous versions disabled this setting, and it hooks into the native gutter highlighter instead.
+
 ### Story
 
 Most developers enjoy using version control to inspect code changes before a commit. However, after committing, all
@@ -68,6 +75,7 @@ widget.
   requirements
 - Ensure opened files will retain last known cursor location
 - For multi-repo layouts, display main repo first in list
+- Move to IntelliJ native diff-view providing the same gutter popup-functionality as all standard Jetbrains IDEs.
 
 ### 2023.1.5
 
