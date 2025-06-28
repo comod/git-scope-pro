@@ -70,7 +70,7 @@ public class MyLineStatusTrackerImpl {
     }
 
     public void update(Collection<Change> changes, @Nullable VirtualFile targetFile) {
-        if (changes == null || changes.isEmpty()) {
+        if (changes == null) {
             return;
         }
 

@@ -58,25 +58,41 @@ public class ChangesService extends GitCompareWithRefAction {
         return branchToCompare;
     }
 
+
     public void collectChangesWithCallback(TargetBranchMap targetBranchByRepo, Consumer<Collection<Change>> callBack) {
-        task = new Task.Backgroundable(this.project, Defs.APPLICATION_NAME + ": Collecting Changes...", true) {
+        // Capture the current project reference to ensure consistency
+        final Project currentProject = this.project;
+        final GitService currentGitService = this.git;
+
+        task = new Task.Backgroundable(currentProject, Defs.APPLICATION_NAME + ": Collecting Changes...", true) {
 
             private Collection<Change> changes;
 
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
                 Collection<Change> _changes = new ArrayList<>();
-                AtomicReference<Collection<Change>> fatalChange = new AtomicReference<>();
-                git.getRepositories().forEach(repo -> {
+                List<String> errorRepos = new ArrayList<>(); // Track problematic repos instead of failing entirely
+
+                // IMPORTANT: Use the captured project and git service to ensure we're working with the right context
+                Collection<GitRepository> repositories = currentGitService.getRepositories();
+
+                repositories.forEach(repo -> {
                     String branchToCompare = getBranchToCompare(targetBranchByRepo, repo);
 
                     Collection<Change> changesPerRepo = null;
-                    changesPerRepo = doCollectChanges(project, repo, branchToCompare);
+                    // Make sure to pass the correct project reference
+                    changesPerRepo = doCollectChanges(currentProject, repo, branchToCompare);
 
-                    if (changesPerRepo instanceof ErrorStateList)
-                    {
-                        fatalChange.set(changesPerRepo);
+                    if (changesPerRepo instanceof ErrorStateList) {
+                        errorRepos.add(repo.getRoot().getPath());
+                        return; // Skip this repo but continue with others
                     }
+
+                    // Handle null case
+                    if (changesPerRepo == null) {
+                        changesPerRepo = new ArrayList<>();
+                    }
+
                     // Simple "merge" logic
                     for (Change change : changesPerRepo) {
                         if (!_changes.contains(change)) {
@@ -84,8 +100,10 @@ public class ChangesService extends GitCompareWithRefAction {
                         }
                     }
                 });
-                if (fatalChange.get() != null) {
-                    changes = fatalChange.get();
+
+                // Only return ERROR_STATE if ALL repositories failed
+                if (!errorRepos.isEmpty() && _changes.isEmpty()) {
+                    changes = ERROR_STATE;
                 } else {
                     changes = _changes;
                 }
@@ -95,7 +113,8 @@ public class ChangesService extends GitCompareWithRefAction {
             public void onSuccess() {
                 // Ensure `changes` is accessed only on the UI thread to update the UI component
                 ApplicationManager.getApplication().invokeLater(() -> {
-                    if (callBack != null) {
+                    // Double-check the project is still valid
+                    if (!currentProject.isDisposed() && callBack != null) {
                         callBack.accept(this.changes);
                     }
                 });
@@ -103,7 +122,11 @@ public class ChangesService extends GitCompareWithRefAction {
 
             @Override
             public void onThrowable(@NotNull Throwable error) {
-                callBack.accept(this.changes);
+                ApplicationManager.getApplication().invokeLater(() -> {
+                    if (!currentProject.isDisposed() && callBack != null) {
+                        callBack.accept(ERROR_STATE);
+                    }
+                });
             }
         };
         task.queue();
@@ -145,11 +168,17 @@ public class ChangesService extends GitCompareWithRefAction {
 
     public Collection<Change> doCollectChanges(Project project, GitRepository repo, String branchToCompare) {
         VirtualFile file = repo.getRoot();
-        Collection<Change> _changes = null;
+        Collection<Change> _changes = new ArrayList<>();
         try {
             // Local Changes
             ChangeListManager changeListManager = ChangeListManager.getInstance(project);
             Collection<Change> localChanges = changeListManager.getAllChanges();
+
+            // Special handling for HEAD - just return local changes
+            if (branchToCompare.equals(GitService.BRANCH_HEAD)) {
+                _changes.addAll(localChanges);
+                return _changes;
+            }
 
             // Diff Changes
             if (branchToCompare.contains("..")) {
@@ -157,20 +186,16 @@ public class ChangesService extends GitCompareWithRefAction {
             } else {
                 GitReference gitReference;
 
-                if (branchToCompare.equals(GitService.BRANCH_HEAD)) {
-                    gitReference = repo.getCurrentBranch();
-                } else {
-                    // First try to find matching branch
-                    gitReference = repo.getBranches().findBranchByName(branchToCompare);
+                // First try to find matching branch
+                gitReference = repo.getBranches().findBranchByName(branchToCompare);
 
-                    if (gitReference == null) {
-                        // Then try a tag
-                        gitReference = repo.getTagHolder().getTag(branchToCompare);
-                    }
-                    if (gitReference == null) {
-                        // Finally resort to try a generic reference (HEAD~2, <hash>, ...)
-                        gitReference = utils.GitUtil.resolveGitReference(repo, branchToCompare);
-                    }
+                if (gitReference == null) {
+                    // Then try a tag
+                    gitReference = repo.getTagHolder().getTag(branchToCompare);
+                }
+                if (gitReference == null) {
+                    // Finally resort to try a generic reference (HEAD~2, <hash>, ...)
+                    gitReference = utils.GitUtil.resolveGitReference(repo, branchToCompare);
                 }
 
                 if (gitReference != null) {

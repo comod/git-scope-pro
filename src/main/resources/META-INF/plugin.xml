@@ -17,10 +17,13 @@
     <depends>com.intellij.modules.vcs</depends>
     <depends>Git4Idea</depends>
 
+    <applicationListeners>
+        <listener class="listener.MyBulkFileListener" topic="com.intellij.openapi.vfs.newvfs.BulkFileListener"/>
+    </applicationListeners>
+
     <projectListeners>
         <listener class="listener.MyToolWindowListener" topic="com.intellij.openapi.wm.ex.ToolWindowManagerListener"/>
         <listener class="listener.VcsStartup" topic="com.intellij.openapi.vcs.VcsMappingListener"/>
-        <listener class="listener.MyVirtualFileListener" topic="com.intellij.openapi.vfs.VirtualFileListener"/>
         <listener class="listener.MyChangeListListener" topic="com.intellij.openapi.vcs.changes.ChangeListListener"/>
         <listener class="listener.MyDynamicPluginListener" topic="com.intellij.ide.plugins.DynamicPluginListener"/>
         <listener class="listener.MyFileEditorManagerListener"

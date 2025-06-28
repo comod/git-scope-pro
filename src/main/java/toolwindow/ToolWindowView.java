@@ -3,6 +3,7 @@ package toolwindow;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ui.componentsList.layout.VerticalStackLayout;
 import com.intellij.openapi.ui.VerticalFlowLayout;
+import com.intellij.openapi.vcs.changes.Change;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.panels.HorizontalBox;
 import com.intellij.ui.components.panels.VerticalBox;
@@ -12,6 +13,7 @@ import org.jdesktop.swingx.StackLayout;
 import toolwindow.elements.CurrentBranch;
 import toolwindow.elements.TargetBranch;
 import toolwindow.elements.VcsTree;
+import java.util.Collection;
 
 import javax.swing.*;
 import java.awt.*;
@@ -70,8 +72,11 @@ public class ToolWindowView {
         boolean showSceneA = myModelIsNew && !isHeadTab;
         sceneA.setVisible(showSceneA);
         sceneB.setVisible(!showSceneA);
-        vcsTree.update(myModel.getChanges());
+
+        Collection<Change> modelChanges = myModel.getChanges();
+        vcsTree.update(modelChanges);
     }
+
 
     public JPanel getRootPanel() {
         return rootPanel;

@@ -39,8 +39,15 @@ public class MyTreeSelectionListener implements TreeSelectionListener {
                 String head = "HEAD";
                 branchName = branchName + twoDots + head;
             }
-            this.viewService.getCurrent().addTargetBranch(favLabel.getGitRepo(), branchName);
-        }
+            // Check if this is HEAD - if so, close current tab and switch to HEAD tab
+            if (GitService.BRANCH_HEAD.equals(branchName)) {
+                // Remove the current "New*" tab first
+                this.viewService.removeCurrentTab();
+                this.viewService.addRevisionTab(branchName); // This will switch to HEAD tab
 
+            } else {
+                this.viewService.getCurrent().addTargetBranch(favLabel.getGitRepo(), branchName);
+            }
+        }
     }
 }

@@ -42,12 +42,21 @@ public class BranchSelectView {
 
 private JPanel createManualInputPanel(GitRepository repository, BranchTree branchTree) {
     JPanel manualInputPanel = new JPanel(new BorderLayout());
-    manualInputPanel.setBorder(JBUI.Borders.empty(2, 8, 2, 8)); // top, left, bottom, right margins
+    manualInputPanel.setBorder(JBUI.Borders.empty(2, 8)); // top, left, bottom, right margins
     
     JBTextField manualInput = new JBTextField();
-    manualInput.setToolTipText("Enter branch, tag or ref (e.g. HEAD~1) and press Enter");
+    manualInput.setToolTipText(
+            "<html>" +
+                    "Enter any valid Git reference:<br/>" +
+                    "• Branch names (e.g., main, develop, feature/xyz)<br/>" +
+                    "• Tag names (e.g., v1.0.0, release-2023)<br/>" +
+                    "• Special refs (e.g., HEAD, HEAD~1, HEAD~5)<br/>" +
+                    "• Commit hashes (full or abbreviated)<br/>" +
+                    "• Other Git syntax (e.g., @{upstream}, origin/main)" +
+                    "</html>"
+    );
     manualInput.getEmptyText()
-            .setText("Enter branch name or ref...")
+            .setText("Enter branch, tag, or git ref...")
             .setFont(manualInput.getFont().deriveFont(Font.ITALIC));
     
     manualInput.addKeyListener(new KeyAdapter() {
@@ -111,7 +120,7 @@ private JPanel createManualInputPanel(GitRepository repository, BranchTree branc
         // Add a mouse listener to the help icon label to show the tool tip on hover
         checkBox.addMouseListener(new MouseAdapter() {
             public void mouseEntered(MouseEvent me) {
-                checkBox.setToolTipText("Tick this box if you want to see the changes that were made only on this branch");
+                checkBox.setToolTipText("See what you have added since [selection] branch point");
             }
         });
 
@@ -204,7 +213,7 @@ private JPanel createManualInputPanel(GitRepository repository, BranchTree branc
     }
 
     private String removeLastChar(String str) {
-        if (str != null && str.length() > 0) {
+        if (str != null && !str.isEmpty()) {
             str = str.substring(0, str.length() - 1);
         }
         return str;

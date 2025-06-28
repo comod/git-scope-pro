@@ -1,3 +1,4 @@
+
 package service;
 
 import com.intellij.openapi.application.ApplicationManager;
@@ -213,6 +214,14 @@ public class ViewService {
     }
 
     public void addRevisionTab(String revision) {
+        if (GitService.BRANCH_HEAD.equals(revision)) {
+            if (myHeadModel != null) {
+                toolWindowService.selectTabByIndex(0);
+                setTabIndex(0);
+                setActiveModel();
+            }
+            return;
+        }
         String tabName = revision;
         MyModel myModel = addTabAndModel(tabName);
 
@@ -294,6 +303,11 @@ public class ViewService {
     }
 
     private void getTargetBranchDisplayAsync(MyModel model, Consumer<String> callback) {
+        // Special handling for HEAD model
+        if (model.isHeadTab()) {
+            callback.accept(GitService.BRANCH_HEAD);
+            return;
+        }
         this.targetBranchService.getTargetBranchDisplayAsync(model.getTargetBranchMap(), callback);
     }
 
@@ -363,7 +377,6 @@ public class ViewService {
         this.collection = collection;
     }
 
-
     public void removeTab(int tabIndex) {
         int modelIndex = getModelIndex(tabIndex);
         // Check if the index is valid before removing
@@ -371,6 +384,12 @@ public class ViewService {
             this.collection.remove(modelIndex);
             save();
         }
+    }
+
+    public void removeCurrentTab() {
+        removeTab(currentTabIndex);
+        // Also remove from the UI
+        toolWindowService.removeTab(currentTabIndex);
     }
 
     public int getTabIndex() {
@@ -401,7 +420,7 @@ public class ViewService {
     }
 
     public void onUpdate(Collection<Change> changes) {
-        if (changes == null || changes.isEmpty()) {
+        if (changes == null) {
             return;
         }
 
