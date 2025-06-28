@@ -1,3 +1,4 @@
+
 package statusBar;
 
 import com.intellij.openapi.project.Project;
@@ -31,11 +32,16 @@ public class MyStatusBarWidgetFactory implements StatusBarWidgetFactory {
 
     @Override
     public void disposeWidget(@NotNull StatusBarWidget widget) {
-
+        widget.dispose();
     }
 
     @Override
     public boolean canBeEnabledOn(@NotNull StatusBar statusBar) {
-        return false;
+        return true;
+    }
+
+    @Override
+    public boolean isEnabledByDefault() {
+        return true;
     }
 }

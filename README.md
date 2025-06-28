@@ -76,6 +76,7 @@ widget.
 - Ensure opened files will retain last known cursor location
 - For multi-repo layouts, display main repo first in list
 - Move to IntelliJ native diff-view providing the same gutter popup-functionality as all standard Jetbrains IDEs.
+- Allow enable/disable of status bar widget (including use themed coloring)
 
 ### 2023.1.5
 

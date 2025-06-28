@@ -25,13 +25,10 @@
         <listener class="listener.MyDynamicPluginListener" topic="com.intellij.ide.plugins.DynamicPluginListener"/>
         <listener class="listener.MyFileEditorManagerListener"
                   topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"/>
-        <!--        <listener class="listener.MouseListener" topic="com.intellij.openapi.editor.event.EditorMouseMotionListener"/>-->
-        <!--        <listener class="listener.MyTabContentListener" topic="com.intellij.toolwindow.content.ContentManagerListener"/>-->
     </projectListeners>
     <extensions defaultExtensionNs="com.intellij">
-
         <statusBarWidgetFactory
-                implementation="statusBar.MyStatusBarWidgetFactory" id="Git Scope Widget"/>
+                implementation="statusBar.MyStatusBarWidgetFactory" id="GitScopeStatusBar"/>
         <toolWindow
                 id="Git Scope"
                 secondary="true"
