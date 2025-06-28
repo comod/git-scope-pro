@@ -79,7 +79,7 @@ public class ViewService {
     }
 
     public void load() {
-        //System.out.println("LOAD");
+        // Load models from state
         List<MyModel> collection = new ArrayList<>();
         List<MyModelBase> load = this.state.getModelData();
         if (load == null) {

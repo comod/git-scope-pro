@@ -171,7 +171,7 @@ public class MyLineStatusTrackerImpl {
                     // Force refresh of all editors for this document
                     refreshEditorsForDocument(document);
                 } else {
-                    LOG.warn("No LineStatusTracker found for document: " + filePath);
+                    LOG.debug("No LineStatusTracker found for document: " + filePath);
                 }
 
             } catch (Exception e) {
