@@ -1,4 +1,3 @@
-
 package service;
 
 import com.intellij.openapi.application.ApplicationManager;
@@ -98,6 +97,19 @@ public class ViewService {
         });
 
         setCollection(collection);
+        
+        // Restore the active tab index
+        Integer savedTabIndex = this.state.getCurrentTabIndex();
+        if (savedTabIndex != null) {
+            this.currentTabIndex = savedTabIndex;
+            // Schedule tab selection after UI is ready
+            EventQueue.invokeLater(() -> {
+                if (toolWindowService != null) {
+                    toolWindowService.selectTabByIndex(savedTabIndex);
+                    setActiveModel();
+                }
+            });
+        }
     }
 
     public void save() {
@@ -117,6 +129,8 @@ public class ViewService {
         });
 
         this.state.setModelData(modelData);
+        // Save the current active tab index
+        this.state.setCurrentTabIndex(this.currentTabIndex);
     }
 
     public void eventVcsReady() {
@@ -397,11 +411,11 @@ public class ViewService {
     }
 
     public void setTabIndex(int index) {
-        // @todo need ID instead of index
         if (currentTabIndex > 0) {
             lastTabIndex = currentTabIndex;
         }
         currentTabIndex = index;
+        save();
     }
 
     public int getCurrentModelIndex() {

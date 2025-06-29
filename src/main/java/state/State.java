@@ -51,6 +51,17 @@ public class State implements PersistentStateComponent<State> {
         twoDotsCheckbox = value;
     }
 
+    // In your State class, add these methods:
+    private Integer currentTabIndex;
+
+    public Integer getCurrentTabIndex() {
+        return currentTabIndex;
+    }
+
+    public void setCurrentTabIndex(Integer currentTabIndex) {
+        this.currentTabIndex = currentTabIndex;
+    }
+
     @Nullable
     @Override
     public State getState() {
