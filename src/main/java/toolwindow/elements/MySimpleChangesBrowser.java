@@ -77,8 +77,6 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
 
                         // Pre-compute all necessary data in background thread to avoid EDT slow operations
                         for (Change change : changes) {
-                            // IMPORTANT: We need to ensure we're doing all slow operations off EDT
-                            // and we need to do them here in the background thread, NOT later in prepareChange
                             if (change != null) {
                                 // Pre-load data completely in this thread
                                 VirtualFile file = change.getVirtualFile();
