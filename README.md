@@ -77,6 +77,9 @@ widget.
 - For multi-repo layouts, display main repo first in list
 - Move to IntelliJ native diff-view providing the same gutter popup-functionality as all standard Jetbrains IDEs.
 - Allow enable/disable of status bar widget (including use themed coloring)
+- Save/restore of active git scope tab
+- Support preview tabs if enabled in settings
+- Always retain scroll position in VCS tree window
 
 ### 2023.1.5
 

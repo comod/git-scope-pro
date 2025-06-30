@@ -72,7 +72,6 @@ public class ToolWindowView {
         boolean showSceneA = myModelIsNew && !isHeadTab;
         sceneA.setVisible(showSceneA);
         sceneB.setVisible(!showSceneA);
-
         Collection<Change> modelChanges = myModel.getChanges();
         vcsTree.update(modelChanges);
     }
