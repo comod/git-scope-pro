@@ -20,7 +20,6 @@ public class MyTabContentListener implements ContentManagerListener {
 
     public MyTabContentListener(Project project) {
         this.project = project;
-        // Don't get the service here, defer until needed
     }
     
     private ViewService getViewService() {
@@ -31,13 +30,11 @@ public class MyTabContentListener implements ContentManagerListener {
     }
 
     public void contentAdded(@NotNull ContentManagerEvent event) {
-        //System.out.println("contentAdded");
     }
 
     public void selectionChanged(@NotNull ContentManagerEvent event) {
         ContentManagerEvent.ContentOperation operation = event.getOperation();
         ContentManagerEvent.ContentOperation add = ContentManagerEvent.ContentOperation.add;
-        //System.out.println("selectionChanged " + operation);
         if (operation.equals(add)) {
             ViewService service = getViewService(); // Get service only when needed
             service.setTabIndex(event.getIndex());

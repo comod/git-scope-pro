@@ -3,7 +3,6 @@ package statusBar;
 import com.intellij.openapi.wm.impl.status.TextPanel;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.util.IconUtil;
-import com.intellij.ui.JBColor;
 import com.intellij.openapi.util.SystemInfo;
 import com.intellij.util.ui.JBFont;
 import com.intellij.util.ui.JBUI;

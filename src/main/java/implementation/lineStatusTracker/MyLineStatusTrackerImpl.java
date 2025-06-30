@@ -170,8 +170,6 @@ public class MyLineStatusTrackerImpl {
 
                     // Force refresh of all editors for this document
                     refreshEditorsForDocument(document);
-                } else {
-                    LOG.debug("No LineStatusTracker found for document: " + filePath);
                 }
 
             } catch (Exception e) {

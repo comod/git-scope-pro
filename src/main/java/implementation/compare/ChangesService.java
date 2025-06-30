@@ -21,7 +21,6 @@ import service.GitService;
 import system.Defs;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 public class ChangesService extends GitCompareWithRefAction {

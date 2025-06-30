@@ -2,7 +2,6 @@
 package toolwindow.elements;
 
 import com.intellij.openapi.project.Project;
-import model.MyModel;
 import service.GitService;
 
 import javax.swing.*;

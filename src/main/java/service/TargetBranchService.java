@@ -3,12 +3,10 @@ package service;
 import com.intellij.openapi.project.Project;
 import git4idea.repo.GitRepository;
 import model.TargetBranchMap;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 public class TargetBranchService {

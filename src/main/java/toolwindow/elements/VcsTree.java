@@ -80,7 +80,7 @@ public class VcsTree extends JPanel {
 
         // If we have a browser already showing the same content, skip
         if (currentBrowser != null && !newChanges.isEmpty()) {
-            LOG.debug("Skipping update - content appears unchanged");
+            // Skipping update - content appears unchanged
             return true;
         }
 
@@ -105,13 +105,13 @@ public class VcsTree extends JPanel {
 
     public void update(Collection<Change> changes) {
         if (project.isDisposed()) {
-            LOG.debug("Project is disposed, ignoring update");
+            // Project is disposed, ignoring update
             return;
         }
 
         // Check if we can skip this update
         if (shouldSkipUpdate(changes)) {
-            LOG.debug("Skipping unnecessary update");
+            // Skipping unnecessary update
             return;
         }
 
@@ -121,12 +121,12 @@ public class VcsTree extends JPanel {
 
         // Generate new sequence number for this update
         final long sequenceNumber = updateSequence.incrementAndGet();
-        LOG.debug("Starting update sequence " + sequenceNumber);
+        // Starting update sequence + sequenceNumber
 
         // Cancel any previous update
         CompletableFuture<Void> previousUpdate = currentUpdate.get();
         if (previousUpdate != null && !previousUpdate.isDone()) {
-            LOG.debug("Cancelling previous update");
+            // Cancelling previous update
             previousUpdate.cancel(true);
         }
 
@@ -146,7 +146,7 @@ public class VcsTree extends JPanel {
                         throw new CompletionException(new InterruptedException("Update cancelled - sequence outdated"));
                     }
 
-                    LOG.debug("Processing changes for sequence " + sequenceNumber);
+                    // Processing changes for sequence + sequenceNumber
                     // Make defensive copy to avoid threading issues
                     return new ArrayList<>(changes);
                 }, AppExecutorUtil.getAppExecutorService())
@@ -157,7 +157,7 @@ public class VcsTree extends JPanel {
                         throw new CompletionException(new InterruptedException("Update cancelled - sequence outdated"));
                     }
 
-                    LOG.debug("Creating browser for sequence " + sequenceNumber);
+                    // Creating browser for sequence + sequenceNumber
                     return MySimpleChangesBrowser.createAsync(project, changesCopy);
                 })
 
@@ -165,17 +165,17 @@ public class VcsTree extends JPanel {
                     // Final UI update on EDT
                     SwingUtilities.invokeLater(() -> {
                         if (isCurrentSequence(sequenceNumber) && !project.isDisposed()) {
-                            LOG.debug("Setting browser component for sequence " + sequenceNumber);
+                            // Setting browser component for sequence + sequenceNumber
                             setComponentSafely(browser);
                             currentBrowser = browser;
                         } else {
-                            LOG.debug("Ignoring browser update for outdated sequence " + sequenceNumber);
+                            // Ignoring browser update for outdated sequence + sequenceNumber
                         }
                     });
                 })
 
                 .exceptionally(throwable -> {
-                    LOG.debug("Update failed for sequence " + sequenceNumber, throwable);
+                    // Update failed for sequence + sequenceNumber
 
                     // Only show error if this is still the current sequence
                     if (isCurrentSequence(sequenceNumber)) {
@@ -249,7 +249,7 @@ public class VcsTree extends JPanel {
             // Restore scroll position IMMEDIATELY after layout
             restoreScrollPosition(component, savedPosition);
 
-            LOG.debug("Component updated successfully with position restored");
+            // Component updated successfully with position restored
         } catch (Exception e) {
             LOG.warn("Error updating component", e);
         }
@@ -282,11 +282,11 @@ public class VcsTree extends JPanel {
                 int vPos = vScrollBar.getValue();
                 int hPos = hScrollBar.getValue();
 
-                LOG.debug("Saved scroll position: vertical=" + vPos + ", horizontal=" + hPos);
+                // Saved scroll position: vertical=" + vPos + ", horizontal=" + hPos
                 return new ScrollPosition(vPos, hPos, true);
             }
         } catch (Exception e) {
-            LOG.debug("Failed to save scroll position", e);
+            // Failed to save scroll position
         }
         return ScrollPosition.invalid();
     }
@@ -312,11 +312,10 @@ public class VcsTree extends JPanel {
                         hScrollBar.setValue(position.horizontalValue);
                     }
 
-                    LOG.debug("Restored scroll position: vertical=" + position.verticalValue +
-                            ", horizontal=" + position.horizontalValue);
+                    // Restored scroll position: vertical=" + position.verticalValue + ", horizontal=" + position.horizontalValue
                 }
             } catch (Exception e) {
-                LOG.debug("Failed to restore scroll position", e);
+                // Failed to restore scroll position
             }
         });
     }

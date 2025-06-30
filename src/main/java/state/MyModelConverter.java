@@ -4,7 +4,6 @@ package state;
 import com.google.common.reflect.TypeToken;
 import com.google.gson.Gson;
 import com.intellij.util.xmlb.Converter;
-import model.MyModel;
 import model.MyModelBase;
 import org.jetbrains.annotations.NotNull;
 

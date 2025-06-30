@@ -6,23 +6,17 @@ import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import git4idea.GitRemoteBranch;
-import git4idea.repo.GitSubmoduleInfo;
 import toolwindow.elements.BranchTreeEntry;
 import git4idea.GitLocalBranch;
-import git4idea.GitUtil;
 import git4idea.branch.GitBranchType;
-import git4idea.config.GitVcsSettings;
 import git4idea.repo.GitRepository;
 import git4idea.repo.GitRepositoryManager;
 import git4idea.ui.branch.GitBranchManager;
 import one.util.streamex.StreamEx;
 import org.jetbrains.annotations.NotNull;
-import git4idea.GitTag;
 
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 public class GitService {
     public static final String BRANCH_HEAD = "HEAD";

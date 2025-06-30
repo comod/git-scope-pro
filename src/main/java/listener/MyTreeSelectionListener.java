@@ -9,7 +9,6 @@ import javax.swing.tree.DefaultMutableTreeNode;
 import com.intellij.ui.treeStructure.Tree;
 import service.GitService;
 import state.State;
-import toolwindow.BranchSelectView;
 import toolwindow.elements.BranchTreeEntry;
 import service.ViewService;
 
