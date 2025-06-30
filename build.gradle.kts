@@ -6,6 +6,7 @@ import javax.xml.xpath.XPathFactory
 import javax.xml.xpath.XPathConstants
 import org.w3c.dom.Document
 import org.gradle.api.provider.Provider
+import org.jetbrains.changelog.markdownToHTML
 
 fun properties(key: String) = project.findProperty(key).toString()
 
@@ -13,7 +14,7 @@ plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "2.1.21"
     id("org.jetbrains.intellij.platform") version "2.6.0"
-    id("org.jetbrains.changelog") version "2.1.2"
+    id("org.jetbrains.changelog") version "2.2.1"
 }
 
 group = properties("pluginGroup")
@@ -28,6 +29,14 @@ repositories {
 
 kotlin {
     jvmToolchain(21)
+}
+
+// Configure changelog plugin
+changelog {
+    version.set(properties("pluginVersion"))
+    groups.set(emptyList())
+    // Configure to accept your version format (YYYY.N or YYYY.N.N)
+    headerParserRegex.set("""(\d{4}\.\d+(?:\.\d+)?)""".toRegex())
 }
 
 // pluginIdeaVersion comes from properties and it set to LATEST-STABLE, LATEST-EAP-SNAPSHOT, or a specific version number
@@ -46,6 +55,15 @@ intellijPlatform {
         ides {
             recommended()
         }
+    }
+    pluginConfiguration {
+        changeNotes.set(provider {
+            changelog.renderItem(
+                changelog.getOrNull(properties("pluginVersion"))
+                    ?: changelog.getLatest(),
+                org.jetbrains.changelog.Changelog.OutputType.HTML
+            )
+        })
     }
 }
 
