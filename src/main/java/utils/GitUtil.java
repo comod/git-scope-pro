@@ -60,6 +60,7 @@ public class GitUtil {
     /**
      * Wraps a 40-character commit hash in a GitReference implementation
      */
+    @SuppressWarnings("FinalMethodsInAnonymousClass")
     @NotNull
     private static GitReference wrapHashAsReference(@NotNull String fullHash) {
         // Ensure it's 40 hex chars
@@ -67,12 +68,6 @@ public class GitUtil {
             throw new IllegalArgumentException("Invalid hash length: " + fullHash);
         }
         return new GitReference(fullHash) {
-            @Override
-            public @NotNull String getName() {
-                // short form (first 7 chars)
-                return fullHash.substring(0, 7);
-            }
-
             @Override
             public @NotNull String getFullName() {
                 return fullHash;
