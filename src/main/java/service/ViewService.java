@@ -14,7 +14,9 @@ import state.State;
 import implementation.scope.MyScope;
 import system.Defs;
 import license.CheckLicense;
+import toolwindow.elements.VcsTree;
 
+import javax.swing.*;
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -440,6 +442,15 @@ public class ViewService {
             updateStatusBarWidget();
             myLineStatusTrackerImpl.update(changes, null);
             myScope.update(changes);
+
+            // Perform scroll restoration after all UI updates are complete
+            // Use another invokeLater to ensure everything is fully rendered
+            SwingUtilities.invokeLater(() -> {
+                VcsTree vcsTree = toolWindowService.getVcsTree();
+                if (vcsTree != null) {
+                    vcsTree.performScrollRestoration();
+                }
+            });
         });
     }
 

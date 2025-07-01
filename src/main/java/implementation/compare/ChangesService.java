@@ -18,6 +18,7 @@ import git4idea.repo.GitRepository;
 import model.TargetBranchMap;
 import org.jetbrains.annotations.NotNull;
 import service.GitService;
+import service.ToolWindowServiceInterface;
 import system.Defs;
 
 import java.util.*;

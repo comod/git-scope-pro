@@ -4,20 +4,25 @@ import com.intellij.icons.AllIcons;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.changes.Change;
+import com.intellij.openapi.vcs.changes.ContentRevision;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import implementation.compare.ChangesService;
+import service.ViewService;
 
 import javax.swing.*;
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 public class VcsTree extends JPanel {
     private static final Logger LOG = Logger.getInstance(VcsTree.class);
@@ -34,6 +39,13 @@ public class VcsTree extends JPanel {
     private Collection<Change> lastChanges;
     private int lastChangesHashCode = 0;
 
+    // Per-tab state tracking
+    private final Map<String, Collection<Change>> lastChangesPerTab = new ConcurrentHashMap<>();
+    private final Map<String, Integer> lastChangesHashCodePerTab = new ConcurrentHashMap<>();
+
+    // Per-tab scroll position tracking
+    private final Map<String, ScrollPosition> scrollPositionPerTab = new ConcurrentHashMap<>();
+
     public VcsTree(Project project) {
         this.project = project;
         this.setLayout(new BorderLayout());
@@ -41,8 +53,22 @@ public class VcsTree extends JPanel {
         this.addListener();
     }
 
+    // Get current tab identifier
+    private String getCurrentTabId() {
+        try {
+            ViewService viewService = project.getService(ViewService.class);
+            if (viewService != null) {
+                int tabIndex = viewService.getTabIndex();
+                return "tab_" + tabIndex;
+            }
+        } catch (Exception e) {
+            LOG.warn("Failed to get current tab ID", e);
+        }
+        return "default_tab";
+    }
+
     public void createElement() {
-        JLabel initialLabel = new JLabel("No changes to display");
+        JLabel initialLabel = new JLabel("No changes to display", AllIcons.General.Information, JLabel.CENTER);
         initialLabel.setHorizontalAlignment(SwingConstants.CENTER);
         this.add(initialLabel, BorderLayout.CENTER);
     }
@@ -52,39 +78,40 @@ public class VcsTree extends JPanel {
     }
 
     private boolean shouldSkipUpdate(Collection<Change> newChanges) {
+        String currentTabId = getCurrentTabId();
+        Collection<Change> tabLastChanges = lastChangesPerTab.get(currentTabId);
+        Integer tabLastChangesHashCode = lastChangesHashCodePerTab.get(currentTabId);
+
+        // Use per-tab values if available, otherwise fall back to global
+        Collection<Change> effectiveLastChanges = tabLastChanges != null ? tabLastChanges : lastChanges;
+        int effectiveLastHashCode = tabLastChangesHashCode != null ? tabLastChangesHashCode : lastChangesHashCode;
+
         // Handle null cases
-        if (newChanges == null && lastChanges == null) {
+        if (newChanges == null && effectiveLastChanges == null) {
             return true; // Both null, no update needed
         }
-        if (newChanges == null || lastChanges == null) {
+        if (newChanges == null || effectiveLastChanges == null) {
             return false; // One is null, other isn't - update needed
         }
 
         // Handle error state markers
         if (newChanges instanceof ChangesService.ErrorStateMarker ||
-                lastChanges instanceof ChangesService.ErrorStateMarker) {
-            // Always update error states to be safe
-            return false;
+                effectiveLastChanges instanceof ChangesService.ErrorStateMarker) {
+            return false; // Always update error states
         }
 
         // Quick size check
-        if (newChanges.size() != lastChanges.size()) {
+        if (newChanges.size() != effectiveLastChanges.size()) {
             return false;
         }
 
-        // Quick hash check
+        // Hash check - if they're the same, skip update
         int newHashCode = calculateChangesHashCode(newChanges);
-        if (newHashCode != lastChangesHashCode) {
-            return false;
+        if (newHashCode == effectiveLastHashCode) {
+            return true; // Changes are identical - skip update
         }
 
-        // If we have a browser already showing the same content, skip
-        if (currentBrowser != null && !newChanges.isEmpty()) {
-            // Skipping update - content appears unchanged
-            return true;
-        }
-
-        return false;
+        return false; // Changes are different - update needed
     }
 
     private int calculateChangesHashCode(Collection<Change> changes) {
@@ -92,41 +119,46 @@ public class VcsTree extends JPanel {
             return 0;
         }
 
-        // Create a hash based on the change contents
-        int hash = 17;
-        for (Change change : changes) {
-            if (change != null) {
-                hash = hash * 31 + Objects.hashCode(change.getBeforeRevision());
-                hash = hash * 31 + Objects.hashCode(change.getAfterRevision());
-            }
-        }
-        return hash;
+        // Extract and sort file paths - this gives us a stable, order-independent hash
+        java.util.List<String> filePaths = changes.stream()
+                .filter(Objects::nonNull)
+                .map(this::getChangePath)
+                .filter(path -> !path.isEmpty())
+                .sorted()
+                .collect(Collectors.toList());
+
+        return Objects.hash(filePaths);
+    }
+
+    private String getChangePath(Change change) {
+        ContentRevision revision = change.getAfterRevision() != null ?
+                change.getAfterRevision() : change.getBeforeRevision();
+        return revision != null ? revision.getFile().getPath() : "";
     }
 
     public void update(Collection<Change> changes) {
         if (project.isDisposed()) {
-            // Project is disposed, ignoring update
             return;
         }
 
         // Check if we can skip this update
         if (shouldSkipUpdate(changes)) {
-            // Skipping unnecessary update
             return;
         }
 
-        // Update tracking state
-        lastChanges = changes != null ? new ArrayList<>(changes) : null;
+        // Update tracking state for current tab and keep global for compatibility
+        String currentTabId = getCurrentTabId();
+        lastChangesPerTab.put(currentTabId, changes != null ? new ArrayList<>(changes) : null);
+        lastChangesHashCodePerTab.put(currentTabId, calculateChangesHashCode(changes));
+        lastChanges = changes;
         lastChangesHashCode = calculateChangesHashCode(changes);
 
         // Generate new sequence number for this update
         final long sequenceNumber = updateSequence.incrementAndGet();
-        // Starting update sequence + sequenceNumber
 
         // Cancel any previous update
         CompletableFuture<Void> previousUpdate = currentUpdate.get();
         if (previousUpdate != null && !previousUpdate.isDone()) {
-            // Cancelling previous update
             previousUpdate.cancel(true);
         }
 
@@ -138,98 +170,94 @@ public class VcsTree extends JPanel {
             return;
         }
 
-        // Create the async update chain - no loading indicator, direct processing
+        // Create the async update chain
         CompletableFuture<Void> updateFuture = CompletableFuture
                 .supplyAsync(() -> {
-                    // Check if still current before processing
                     if (!isCurrentSequence(sequenceNumber)) {
                         throw new CompletionException(new InterruptedException("Update cancelled - sequence outdated"));
                     }
-
-                    // Processing changes for sequence + sequenceNumber
-                    // Make defensive copy to avoid threading issues
                     return new ArrayList<>(changes);
                 }, AppExecutorUtil.getAppExecutorService())
 
                 .thenCompose(changesCopy -> {
-                    // Check again before creating browser
                     if (!isCurrentSequence(sequenceNumber)) {
                         throw new CompletionException(new InterruptedException("Update cancelled - sequence outdated"));
                     }
-
-                    // Creating browser for sequence + sequenceNumber
                     return MySimpleChangesBrowser.createAsync(project, changesCopy);
                 })
 
                 .thenAccept(browser -> {
-                    // Final UI update on EDT
                     SwingUtilities.invokeLater(() -> {
                         if (isCurrentSequence(sequenceNumber) && !project.isDisposed()) {
-                            // Setting browser component for sequence + sequenceNumber
-                            setComponentSafely(browser);
+                            setComponent(browser);
                             currentBrowser = browser;
-                        } else {
-                            // Ignoring browser update for outdated sequence + sequenceNumber
                         }
                     });
                 })
 
                 .exceptionally(throwable -> {
-                    // Update failed for sequence + sequenceNumber
-
-                    // Only show error if this is still the current sequence
                     if (isCurrentSequence(sequenceNumber)) {
                         SwingUtilities.invokeLater(() -> {
                             if (!project.isDisposed() && isCurrentSequence(sequenceNumber)) {
                                 JLabel errorLabel = createErrorLabel(throwable);
-                                setComponentSafely(errorLabel);
-                                currentBrowser = null; // Clear current browser on error
+                                setComponent(errorLabel);
+                                currentBrowser = null;
                             }
                         });
                     }
                     return null;
                 })
 
-                // Add timeout protection
                 .completeOnTimeout(null, UPDATE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
 
-        // Store the current update
         currentUpdate.set(updateFuture);
     }
 
     private boolean isCurrentSequence(long sequenceNumber) {
-        return sequenceNumber == updateSequence.get();
+        return updateSequence.get() == sequenceNumber;
     }
 
     private JLabel createStatusLabel(Collection<Change> changes) {
         if (changes == null) {
             return new JBLabel("Collecting changes...", AllIcons.Process.Step_1, JLabel.CENTER);
         } else if (changes instanceof ChangesService.ErrorStateMarker) {
-            return new JLabel("Invalid git scope", AllIcons.General.Error, JLabel.CENTER);
+            return new JBLabel("Invalid git scope", AllIcons.General.Error, JLabel.CENTER);
         } else {
-            return new JLabel("No changes to display", AllIcons.General.Information, JLabel.CENTER);
+            return new JBLabel("No changes to display", AllIcons.General.Information, JLabel.CENTER);
         }
     }
 
     private JLabel createErrorLabel(Throwable throwable) {
-        String message = throwable.getCause() instanceof InterruptedException ?
-                "Update cancelled" :
-                "Error loading changes: " + throwable.getMessage();
-        return new JLabel(message, AllIcons.General.Error, JLabel.CENTER);
+        String message = throwable.getMessage();
+        if (throwable instanceof InterruptedException ||
+                (throwable instanceof CompletionException && throwable.getCause() instanceof InterruptedException)) {
+            return new JBLabel("No changes to display", AllIcons.General.Information, JLabel.CENTER);
+        }
+        return new JBLabel("Error: " + (message != null ? message : "Unknown error"),
+                AllIcons.General.Error, JLabel.CENTER);
     }
 
     private void setComponentIfCurrent(Component component, long sequenceNumber) {
         if (isCurrentSequence(sequenceNumber)) {
-            setComponentSafely(component);
-            if (!(component instanceof MySimpleChangesBrowser)) {
-                currentBrowser = null; // Clear current browser if setting a different component
+            setComponent(component);
+        }
+    }
+
+    public void performScrollRestoration() {
+        // Assume savedPosition and currentTabId are already defined at your scope.
+        ScrollPosition savedPosition = scrollPositionPerTab.get(getCurrentTabId());
+        if (savedPosition != null) {
+            if (SwingUtilities.isEventDispatchThread()) {
+                restoreScrollPosition(this, savedPosition);
+            } else {
+                SwingUtilities.invokeLater(() -> restoreScrollPosition(this, savedPosition));
             }
         }
     }
 
-    private void setComponentSafely(Component component) {
+    private void setComponent(Component component) {
         if (!SwingUtilities.isEventDispatchThread()) {
-            SwingUtilities.invokeLater(() -> setComponentSafely(component));
+            SwingUtilities.invokeLater(() -> setComponent(component));
             return;
         }
 
@@ -238,20 +266,29 @@ public class VcsTree extends JPanel {
         }
 
         try {
-            // Save scroll position BEFORE replacing component
-            ScrollPosition savedPosition = saveScrollPosition();
+            String currentTabId = getCurrentTabId();
 
+            // Save current scroll position for the current tab
+            ScrollPosition currentPosition = saveScrollPosition();
+            if (currentPosition.isValid) {
+                scrollPositionPerTab.put(currentTabId, currentPosition);
+            }
+
+            // Remove all components and add the new one
             this.removeAll();
             this.add(component, BorderLayout.CENTER);
             this.revalidate();
             this.repaint();
-
-            // Restore scroll position IMMEDIATELY after layout
-            restoreScrollPosition(component, savedPosition);
-
-            // Component updated successfully with position restored
         } catch (Exception e) {
-            LOG.warn("Error updating component", e);
+            LOG.warn("Error updating VcsTree component", e);
+            try {
+                this.removeAll();
+                this.add(component, BorderLayout.CENTER);
+                this.revalidate();
+                this.repaint();
+            } catch (Exception fallbackError) {
+                LOG.error("Fallback component update also failed", fallbackError);
+            }
         }
     }
 
@@ -276,17 +313,20 @@ public class VcsTree extends JPanel {
         try {
             JScrollPane scrollPane = findScrollPane(this);
             if (scrollPane != null) {
-                JScrollBar vScrollBar = scrollPane.getVerticalScrollBar();
-                JScrollBar hScrollBar = scrollPane.getHorizontalScrollBar();
+                JScrollBar verticalScrollBar = scrollPane.getVerticalScrollBar();
+                JScrollBar horizontalScrollBar = scrollPane.getHorizontalScrollBar();
 
-                int vPos = vScrollBar.getValue();
-                int hPos = hScrollBar.getValue();
+                // Check that both scrollbars are not null before setting valid to true
+                boolean valid = verticalScrollBar != null && horizontalScrollBar != null;
+                return new ScrollPosition(
+                        verticalScrollBar != null ? verticalScrollBar.getValue() : 0,
+                        horizontalScrollBar != null ? horizontalScrollBar.getValue() : 0,
+                        valid
+                );
 
-                // Saved scroll position: vertical=" + vPos + ", horizontal=" + hPos
-                return new ScrollPosition(vPos, hPos, true);
             }
         } catch (Exception e) {
-            // Failed to save scroll position
+            LOG.debug("Could not save scroll position", e);
         }
         return ScrollPosition.invalid();
     }
@@ -296,64 +336,37 @@ public class VcsTree extends JPanel {
             return;
         }
 
-        // Use invokeLater to ensure the component is fully laid out first
-        SwingUtilities.invokeLater(() -> {
-            try {
-                JScrollPane scrollPane = findScrollPane(this);
-                if (scrollPane != null) {
-                    JScrollBar vScrollBar = scrollPane.getVerticalScrollBar();
-                    JScrollBar hScrollBar = scrollPane.getHorizontalScrollBar();
+        JScrollPane scrollPane = findScrollPane(newComponent);
+        if (scrollPane != null) {
+            JScrollBar verticalScrollBar = scrollPane.getVerticalScrollBar();
+            JScrollBar horizontalScrollBar = scrollPane.getHorizontalScrollBar();
 
-                    // Restore positions
-                    if (position.verticalValue <= vScrollBar.getMaximum()) {
-                        vScrollBar.setValue(position.verticalValue);
-                    }
-                    if (position.horizontalValue <= hScrollBar.getMaximum()) {
-                        hScrollBar.setValue(position.horizontalValue);
-                    }
-
-                    // Restored scroll position: vertical=" + position.verticalValue + ", horizontal=" + position.horizontalValue
-                }
-            } catch (Exception e) {
-                // Failed to restore scroll position
+            if (verticalScrollBar != null) {
+                verticalScrollBar.setValue(position.verticalValue);
             }
-        });
+            if (horizontalScrollBar != null) {
+                horizontalScrollBar.setValue(position.horizontalValue);
+            }
+        }
     }
 
     private JScrollPane findScrollPane(Component component) {
-        // Look up the component hierarchy to find the scroll pane
-        Component current = component;
-        while (current != null) {
-            if (current instanceof JScrollPane) {
-                return (JScrollPane) current;
-            }
-            current = current.getParent();
+        if (component instanceof JScrollPane) {
+            return (JScrollPane) component;
         }
-
-        // If not found in parents, look for scroll pane in children
-        // This handles cases where the scroll pane contains our component
         return findScrollPaneInChildren(component);
     }
 
     private JScrollPane findScrollPaneInChildren(Component component) {
-        if (component instanceof JScrollPane) {
-            return (JScrollPane) component;
-        }
-
         if (component instanceof Container) {
             Container container = (Container) component;
             for (Component child : container.getComponents()) {
-                if (child instanceof JScrollPane) {
-                    return (JScrollPane) child;
-                }
-                // Recursively search in children
-                JScrollPane found = findScrollPaneInChildren(child);
-                if (found != null) {
-                    return found;
+                JScrollPane result = findScrollPane(child);
+                if (result != null) {
+                    return result;
                 }
             }
         }
-
         return null;
     }
 
@@ -365,9 +378,9 @@ public class VcsTree extends JPanel {
         if (current != null && !current.isDone()) {
             current.cancel(true);
         }
-        // Clear saved state
+        lastChangesPerTab.clear();
+        lastChangesHashCodePerTab.clear();
+        scrollPositionPerTab.clear();
         currentBrowser = null;
-        lastChanges = null;
-        lastChangesHashCode = 0;
     }
 }

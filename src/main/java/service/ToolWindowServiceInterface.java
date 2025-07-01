@@ -1,6 +1,7 @@
 package service;
 
 import model.MyModel;
+import toolwindow.elements.VcsTree;
 
 public interface ToolWindowServiceInterface {
     void addTab(MyModel myModel, String tabName, boolean closeable);
@@ -18,4 +19,6 @@ public interface ToolWindowServiceInterface {
     void selectNewTab();
 
     void selectTabByIndex(int index);
+
+    VcsTree getVcsTree();
 }

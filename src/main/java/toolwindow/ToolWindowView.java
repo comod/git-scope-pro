@@ -70,6 +70,9 @@ public class ToolWindowView {
         vcsTree.update(modelChanges);
     }
 
+    public VcsTree getVcsTree() {
+        return this.vcsTree;
+    }
 
     public JPanel getRootPanel() {
         return rootPanel;
