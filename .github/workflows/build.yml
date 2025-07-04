@@ -1,0 +1,43 @@
+# Build GitScope Pro using JBR 21
+name: Build IntelliJ Plugin with JBR 21
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download JetBrains Runtime (JBR 21)
+        run: |
+          wget https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-21.0.7-linux-x64-b1038.54.tar.gz -O jbr.tar.gz
+          mkdir -p jbr
+          tar -xzf jbr.tar.gz -C jbr --strip-components=1
+
+      - name: Set JAVA_HOME to JBR 21
+        run: echo "JAVA_HOME=${{ github.workspace }}/jbr" >> $GITHUB_ENV
+
+      - name: Verify Java version
+        run: $JAVA_HOME/bin/java -version
+
+      - name: Validate Gradle Wrapper
+        uses: gradle/wrapper-validation-action@v2
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build Plugin
+        run: ./gradlew buildPlugin
+
+      - name: Upload Plugin Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-artifact
+          path: build/distributions/*.zip
