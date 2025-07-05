@@ -16,7 +16,8 @@ The Current "scope" is displayed/available as
 When upgrading from a previous version of this plugin, make sure that you enable the native gutter highlighting via
 `Tools -> Diff & Merge -> Highlight modified lines in gutter`
 
-Previous versions disabled this setting, and it hooks into the native gutter highlighter instead.
+Previous versions of the plugin disabled this setting, while current versions rely on this setting being enabled to show
+changes in gutter.
 
 ### Story
 
@@ -65,14 +66,22 @@ widget.
 
 <!-- Plugin description end -->
 
-# Gradle
-
-```bash
-gradle  runIde
-```
+# Gradle Commands
 
 Build (build/distributions)
 
 ```bash
-gradle build
+./gradlew buildPlugin
+```
+
+Run/debug plugin
+
+```bash
+./gradlew runIde
+```
+
+Verify
+
+```bash
+./gradlew verifyPlugin
 ```
