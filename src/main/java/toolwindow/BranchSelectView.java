@@ -3,13 +3,14 @@ package toolwindow;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ui.componentsList.layout.VerticalStackLayout;
 import com.intellij.ui.DocumentAdapter;
-import com.intellij.ui.JBColor;
 import com.intellij.ui.SearchTextField;
-import com.intellij.ui.SeparatorWithText;
 import com.intellij.ui.components.JBScrollPane;
+import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.JBUI;
+import com.intellij.ui.SeparatorFactory;
 import git4idea.branch.GitBranchType;
-import org.jdesktop.swingx.StackLayout;
+import com.intellij.ui.treeStructure.Tree;
+import git4idea.repo.GitRepository;
 import org.jetbrains.annotations.NotNull;
 import service.GitService;
 import state.State;
@@ -18,51 +19,84 @@ import toolwindow.elements.BranchTreeEntry;
 
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
+import javax.swing.tree.DefaultMutableTreeNode;
+import javax.swing.tree.TreePath;
 import java.awt.*;
-import java.awt.event.KeyEvent;
-import java.awt.event.KeyListener;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
+import java.awt.event.*;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 public class BranchSelectView {
-
-    //    public static final String TAG_OR_REVISION = "Tag or Revision...";
-    //    private final JPanel rootPanel = new JPanel(new VerticalStackLayout());
     private final JPanel rootPanel = new JPanel(new BorderLayout());
-    //    private final JPanel rootPanel = new JPanel(new VerticalFlowLayout());
-    //    private final MyModel myModel;
     private final Project project;
-    //    private final TargetBranchService targetBranchService;
-//    private final CurrentBranch currentBranch;
     private final GitService gitService;
     private final State state;
-
     private SearchTextField search;
+
+private JPanel createManualInputPanel(GitRepository repository, BranchTree branchTree) {
+    JPanel manualInputPanel = new JPanel(new BorderLayout());
+    manualInputPanel.setBorder(JBUI.Borders.empty(2, 8)); // top, left, bottom, right margins
+    
+    JBTextField manualInput = new JBTextField();
+    manualInput.setToolTipText(
+            "<html>" +
+                    "Enter any valid Git reference:<br/>" +
+                    "• Branch names (e.g., main, develop, feature/xyz)<br/>" +
+                    "• Tag names (e.g., v1.0.0, release-2023)<br/>" +
+                    "• Special refs (e.g., HEAD, HEAD~1, HEAD~5)<br/>" +
+                    "• Commit hashes (full or abbreviated)<br/>" +
+                    "• Other Git syntax (e.g., @{upstream}, origin/main)" +
+                    "</html>"
+    );
+    manualInput.getEmptyText()
+            .setText("Enter branch, tag, or git ref...")
+            .setFont(manualInput.getFont().deriveFont(Font.ITALIC));
+    
+    manualInput.addKeyListener(new KeyAdapter() {
+        @Override
+        public void keyPressed(KeyEvent e) {
+            if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+                String ref = manualInput.getText().trim();
+                if (!ref.isEmpty()) {
+                    BranchTreeEntry entry = BranchTreeEntry.create(ref, false, repository);
+                    Tree tree = (Tree) branchTree.getTreeComponent();
+                    DefaultMutableTreeNode root = (DefaultMutableTreeNode) tree.getModel().getRoot();
+
+                    // Find or create "Manual Input" node
+                    DefaultMutableTreeNode manualNode = null;
+                    for (int i = 0; i < root.getChildCount(); i++) {
+                        DefaultMutableTreeNode child = (DefaultMutableTreeNode) root.getChildAt(i);
+                        if ("Manual Input".equals(child.getUserObject())) {
+                            manualNode = child;
+                            break;
+                        }
+                    }
+                    if (manualNode == null) {
+                        manualNode = new DefaultMutableTreeNode("Manual Input");
+                        root.add(manualNode);
+                    }
+
+                    DefaultMutableTreeNode entryNode = new DefaultMutableTreeNode(entry);
+                    manualNode.add(entryNode);
+                    branchTree.update(search);
+                    TreePath path = new TreePath(entryNode.getPath());
+                    tree.setSelectionPath(path);
+                    manualInput.setText("");
+                }
+            }
+        }
+    });
+
+    manualInputPanel.add(manualInput, BorderLayout.CENTER);
+    return manualInputPanel;
+}
+
 
     public BranchSelectView(Project project) {
         this.project = project;
         this.state = project.getService(State.class);
-//        this.myModel = myModel;
-//        this.targetBranchService = project.getService(TargetBranchService.class);
         this.gitService = project.getService(GitService.class);
-//
-//        this.currentBranch = new CurrentBranch(project);
-//
-//        myModel.getObservable().subscribe(model -> {
-//            render();
-//        });
-//
-////        draw();
-//        drawNew();
-//
-//        addListener();
-//
-//        render();
-//    }
-//
 
         // main
         JPanel main = new JPanel();
@@ -72,90 +106,48 @@ public class BranchSelectView {
         JPanel help = new JPanel();
         help.setLayout(new FlowLayout(FlowLayout.LEFT));
 
-        JCheckBox checkBox = new JCheckBox("Only Changes Since Common Ancestor (git diff A..B)");
-        checkBox.setSelected(this.state.getThreeDotsCheckBox());
-        checkBox.setBorder(JBUI.Borders.empty(10)); // top, left, bottom, right padding
-        checkBox.addActionListener(e -> this.state.setThreeDotsCheckBox(checkBox.isSelected()));
+        JCheckBox checkBox = new JCheckBox("Only Changes Since Common Ancestor (git diff <selection>..HEAD)");
+        checkBox.setSelected(this.state.getTwoDotsCheckbox());
+        checkBox.setBorder(JBUI.Borders.empty(1)); // top, left, bottom, right padding
+        checkBox.addActionListener(e -> this.state.setTwoDotsCheckbox(checkBox.isSelected()));
 
         // Add a mouse listener to the help icon label to show the tool tip on hover
         checkBox.addMouseListener(new MouseAdapter() {
             public void mouseEntered(MouseEvent me) {
-                checkBox.setToolTipText("Tick this box if you want to see the changes that were made only on this branch");
+                checkBox.setToolTipText("See what you have added since [selection] branch point");
             }
         });
 
         help.add(checkBox);
         main.add(help);
-//        SimpleColoredComponent simple = new SimpleColoredComponent();
-//        simple.append("HEAD (Current)");
-//        simple.setIcon(AllIcons.Vcs.Merge);
-//        simple.setIconTextGap(20);
-//        main.add(new SeparatorWithText());
-//        @NotNull JBInsets insets = JBUI.insets(100, 10, 0, 0);
-//        main.add(simple);
-//        main.add(new SeparatorWithText());
 
         this.search = new SearchTextField();
         search.setText("");
-        // node
 
-        // branchTree
+        boolean isMulti = gitService.isMulti();  // More than one repo
+        gitService.getRepositoriesAsync(repositories -> {
+            repositories.forEach(gitRepository -> {
+                if (isMulti) {
+                    JComponent sep = SeparatorFactory.createSeparator(gitRepository.getRoot().getName(), null);
+                    main.add(sep);
+                }
 
-//        List<BranchTreeEntry> recentBranchList = new ArrayList<>();
-//        recentBranchList.add(BranchTreeEntry.create("HEAD"));
-//        recentBranchList.add(BranchTreeEntry.create("master"));
+                Map<String, List<BranchTreeEntry>> node = new LinkedHashMap<>();
+                List<BranchTreeEntry> localBranchList = gitService.listOfLocalBranches(gitRepository);
+                if (!localBranchList.isEmpty()) {
+                    node.put(GitBranchType.LOCAL.getName(), localBranchList);
+                }
 
-//        List<BranchTreeEntry> specialBranchList = new ArrayList<>();
-//        specialBranchList.add(BranchTreeEntry.create("Tag or Revision..."));
-//        Map<String, List<BranchTreeEntry>> specialNodes = new LinkedHashMap<>();
-//        specialNodes.put(null, specialBranchList);
+                List<BranchTreeEntry> remoteBranchList = gitService.listOfRemoteBranches(gitRepository);
+                if (!remoteBranchList.isEmpty()) {
+                    node.put(GitBranchType.REMOTE.getName(), remoteBranchList);
+                }
 
-//        Map<String, List<BranchTreeEntry>> specialNodes = new LinkedHashMap<>();
-//        specialNodes.put(TAG_OR_REVISION, null);
-//        BranchTree specialBranchTree = createBranchTree(project, specialNodes);
-//        main.add(specialBranchTree);
-
-        Map<String, List<BranchTreeEntry>> node = new LinkedHashMap<>();
-//        node.put("Recent", recentBranchList);
-        boolean isMulti = gitService.isMulti();
-//        if (isMulti) {
-//            SeparatorWithText sep = new SeparatorWithText();
-//            sep.setCaption("Repos");
-//            main.add(sep);
-//        }
-        gitService.getRepositories().forEach(gitRepository -> {
-            if (isMulti) {
-                SeparatorWithText sep = new SeparatorWithText();
-                sep.setCaption(gitRepository.getRoot().getName());
-                main.add(sep);
-            }
-            List<BranchTreeEntry> localBranchList = gitService.listOfLocalBranches(gitRepository);
-            if (!localBranchList.isEmpty()) {
-                node.put(GitBranchType.LOCAL.getName(), localBranchList);
-            }
-
-            List<BranchTreeEntry> remoteBranchList = gitService.listOfRemoteBranches(gitRepository);
-            if (!remoteBranchList.isEmpty()) {
-                node.put(GitBranchType.REMOTE.getName(), remoteBranchList);
-            }
-
-            BranchTree branchTree = createBranchTree(project, node);
-            main.add(branchTree);
+                BranchTree branchTree = createBranchTree(project, node);
+                main.add(createManualInputPanel(gitRepository, branchTree));
+                main.add(branchTree);
+            });
         });
-
-//        BranchTree branchTree2 = createBranchTree(project, node);
-//        } else {
-
-//            gitService.getRepositories().forEach(gitRepository -> {
-//                List<BranchTreeEntry> localBranchList = gitService.iconLabelListOfLocalBranches(gitRepository);
-//                node.put("Local", localBranchList);
-//            });
-//        }
-//        node.put("Remote", localBranchList);
-
-//        List<IconLabel> remoteBranchList = gitService.iconLabelListOfRemoteBranches();
-//        BranchTree special = new BranchTree("Special", specialBranchList);
-
 
         // root = search + scroll (main)
         JBScrollPane scroll = new JBScrollPane(main);
@@ -187,7 +179,6 @@ public class BranchSelectView {
                 //System.out.println(e);
                 String text = search.getText();
                 if (e.getKeyChar() == KeyEvent.VK_BACK_SPACE) {
-                    //System.out.println(removeLastChar(text));
                     search.setText(removeLastChar(text));
                     return;
                 }
@@ -197,7 +188,6 @@ public class BranchSelectView {
                 }
 
                 if (e.getKeyChar() == KeyEvent.VK_ENTER) {
-                    //System.out.println("enter");
                     return;
                 }
 
@@ -217,7 +207,7 @@ public class BranchSelectView {
     }
 
     private String removeLastChar(String str) {
-        if (str != null && str.length() > 0) {
+        if (str != null && !str.isEmpty()) {
             str = str.substring(0, str.length() - 1);
         }
         return str;

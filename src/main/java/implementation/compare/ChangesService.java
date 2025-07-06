@@ -1,5 +1,6 @@
 package implementation.compare;
 
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
@@ -10,20 +11,28 @@ import com.intellij.openapi.vcs.changes.ChangeListManager;
 import com.intellij.openapi.vcs.changes.ChangesUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import git4idea.GitCommit;
-import git4idea.GitUtil;
-import git4idea.actions.GitCompareWithBranchAction;
+import git4idea.GitReference;
+import git4idea.actions.GitCompareWithRefAction;
 import git4idea.history.GitHistoryUtils;
 import git4idea.repo.GitRepository;
 import model.TargetBranchMap;
 import org.jetbrains.annotations.NotNull;
 import service.GitService;
+import service.ToolWindowServiceInterface;
 import system.Defs;
 
 import java.util.*;
 import java.util.function.Consumer;
 
-public class ChangesService extends GitCompareWithBranchAction {
-
+public class ChangesService extends GitCompareWithRefAction {
+    public interface ErrorStateMarker {}
+    public static class ErrorStateList extends AbstractList<Change> implements ErrorStateMarker {
+        @Override public Change get(int index) { throw new IndexOutOfBoundsException(); }
+        @Override public int size() { return 0; }
+        @Override public String toString() { return "ERROR_STATE_SENTINEL"; }
+        @Override public boolean equals(Object o) { return o instanceof ErrorStateList; }
+    }
+    public static final Collection<Change> ERROR_STATE = new ErrorStateList();
     private final Project project;
     private GitRepository repo;
     private Task.Backgroundable task;
@@ -43,77 +52,89 @@ public class ChangesService extends GitCompareWithBranchAction {
         } else {
             branchToCompare = targetBranchByRepo.getValue().get(repo.toString());
         }
-//            String targetBranchByRepo = getTargetBranchByRepository(repo);
         if (branchToCompare == null) {
-            // Notification.notify(Defs.NAME, "Choose a Branch");
-//                toolWindowUI.showTargetBranchPopupAtToolWindow();
             branchToCompare = GitService.BRANCH_HEAD;
         }
         return branchToCompare;
     }
 
-    //    public void collectChangesWithCallback(@NotNull Project project,
-//                                           @NotNull GitRepository repo,
-//                                           @NotNull String branchToCompare,
-//                                           Consumer<Collection<Change>> callBack) {
-//
+
     public void collectChangesWithCallback(TargetBranchMap targetBranchByRepo, Consumer<Collection<Change>> callBack) {
-//        SwingUtilities.invokeLater(() -> {
-//            Collection<Change> changes = doCollectChanges(project, repo, branchToCompare);
-//            callBack.accept(changes);
-//        });
-        task = new Task.Backgroundable(this.project, Defs.APPLICATION_NAME + ": Collecting Changes...", true) {
+        // Capture the current project reference to ensure consistency
+        final Project currentProject = this.project;
+        final GitService currentGitService = this.git;
+
+        task = new Task.Backgroundable(currentProject, Defs.APPLICATION_NAME + ": Collecting Changes...", true) {
 
             private Collection<Change> changes;
 
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
                 Collection<Change> _changes = new ArrayList<>();
-                git.getRepositories().forEach(repo -> {
+                List<String> errorRepos = new ArrayList<>(); // Track problematic repos instead of failing entirely
+
+                // IMPORTANT: Use the captured project and git service to ensure we're working with the right context
+                Collection<GitRepository> repositories = currentGitService.getRepositories();
+
+                repositories.forEach(repo -> {
                     String branchToCompare = getBranchToCompare(targetBranchByRepo, repo);
 
-//                    Collection<Change> changesPerRepo = doCollectChanges(project, repo, branchToCompare);
                     Collection<Change> changesPerRepo = null;
-                    changesPerRepo = doCollectChanges(project, repo, branchToCompare);
+                    // Make sure to pass the correct project reference
+                    changesPerRepo = doCollectChanges(currentProject, repo, branchToCompare);
 
+                    if (changesPerRepo instanceof ErrorStateList) {
+                        errorRepos.add(repo.getRoot().getPath());
+                        return; // Skip this repo but continue with others
+                    }
+
+                    // Handle null case
+                    if (changesPerRepo == null) {
+                        changesPerRepo = new ArrayList<>();
+                    }
 
                     // Simple "merge" logic
                     for (Change change : changesPerRepo) {
-//                        //System.out.println(change);
                         if (!_changes.contains(change)) {
                             _changes.add(change);
                         }
                     }
                 });
-                changes = _changes;
+
+                // Only return ERROR_STATE if ALL repositories failed
+                if (!errorRepos.isEmpty() && _changes.isEmpty()) {
+                    changes = ERROR_STATE;
+                } else {
+                    changes = _changes;
+                }
             }
 
             @Override
             public void onSuccess() {
-                callBack.accept(this.changes);
+                // Ensure `changes` is accessed only on the UI thread to update the UI component
+                ApplicationManager.getApplication().invokeLater(() -> {
+                    // Double-check the project is still valid
+                    if (!currentProject.isDisposed() && callBack != null) {
+                        callBack.accept(this.changes);
+                    }
+                });
             }
 
             @Override
             public void onThrowable(@NotNull Throwable error) {
-                callBack.accept(this.changes);
+                ApplicationManager.getApplication().invokeLater(() -> {
+                    if (!currentProject.isDisposed() && callBack != null) {
+                        callBack.accept(ERROR_STATE);
+                    }
+                });
             }
         };
         task.queue();
     }
 
-//    private void merge(Collection<Change> firstChanges, Collection<Change> secondChanges) {
-//
-//        for (Change change : secondChanges) {
-//            if (!firstChanges.contains(change)) {
-//                firstChanges.add(change);
-//            }
-//        }
-//
-//    }
-
     private Boolean isLocalChangeOnly(String localChangePath, Collection<Change> changes) {
 
-        if (changes == null) {
+        if (changes == null || changes.isEmpty()) {
             return false;
         }
 
@@ -129,74 +150,79 @@ public class ChangesService extends GitCompareWithBranchAction {
                 return false;
             }
         }
-
         return true;
-
     }
 
     @NotNull
     public Collection<Change> getChangesByHistory(Project project, GitRepository repo, String branchToCompare) throws VcsException {
-//        GitRepository repository = GitUtil.getRepositoryManager(project).getRepositoryForRootQuick(project.getBaseDir());
-//        if (repository == null) {
-//            throw new IllegalStateException("Git repository not found");
-//        }
-//
-//        branchToCompare = "main..feature/add-sorting";
         List<GitCommit> commits = GitHistoryUtils.history(project, repo.getRoot(), branchToCompare);
-
         Map<FilePath, Change> changeMap = new HashMap<>();
         for (GitCommit commit : commits) {
-            System.out.println(commit);
             for (Change change : commit.getChanges()) {
                 FilePath path = ChangesUtil.getFilePath(change);
                 changeMap.put(path, change);
             }
         }
-
         return new ArrayList<>(changeMap.values());
     }
 
-
     public Collection<Change> doCollectChanges(Project project, GitRepository repo, String branchToCompare) {
-        //                try {
-//                    Thread.sleep(3000);
-//                } catch (InterruptedException e) {
-//                    e.printStackTrace();
-//                }
         VirtualFile file = repo.getRoot();
-//        //System.out.println("file " + file);
-        Collection<Change> _changes = null;
+        Collection<Change> _changes = new ArrayList<>();
         try {
-
             // Local Changes
             ChangeListManager changeListManager = ChangeListManager.getInstance(project);
             Collection<Change> localChanges = changeListManager.getAllChanges();
+
+            // Special handling for HEAD - just return local changes
+            if (branchToCompare.equals(GitService.BRANCH_HEAD)) {
+                _changes.addAll(localChanges);
+                return _changes;
+            }
 
             // Diff Changes
             if (branchToCompare.contains("..")) {
                 _changes = getChangesByHistory(project, repo, branchToCompare);
             } else {
-                _changes = getDiffChanges(project, file, branchToCompare);
+                GitReference gitReference;
+
+                // First try to find matching branch
+                gitReference = repo.getBranches().findBranchByName(branchToCompare);
+
+                if (gitReference == null) {
+                    // Then try a tag
+                    gitReference = repo.getTagHolder().getTag(branchToCompare);
+                }
+                if (gitReference == null) {
+                    // Finally resort to try a generic reference (HEAD~2, <hash>, ...)
+                    gitReference = utils.GitUtil.resolveGitReference(repo, branchToCompare);
+                }
+
+                if (gitReference != null) {
+                    // We have a valid GitReference
+                    _changes = getDiffChanges(repo, file, gitReference);
+                }
+                else {
+                    // We do not have a valid GitReference => return null immediately (no point trying to add localChanges)
+                    // null will be interpreted as invalid reference and displayed accordingly
+                    return ERROR_STATE;
+                }
             }
-//            //System.out.println("diffChanges (repo: " + repo + ") changes: " + _changes);
 
             for (Change localChange : localChanges) {
                 VirtualFile localChangeVirtualFile = localChange.getVirtualFile();
                 if (localChangeVirtualFile == null) {
                     continue;
                 }
-
                 String localChangePath = localChangeVirtualFile.getPath();
-                // Add Local Change if not part of Diff Changes anyway
 
+                // Add Local Change if not part of Diff Changes anyway
                 if (isLocalChangeOnly(localChangePath, _changes)) {
                     _changes.add(localChange);
                 }
             }
 
-        } catch (VcsException e) {
-//            //System.out.println("EEE Exception while collecting _changes " + e.getMessage());
-            // silent
+        } catch (VcsException ignored) {
         }
         return _changes;
     }

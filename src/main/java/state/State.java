@@ -4,12 +4,10 @@ import com.intellij.openapi.components.PersistentStateComponent;
 import com.intellij.openapi.components.Storage;
 import com.intellij.util.xmlb.XmlSerializerUtil;
 import com.intellij.util.xmlb.annotations.OptionTag;
-import model.MyModel;
 import model.MyModelBase;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -33,7 +31,7 @@ public class State implements PersistentStateComponent<State> {
 
     @OptionTag(converter = MyModelConverter.class)
     public List<MyModelBase> modelData;
-    public Boolean ThreeDotsCheckBox = true;
+    public Boolean twoDotsCheckbox = false;
 
     public List<MyModelBase> getModelData() {
         return modelData;
@@ -43,12 +41,23 @@ public class State implements PersistentStateComponent<State> {
         this.modelData = modelData;
     }
 
-    public Boolean getThreeDotsCheckBox() {
-        return ThreeDotsCheckBox;
+    public Boolean getTwoDotsCheckbox() {
+        return twoDotsCheckbox;
     }
 
-    public void setThreeDotsCheckBox(Boolean threeDotsCheckBox) {
-        ThreeDotsCheckBox = threeDotsCheckBox;
+    public void setTwoDotsCheckbox(Boolean value) {
+        twoDotsCheckbox = value;
+    }
+
+    // In your State class, add these methods:
+    private Integer currentTabIndex;
+
+    public Integer getCurrentTabIndex() {
+        return currentTabIndex;
+    }
+
+    public void setCurrentTabIndex(Integer currentTabIndex) {
+        this.currentTabIndex = currentTabIndex;
     }
 
     @Nullable

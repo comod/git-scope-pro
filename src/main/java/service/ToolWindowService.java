@@ -13,14 +13,24 @@ import model.MyModel;
 import toolwindow.ToolWindowView;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import toolwindow.elements.VcsTree;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @Service(Service.Level.PROJECT)
 public final class ToolWindowService implements ToolWindowServiceInterface {
     private final Project project;
+    private final Map<Content, ToolWindowView> contentToViewMap = new HashMap<>();
 
     public ToolWindowService(Project project) {
         this.project = project;
+    }
 
+    @Override
+    public void removeAllTabs() {
+        getContentManager().removeAllContents(true);
+        contentToViewMap.clear();
     }
 
     public ToolWindow getToolWindow() {
@@ -39,12 +49,36 @@ public final class ToolWindowService implements ToolWindowServiceInterface {
         ToolWindowView toolWindowView = new ToolWindowView(project, myModel);
         Content content = ContentFactory.getInstance().createContent(toolWindowView.getRootPanel(), tabName, false);
         content.setCloseable(closeable);
+
+        contentToViewMap.put(content, toolWindowView);
+
         ContentManager contentManager = getContentManager();
-//        contentManager.getComponent();
         contentManager.addContent(content);
 
         int index = contentManager.getIndexOfContent(content);
-        //System.out.println("addTab " + tabName + " with index " + index);
+    }
+
+    @Override
+    public VcsTree getVcsTree() {
+        try {
+            // Get the currently selected content
+            Content selectedContent = getContentManager().getSelectedContent();
+            if (selectedContent == null) {
+                return null;
+            }
+
+            // Get the ToolWindowView for this content
+            ToolWindowView toolWindowView = contentToViewMap.get(selectedContent);
+            if (toolWindowView != null) {
+                return toolWindowView.getVcsTree();
+            }
+
+            return null;
+
+        } catch (Exception e) {
+            // Log the error if needed
+            return null;
+        }
     }
 
 
@@ -55,22 +89,14 @@ public final class ToolWindowService implements ToolWindowServiceInterface {
     @Override
     public void changeTabName(String title) {
         getToolWindow().setTitle(title);
-//        setClosable();
     }
-
-//    public void setClosable() {
-//        @Nullable Content currentTabContent = getContentManager().getSelectedContent();
-//        if (currentTabContent == null) {
-//            return;
-//        }
-//        currentTabContent.setCloseable(true);
-//    }
 
     public void removeTab(int index) {
         @Nullable Content content = getContentManager().getContent(index);
         if (content == null) {
             return;
         }
+        contentToViewMap.remove(content);
         getContentManager().removeContent(content, false);
     }
 
@@ -79,6 +105,7 @@ public final class ToolWindowService implements ToolWindowServiceInterface {
         if (content == null) {
             return;
         }
+        contentToViewMap.remove(content);
         getContentManager().removeContent(content, true);
     }
 
@@ -97,15 +124,5 @@ public final class ToolWindowService implements ToolWindowServiceInterface {
         getContentManager().setSelectedContent(content);
         getContentManager().requestFocus(content, true);
     }
-
-//    public void selectHeadTab() {
-//        int count = getContentManager().getContentCount();
-//        @Nullable Content content = getContentManager().getContent(0);
-//        if (content == null) {
-//            return;
-//        }
-//        getContentManager().setSelectedContent(content);
-//        getContentManager().requestFocus(content, true);
-//    }
 
 }

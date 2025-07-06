@@ -1,24 +1,20 @@
-import org.jetbrains.changelog.Changelog
+import java.io.*
+import java.net.*
+import java.nio.file.Files
+import javax.xml.parsers.DocumentBuilderFactory
+import javax.xml.xpath.XPathFactory
+import javax.xml.xpath.XPathConstants
+import org.w3c.dom.Document
+import org.gradle.api.provider.Provider
 import org.jetbrains.changelog.markdownToHTML
 
 fun properties(key: String) = project.findProperty(key).toString()
 
-//fun properties(key: String) = providers.gradleProperty(key)
-fun environment(key: String) = providers.environmentVariable(key)
-//https://plugins.jetbrains.com/docs/intellij/creating-plugin-project.html#components-of-a-wizard-generated-gradle-intellij-platform-plugin
 plugins {
-    // Java support
     id("java")
-    // Kotlin support
-    id("org.jetbrains.kotlin.jvm") version "1.8.0"
-    // Gradle IntelliJ Plugin
-    id("org.jetbrains.intellij") version "1.15.0"
-    // Gradle Changelog Plugin
-    id("org.jetbrains.changelog") version "2.1.2"
-    // Gradle Qodana Plugin
-//    id("org.jetbrains.qodana") version "0.1.13"
-//    // Gradle Kover Plugin
-//    id("org.jetbrains.kotlinx.kover") version "0.6.1"
+    id("org.jetbrains.kotlin.jvm") version "2.1.21"
+    id("org.jetbrains.intellij.platform") version "2.6.0"
+    id("org.jetbrains.changelog") version "2.2.1"
 }
 
 group = properties("pluginGroup")
@@ -26,108 +22,152 @@ version = properties("pluginVersion")
 
 repositories {
     mavenCentral()
+    intellijPlatform {
+        defaultRepositories()
+    }
 }
 
-// Set the JVM language level used to build the project. Use Java 11 for 2020.3+, and Java 17 for 2022.2+.
 kotlin {
-//    jvmToolchain(11)
-    jvmToolchain(17)
+    jvmToolchain(21)
 }
-//// Configure Gradle IntelliJ Plugin
-//// Read more: https://plugins.jetbrains.com/docs/intellij/tools-gradle-intellij-plugin.html
-intellij {
-    pluginName.set(properties("pluginName"))
-//    version.set(properties("platformVersion"))
-    version.set("LATEST-EAP-SNAPSHOT")
-    type.set(properties("platformType"))
 
-    // Plugin Dependencies. Uses `platformPlugins` property from the gradle.properties file.
-//    plugins.set(properties("platformPlugins").split(',').map(String::trim).filter(String::isNotEmpty))
-    plugins.set(listOf("Git4Idea"))
+// Configure changelog plugin
+changelog {
+    version.set(properties("pluginVersion"))
+    groups.set(emptyList())
+    // Configure to accept your version format (YYYY.N or YYYY.N.N)
+    headerParserRegex.set("""(\d{4}\.\d+(?:\.\d+)?)""".toRegex())
 }
-// Configure Gradle Changelog Plugin - read more: https://github.com/JetBrains/gradle-changelog-plugin
-//changelog {
-//    groups.set(emptyList())
-//    repositoryUrl.set(properties("pluginRepositoryUrl"))
-//}
+
+// pluginIdeaVersion comes from properties and it set to LATEST-STABLE, LATEST-EAP-SNAPSHOT, or a specific version number
+val ideaVersion = findIdeaVersion(providers.gradleProperty("platformVersion"))
+dependencies {
+    intellijPlatform {
+        val type = providers.gradleProperty("platformType")
+        create(type, ideaVersion)
+        bundledPlugins(providers.gradleProperty("platformBundledPlugins").map { it.split(',') })
+        pluginVerifier()
+    }
+}
+
+intellijPlatform {
+    pluginVerification {
+        ides {
+            recommended()
+        }
+    }
+    pluginConfiguration {
+        changeNotes.set(provider {
+            changelog.renderItem(
+                changelog.getOrNull(properties("pluginVersion"))
+                    ?: changelog.getLatest(),
+                org.jetbrains.changelog.Changelog.OutputType.HTML
+            )
+        })
+    }
+}
+
 dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
     implementation("io.reactivex.rxjava3:rxjava:3.1.6")
 }
-tasks {
 
-    wrapper {
-        gradleVersion = properties("gradleVersion")
+/**
+ * Find the latest stable or EAP IDE version from the JetBrains website, otherwise simply returns the given IDE version string.
+ * @param ideaVersion can be LATEST-STABLE, LATEST-EAP-SNAPSHOT or a specific IDE version string (year.maj.min).
+ */
+fun findIdeaVersion(ideaVersion: Provider<String>): String {
+    // Get the actual value from the Provider
+    val versionValue = ideaVersion.get()
+
+    /** Find the latest IntelliJ EAP version from the JetBrains website. Result is cached locally for 24h. */
+    fun findLatestIdeaVersion(isStable: Boolean): String {
+
+        /** Read a remote file as String. */
+        fun readRemoteContent(url: URL): String {
+            val t1 = System.currentTimeMillis()
+            val content = StringBuilder()
+            val conn = url.openConnection() as HttpURLConnection
+            conn.requestMethod = "GET"
+            BufferedReader(InputStreamReader(conn.inputStream)).use { rd ->
+                var line: String? = rd.readLine()
+                while (line != null) {
+                    content.append(line)
+                    line = rd.readLine()
+                }
+            }
+            val t2 = System.currentTimeMillis()
+            logger.quiet("Download $url, took ${t2 - t1} ms (${content.length} B)")
+            return content.toString()
+        }
+
+        /** Find the latest IntelliJ version from the given url and xpath expression that picks the desired IDE version and channel.
+         * The result is cached for 24hr.*/
+        fun getOnlineLatestIdeVersion(definitionsUrl: URL, xpathExpression: String): String {
+            val definitionsStr = readRemoteContent(definitionsUrl)
+            val builderFactory = DocumentBuilderFactory.newInstance()
+            val builder = builderFactory.newDocumentBuilder()
+            val xmlDocument: Document = builder.parse(ByteArrayInputStream(definitionsStr.toByteArray()))
+            val xPath = XPathFactory.newInstance().newXPath()
+            return xPath.compile(xpathExpression).evaluate(xmlDocument, XPathConstants.STRING) as String
+        }
+
+        val t1 = System.currentTimeMillis()
+        // IMPORTANT if not available, migrate to https://data.services.jetbrains.com/products?code=IC
+        @Suppress("DEPRECATION")
+        val definitionsUrl = URL("https://www.jetbrains.com/updates/updates.xml")
+        val xpathExpression =
+            if (isStable) "/products/product[@name='IntelliJ IDEA']/channel[@id='IC-IU-RELEASE-licensing-RELEASE']/build[1]/@version"
+            else "/products/product[@name='IntelliJ IDEA']/channel[@id='IC-IU-EAP-licensing-EAP']/build[1]/@fullNumber"
+        val cachedLatestVersionFile =
+            File(System.getProperty("java.io.tmpdir") + (if (isStable) "/jle-ij-latest-stable-version.txt" else "/jle-ij-latest-eap-version.txt"))
+        var latestVersion: String
+        try {
+            if (cachedLatestVersionFile.exists()) {
+
+                val cacheDurationMs = 24 * 60 * 60_000 // 24hr
+                if (cachedLatestVersionFile.exists() && cachedLatestVersionFile.lastModified() < (System.currentTimeMillis() - cacheDurationMs)) {
+                    logger.quiet("Cache expired, find latest EAP IDE version from $definitionsUrl then update cached file $cachedLatestVersionFile")
+                    latestVersion = getOnlineLatestIdeVersion(definitionsUrl, xpathExpression)
+                    cachedLatestVersionFile.delete()
+                    Files.writeString(cachedLatestVersionFile.toPath(), latestVersion, Charsets.UTF_8)
+
+                } else {
+                    logger.quiet("Find latest EAP IDE version from cached file $cachedLatestVersionFile")
+                    latestVersion = Files.readString(cachedLatestVersionFile.toPath())
+                }
+
+            } else {
+                logger.quiet("Find latest EAP IDE version from $definitionsUrl")
+                latestVersion = getOnlineLatestIdeVersion(definitionsUrl, xpathExpression)
+                Files.writeString(cachedLatestVersionFile.toPath(), latestVersion, Charsets.UTF_8)
+            }
+
+        } catch (e: Exception) {
+            if (cachedLatestVersionFile.exists()) {
+                logger.warn("Error: ${e.message}. Will find latest EAP IDE version from cached file $cachedLatestVersionFile")
+                latestVersion = Files.readString(cachedLatestVersionFile.toPath())
+            } else {
+                throw RuntimeException(e)
+            }
+        }
+        if (logger.isDebugEnabled) {
+            val t2 = System.currentTimeMillis()
+            logger.debug("Operation took ${t2 - t1} ms")
+        }
+        return latestVersion
     }
 
-    // Set the JVM compatibility versions
-//    withType<JavaCompile> {
-//
-////        sourceCompatibility = "11"
-////        targetCompatibility = "11"
-//        sourceCompatibility = "17"
-//        targetCompatibility = "17"
-//    }
-
-    patchPluginXml {
-        version.set(properties("pluginVersion"))
-        sinceBuild.set(properties("pluginSinceBuild"))
-        untilBuild.set(properties("pluginUntilBuild"))
-
-        // Extract the <!-- Plugin description --> section from README.md and provide for the plugin's manifest
-        pluginDescription.set(
-                file("README.md").readText().lines().run {
-                    val start = "<!-- Plugin description -->"
-                    val end = "<!-- Plugin description end -->"
-
-                    if (!containsAll(listOf(start, end))) {
-                        throw GradleException("Plugin description section not found in README.md:\n$start ... $end")
-                    }
-                    subList(indexOf(start) + 1, indexOf(end))
-                }.joinToString("\n").let { markdownToHTML(it) }
-        )
-
-        changeNotes.set(
-                file("README.md").readText().lines().run {
-                    val start = "<!-- Plugin changelog -->"
-                    val end = "<!-- Plugin changelog end -->"
-
-                    if (!containsAll(listOf(start, end))) {
-                        throw GradleException("Plugin description section not found in README.md:\n$start ... $end")
-                    }
-                    subList(indexOf(start) + 1, indexOf(end))
-                }.joinToString("\n").let { markdownToHTML(it) }
-        )
-//        changeNotes.set(provider {
-//            with(changelog) {
-//                renderItem(
-//                        getOrNull(properties("pluginVersion"))
-//                                ?: runCatching { getLatest() }.getOrElse { getUnreleased() },
-//                        Changelog.OutputType.HTML,
-//                )
-//            }
-//        })
-
-//    }
-//    patchPluginXml {
-        // https://plugins.jetbrains.com/docs/intellij/build-number-ranges.html#intellij-platform-based-products-of-recent-ide-versions
-        // keep in sync with resources/META-INF/plugin.xml
-        // 305
-//        sinceBuild.set("211")
-//        untilBuild.set("222")
-
-        // 306
-        sinceBuild.set(properties("pluginSinceBuild"))
-        untilBuild.set(properties("pluginUntilBuild"))
+    if (versionValue == "LATEST-STABLE") {
+        val version = findLatestIdeaVersion(true)
+        logger.quiet("Found latest stable IDE version: $version")
+        return version
     }
-
-//    signPlugin {
-//        certificateChain.set(System.getenv("CERTIFICATE_CHAIN"))
-//        privateKey.set(System.getenv("PRIVATE_KEY"))
-//        password.set(System.getenv("PRIVATE_KEY_PASSWORD"))
-//    }
-//
-//    publishPlugin {
-//        token.set(System.getenv("PUBLISH_TOKEN"))
-//    }
+    if (versionValue == "LATEST-EAP-SNAPSHOT") {
+        val version = findLatestIdeaVersion(false)
+        logger.quiet("Found latest EAP IDE version: $version")
+        return version
+    }
+    logger.warn("Will use user-defined IDE version: $versionValue")
+    return versionValue
 }

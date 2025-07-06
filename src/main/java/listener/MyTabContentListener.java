@@ -15,32 +15,37 @@ import static service.ViewService.PLUS_TAB_LABEL;
 public class MyTabContentListener implements ContentManagerListener {
 
     private final Project project;
-    private final ViewService viewService;
+    // Use lazy initialization for the service
+    private ViewService viewService;
 
     public MyTabContentListener(Project project) {
         this.project = project;
-        this.viewService = project.getService(ViewService.class);
+    }
+    
+    private ViewService getViewService() {
+        if (viewService == null) {
+            viewService = project.getService(ViewService.class);
+        }
+        return viewService;
     }
 
     public void contentAdded(@NotNull ContentManagerEvent event) {
-        //System.out.println("contentAdded");
     }
 
     public void selectionChanged(@NotNull ContentManagerEvent event) {
-
         ContentManagerEvent.ContentOperation operation = event.getOperation();
         ContentManagerEvent.ContentOperation add = ContentManagerEvent.ContentOperation.add;
-        //System.out.println("selectionChanged " + operation);
         if (operation.equals(add)) {
-            this.viewService.setTabIndex(event.getIndex());
+            ViewService service = getViewService(); // Get service only when needed
+            service.setTabIndex(event.getIndex());
             @NlsContexts.TabTitle String tabName = event.getContent().getTabName();
             if (Objects.equals(tabName, PLUS_TAB_LABEL)) {
-                SwingUtilities.invokeLater(this.viewService::plusTabClicked);
+                SwingUtilities.invokeLater(service::plusTabClicked);
                 return;
             }
 
-            this.viewService.setTabIndex(event.getIndex());
-            this.viewService.setActiveModel();
+            service.setTabIndex(event.getIndex());
+            service.setActiveModel();
         }
     }
 
@@ -49,6 +54,6 @@ public class MyTabContentListener implements ContentManagerListener {
         if (Objects.equals(tabName, PLUS_TAB_LABEL)) {
             return;
         }
-        this.viewService.removeTab(event.getIndex());
+        getViewService().removeTab(event.getIndex()); // Get service only when needed
     }
 }

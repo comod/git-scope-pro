@@ -7,10 +7,7 @@ import com.intellij.psi.search.scope.packageSet.NamedScopeManager;
 import com.intellij.util.ArrayUtil;
 import system.Defs;
 
-import java.util.function.Supplier;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
 
 public class MyScope {
 
