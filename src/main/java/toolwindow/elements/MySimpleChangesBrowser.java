@@ -9,7 +9,6 @@ import com.intellij.openapi.editor.ScrollType;
 import com.intellij.openapi.fileEditor.FileEditor;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.TextEditor;
-import com.intellij.openapi.fileEditor.impl.FileEditorOpenOptions;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.changes.Change;
 import com.intellij.openapi.vcs.changes.ChangesUtil;
@@ -85,11 +84,18 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
         try {
             FileEditorManager editorManager = FileEditorManager.getInstance(project);
 
-            // Create FileEditorOpenOptions with preview tab enabled
-            FileEditorOpenOptions options = new FileEditorOpenOptions()
-                    .withRequestFocus(true)
-                    .withUsePreviewTab(true)
-                    .withReuseOpen(true);
+            // Use reflection to create FileEditorOpenOptions
+            Class<?> optionsClass = Class.forName("com.intellij.openapi.fileEditor.impl.FileEditorOpenOptions");
+            Object options = optionsClass.getDeclaredConstructor().newInstance();
+
+            // Chain the methods using reflection
+            Method withRequestFocus = optionsClass.getMethod("withRequestFocus", boolean.class);
+            Method withUsePreviewTab = optionsClass.getMethod("withUsePreviewTab", boolean.class);
+            Method withReuseOpen = optionsClass.getMethod("withReuseOpen", boolean.class);
+
+            options = withRequestFocus.invoke(options, true);
+            options = withUsePreviewTab.invoke(options, true);
+            options = withReuseOpen.invoke(options, true);
 
             // Look for the openFile method with FileEditorOpenOptions
             Method openFileMethod = null;
@@ -101,7 +107,7 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
                         Class<?>[] paramTypes = method.getParameterTypes();
                         if (paramTypes.length == 3 &&
                                 VirtualFile.class.isAssignableFrom(paramTypes[0]) &&
-                                FileEditorOpenOptions.class.isAssignableFrom(paramTypes[2])) {
+                                optionsClass.isAssignableFrom(paramTypes[2])) {
                             openFileMethod = method;
                             break;
                         }
