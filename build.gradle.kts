@@ -6,7 +6,6 @@ import javax.xml.xpath.XPathFactory
 import javax.xml.xpath.XPathConstants
 import org.w3c.dom.Document
 import org.gradle.api.provider.Provider
-import org.jetbrains.changelog.markdownToHTML
 
 fun properties(key: String) = project.findProperty(key).toString()
 
@@ -32,11 +31,17 @@ kotlin {
 }
 
 // Configure changelog plugin
+fun getMajorVersion(version: String): String {
+    val parts = version.split(".")
+    return if (parts.size >= 2) "${parts[0]}.${parts[1]}" else version
+}
+
 changelog {
     version.set(properties("pluginVersion"))
     groups.set(emptyList())
     // Configure to accept your version format (YYYY.N or YYYY.N.N)
     headerParserRegex.set("""(\d{4}\.\d+(?:\.\d+)?)""".toRegex())
+    keepUnreleasedSection.set(true)
 }
 
 // pluginIdeaVersion comes from properties and it set to LATEST-STABLE, LATEST-EAP-SNAPSHOT, or a specific version number
@@ -58,12 +63,28 @@ intellijPlatform {
     }
     pluginConfiguration {
         changeNotes.set(provider {
-            changelog.renderItem(
-                changelog.getOrNull(properties("pluginVersion"))
-                    ?: changelog.getLatest(),
-                org.jetbrains.changelog.Changelog.OutputType.HTML
-            )
+            val majorVersion = getMajorVersion(project.version.toString())
+
+            // Get all changelog entries that start with the major version
+            val matchingEntries = changelog.getAll().values
+                .filter { it.version.startsWith(majorVersion) }
+            if (matchingEntries.isNotEmpty()) {
+                matchingEntries.joinToString("\n\n") {
+                    changelog.renderItem(it, org.jetbrains.changelog.Changelog.OutputType.HTML)
+                }
+            } else {
+                // Fallback to current version only
+                changelog.renderItem(
+                    changelog.getOrNull(properties("pluginVersion").toString())
+                        ?: changelog.getLatest(),
+                    org.jetbrains.changelog.Changelog.OutputType.HTML
+                )
+            }
         })
+        ideaVersion {
+            sinceBuild = properties("pluginSinceBuild")
+            untilBuild = properties("pluginUntilBuild")
+        }
     }
 }
 
