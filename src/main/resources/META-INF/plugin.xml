@@ -3,7 +3,6 @@
     <id>Git Scope</id>
     <name>Git Scope</name>
     <vendor>WOELKIT</vendor>
-    <product-descriptor code="PGITSCOPE" release-date="20250629" release-version="20251"/>
     <version>auto</version>
     <description>Create custom Git "scopes" for any target branch.</description>
     <change-notes>auto</change-notes>

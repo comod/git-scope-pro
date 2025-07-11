@@ -13,7 +13,6 @@ import model.TargetBranchMap;
 import state.State;
 import implementation.scope.MyScope;
 import system.Defs;
-import license.CheckLicense;
 import toolwindow.elements.VcsTree;
 
 import javax.swing.*;
@@ -68,13 +67,6 @@ public class ViewService {
 
     private void doUpdateDebounced(Collection<Change> changes) {
         debouncer.debounce(Void.class, () -> onUpdate(changes), DEBOUNCE_MS, TimeUnit.MILLISECONDS);
-    }
-
-    public void licenseCheck() {
-        final Boolean isLicensed = CheckLicense.isLicensed();
-        if (!Boolean.TRUE.equals(isLicensed)) {
-            CheckLicense.requestLicense("Please register the plugin!");
-        }
     }
 
     public void load() {

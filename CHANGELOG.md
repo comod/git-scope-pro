@@ -1,4 +1,11 @@
+## [2025.1.2]
+
+### Added
+
+- Plugin back as a Free and Open Source Software
+
 ## [2025.1.1]
+
 ### Fixed
 
 - Support 2024.3.x - 2025.2.x
