@@ -9,6 +9,8 @@ import com.intellij.ui.components.JBLabel;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import implementation.compare.ChangesService;
 import service.ViewService;
+import state.WindowPositionTracker;
+import state.WindowPositionTracker.ScrollPosition;
 
 import javax.swing.*;
 import java.awt.*;
@@ -29,31 +31,59 @@ public class VcsTree extends JPanel {
     private static final int UPDATE_TIMEOUT_SECONDS = 30;
 
     private final Project project;
+    private final WindowPositionTracker positionTracker;
 
-    // Simple sequence-based approach - much more robust
     private final AtomicLong updateSequence = new AtomicLong(0);
     private final AtomicReference<CompletableFuture<Void>> currentUpdate = new AtomicReference<>();
 
-    // Track current state to avoid unnecessary updates
     private MySimpleChangesBrowser currentBrowser;
     private Collection<Change> lastChanges;
     private int lastChangesHashCode = 0;
 
-    // Per-tab state tracking
     private final Map<String, Collection<Change>> lastChangesPerTab = new ConcurrentHashMap<>();
     private final Map<String, Integer> lastChangesHashCodePerTab = new ConcurrentHashMap<>();
 
-    // Per-tab scroll position tracking
-    private final Map<String, ScrollPosition> scrollPositionPerTab = new ConcurrentHashMap<>();
-
     public VcsTree(Project project) {
         this.project = project;
+        this.positionTracker = new WindowPositionTracker(
+                this::getCurrentTabId,
+                this::onVcsTreeLoaded,
+                () -> this
+        );
         this.setLayout(new BorderLayout());
         this.createElement();
         this.addListener();
     }
 
-    // Get current tab identifier
+    private void onVcsTreeLoaded(String tabId) {
+        // This is called when VCS tree has finished loading
+    }
+
+    public void onTabSwitched() {
+        SwingUtilities.invokeLater(() -> {
+            try {
+                Component currentComponent = getComponentCount() > 0 ? getComponent(0) : null;
+                if (currentComponent != null) {
+                    positionTracker.attachScrollListeners(currentComponent);
+
+                    SwingUtilities.invokeLater(() -> {
+                        String currentTabId = getCurrentTabId();
+                        ScrollPosition savedPosition = positionTracker.getSavedScrollPosition(currentTabId);
+                        if (savedPosition != null) {
+                            positionTracker.restoreScrollPosition(currentComponent, savedPosition);
+                        }
+                        positionTracker.setScrollPositionRestored(true);
+                    });
+                } else {
+                    positionTracker.setScrollPositionRestored(true);
+                }
+            } catch (Exception e) {
+                LOG.error("Error re-attaching scroll listeners after tab switch", e);
+                positionTracker.setScrollPositionRestored(true);
+            }
+        });
+    }
+
     private String getCurrentTabId() {
         try {
             ViewService viewService = project.getService(ViewService.class);
@@ -82,36 +112,31 @@ public class VcsTree extends JPanel {
         Collection<Change> tabLastChanges = lastChangesPerTab.get(currentTabId);
         Integer tabLastChangesHashCode = lastChangesHashCodePerTab.get(currentTabId);
 
-        // Use per-tab values if available, otherwise fall back to global
         Collection<Change> effectiveLastChanges = tabLastChanges != null ? tabLastChanges : lastChanges;
         int effectiveLastHashCode = tabLastChangesHashCode != null ? tabLastChangesHashCode : lastChangesHashCode;
 
-        // Handle null cases
         if (newChanges == null && effectiveLastChanges == null) {
-            return true; // Both null, no update needed
+            return true;
         }
         if (newChanges == null || effectiveLastChanges == null) {
-            return false; // One is null, other isn't - update needed
+            return false;
         }
 
-        // Handle error state markers
         if (newChanges instanceof ChangesService.ErrorStateMarker ||
                 effectiveLastChanges instanceof ChangesService.ErrorStateMarker) {
-            return false; // Always update error states
+            return false;
         }
 
-        // Quick size check
         if (newChanges.size() != effectiveLastChanges.size()) {
             return false;
         }
 
-        // Hash check - if they're the same, skip update
         int newHashCode = calculateChangesHashCode(newChanges);
         if (newHashCode == effectiveLastHashCode) {
-            return true; // Changes are identical - skip update
+            return true;
         }
 
-        return false; // Changes are different - update needed
+        return false;
     }
 
     private int calculateChangesHashCode(Collection<Change> changes) {
@@ -119,7 +144,6 @@ public class VcsTree extends JPanel {
             return 0;
         }
 
-        // Extract and sort file paths - this gives us a stable, order-independent hash
         java.util.List<String> filePaths = changes.stream()
                 .filter(Objects::nonNull)
                 .map(this::getChangePath)
@@ -141,28 +165,23 @@ public class VcsTree extends JPanel {
             return;
         }
 
-        // Check if we can skip this update
         if (shouldSkipUpdate(changes)) {
             return;
         }
 
-        // Update tracking state for current tab and keep global for compatibility
         String currentTabId = getCurrentTabId();
         lastChangesPerTab.put(currentTabId, changes != null ? new ArrayList<>(changes) : null);
         lastChangesHashCodePerTab.put(currentTabId, calculateChangesHashCode(changes));
         lastChanges = changes;
         lastChangesHashCode = calculateChangesHashCode(changes);
 
-        // Generate new sequence number for this update
         final long sequenceNumber = updateSequence.incrementAndGet();
 
-        // Cancel any previous update
         CompletableFuture<Void> previousUpdate = currentUpdate.get();
         if (previousUpdate != null && !previousUpdate.isDone()) {
             previousUpdate.cancel(true);
         }
 
-        // Handle immediate cases (null, empty, or error states)
         if (changes == null || changes.isEmpty() || changes instanceof ChangesService.ErrorStateMarker) {
             JLabel statusLabel = createStatusLabel(changes);
             SwingUtilities.invokeLater(() -> setComponentIfCurrent(statusLabel, sequenceNumber));
@@ -170,7 +189,6 @@ public class VcsTree extends JPanel {
             return;
         }
 
-        // Create the async update chain
         CompletableFuture<Void> updateFuture = CompletableFuture
                 .supplyAsync(() -> {
                     if (!isCurrentSequence(sequenceNumber)) {
@@ -244,13 +262,12 @@ public class VcsTree extends JPanel {
     }
 
     public void performScrollRestoration() {
-        // Assume savedPosition and currentTabId are already defined at your scope.
-        ScrollPosition savedPosition = scrollPositionPerTab.get(getCurrentTabId());
+        ScrollPosition savedPosition = positionTracker.getSavedScrollPosition(getCurrentTabId());
         if (savedPosition != null) {
             if (SwingUtilities.isEventDispatchThread()) {
-                restoreScrollPosition(this, savedPosition);
+                positionTracker.restoreScrollPosition(this, savedPosition);
             } else {
-                SwingUtilities.invokeLater(() -> restoreScrollPosition(this, savedPosition));
+                SwingUtilities.invokeLater(() -> positionTracker.restoreScrollPosition(this, savedPosition));
             }
         }
     }
@@ -268,119 +285,58 @@ public class VcsTree extends JPanel {
         try {
             String currentTabId = getCurrentTabId();
 
-            // Save current scroll position for the current tab
-            ScrollPosition currentPosition = saveScrollPosition();
-            if (currentPosition.isValid) {
-                scrollPositionPerTab.put(currentTabId, currentPosition);
+            if (positionTracker.isScrollPositionRestored()) {
+                ScrollPosition currentPosition = positionTracker.saveScrollPosition();
+                if (currentPosition.isValid) {
+                    positionTracker.setSavedScrollPosition(currentTabId, currentPosition);
+                }
             }
 
-            // Remove all components and add the new one
+            positionTracker.setScrollPositionRestored(false);
+
             this.removeAll();
             this.add(component, BorderLayout.CENTER);
             this.revalidate();
             this.repaint();
+
+            SwingUtilities.invokeLater(() -> {
+                positionTracker.attachScrollListeners(component);
+
+                SwingUtilities.invokeLater(() -> {
+                    ScrollPosition savedPosition = positionTracker.getSavedScrollPosition(currentTabId);
+                    if (savedPosition != null) {
+                        positionTracker.restoreScrollPosition(component, savedPosition);
+                    }
+                    positionTracker.setScrollPositionRestored(true);
+                });
+            });
+
         } catch (Exception e) {
-            LOG.warn("Error updating VcsTree component", e);
+            LOG.error("Error updating VcsTree component", e);
             try {
                 this.removeAll();
                 this.add(component, BorderLayout.CENTER);
                 this.revalidate();
                 this.repaint();
+                positionTracker.setScrollPositionRestored(true);
             } catch (Exception fallbackError) {
                 LOG.error("Fallback component update also failed", fallbackError);
             }
         }
     }
 
-    // Simple data class to hold scroll position
-    private static class ScrollPosition {
-        final int verticalValue;
-        final int horizontalValue;
-        final boolean isValid;
-
-        ScrollPosition(int vertical, int horizontal, boolean valid) {
-            this.verticalValue = vertical;
-            this.horizontalValue = horizontal;
-            this.isValid = valid;
-        }
-
-        static ScrollPosition invalid() {
-            return new ScrollPosition(0, 0, false);
-        }
-    }
-
-    private ScrollPosition saveScrollPosition() {
-        try {
-            JScrollPane scrollPane = findScrollPane(this);
-            if (scrollPane != null) {
-                JScrollBar verticalScrollBar = scrollPane.getVerticalScrollBar();
-                JScrollBar horizontalScrollBar = scrollPane.getHorizontalScrollBar();
-
-                // Check that both scrollbars are not null before setting valid to true
-                boolean valid = verticalScrollBar != null && horizontalScrollBar != null;
-                return new ScrollPosition(
-                        verticalScrollBar != null ? verticalScrollBar.getValue() : 0,
-                        horizontalScrollBar != null ? horizontalScrollBar.getValue() : 0,
-                        valid
-                );
-
-            }
-        } catch (Exception e) {
-            LOG.debug("Could not save scroll position", e);
-        }
-        return ScrollPosition.invalid();
-    }
-
-    private void restoreScrollPosition(Component newComponent, ScrollPosition position) {
-        if (!position.isValid) {
-            return;
-        }
-
-        JScrollPane scrollPane = findScrollPane(newComponent);
-        if (scrollPane != null) {
-            JScrollBar verticalScrollBar = scrollPane.getVerticalScrollBar();
-            JScrollBar horizontalScrollBar = scrollPane.getHorizontalScrollBar();
-
-            if (verticalScrollBar != null) {
-                verticalScrollBar.setValue(position.verticalValue);
-            }
-            if (horizontalScrollBar != null) {
-                horizontalScrollBar.setValue(position.horizontalValue);
-            }
-        }
-    }
-
-    private JScrollPane findScrollPane(Component component) {
-        if (component instanceof JScrollPane) {
-            return (JScrollPane) component;
-        }
-        return findScrollPaneInChildren(component);
-    }
-
-    private JScrollPane findScrollPaneInChildren(Component component) {
-        if (component instanceof Container) {
-            Container container = (Container) component;
-            for (Component child : container.getComponents()) {
-                JScrollPane result = findScrollPane(child);
-                if (result != null) {
-                    return result;
-                }
-            }
-        }
-        return null;
-    }
-
-    // Clean up when component is disposed
     @Override
     public void removeNotify() {
         super.removeNotify();
+
+        positionTracker.cleanup();
+
         CompletableFuture<Void> current = currentUpdate.get();
         if (current != null && !current.isDone()) {
             current.cancel(true);
         }
         lastChangesPerTab.clear();
         lastChangesHashCodePerTab.clear();
-        scrollPositionPerTab.clear();
         currentBrowser = null;
     }
 }

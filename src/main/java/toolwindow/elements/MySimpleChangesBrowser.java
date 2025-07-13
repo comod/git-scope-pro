@@ -93,7 +93,7 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
             Method withUsePreviewTab = optionsClass.getMethod("withUsePreviewTab", boolean.class);
             Method withReuseOpen = optionsClass.getMethod("withReuseOpen", boolean.class);
 
-            options = withRequestFocus.invoke(options, true);
+            options = withRequestFocus.invoke(options, false);
             options = withUsePreviewTab.invoke(options, true);
             options = withReuseOpen.invoke(options, true);
 
