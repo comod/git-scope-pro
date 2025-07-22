@@ -5,6 +5,7 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.EditorFactory;
+import com.intellij.openapi.editor.EditorKind;
 import com.intellij.openapi.editor.ex.EditorGutterComponentEx;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditorManager;
@@ -24,9 +25,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Method;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 public class MyLineStatusTrackerImpl {
     private static final Logger LOG = Logger.getInstance(MyLineStatusTrackerImpl.class);
@@ -69,6 +68,19 @@ public class MyLineStatusTrackerImpl {
         );
     }
 
+    private boolean isDiffView(Editor editor) {
+        return editor.getEditorKind() == EditorKind.DIFF;
+    }
+
+    private void refreshEditor(Editor editor) {
+        editor.getMarkupModel().removeAllHighlighters();
+        if (editor.getGutter() instanceof EditorGutterComponentEx gutter) {
+            gutter.revalidateMarkup();
+            gutter.repaint();
+        }
+        editor.getComponent().repaint();
+    }
+
     public void update(Collection<Change> changes, @Nullable VirtualFile targetFile) {
         if (changes == null) {
             return;
@@ -78,7 +90,13 @@ public class MyLineStatusTrackerImpl {
         ApplicationManager.getApplication().invokeLater(() -> {
             Editor[] editors = EditorFactory.getInstance().getAllEditors();
             for (Editor editor : editors) {
+                if (isDiffView(editor)) {
+                    Document doc = editor.getDocument();
+                    VirtualFile file = FileDocumentManager.getInstance().getFile(doc);
+                    continue;
+                }
                 updateLineStatusByChangesForEditor(editor, changes);
+                refreshEditor(editor);
             }
         });
     }
@@ -167,9 +185,6 @@ public class MyLineStatusTrackerImpl {
                 LineStatusTracker<?> tracker = trackerManager.getLineStatusTracker(document);
                 if (tracker != null) {
                     updateTrackerBaseRevision(tracker, finalContent);
-
-                    // Force refresh of all editors for this document
-                    refreshEditorsForDocument(document);
                 }
 
             } catch (Exception e) {
@@ -218,24 +233,6 @@ public class MyLineStatusTrackerImpl {
             }
         }
         return null;
-    }
-
-    /**
-     * Force refresh all editors displaying this document
-     */
-    private void refreshEditorsForDocument(Document document) {
-        for (Editor editor : EditorFactory.getInstance().getEditors(document)) {
-            ApplicationManager.getApplication().runWriteAction(() -> {
-                editor.getMarkupModel().removeAllHighlighters();
-            });
-
-            if (editor.getGutter() instanceof EditorGutterComponentEx gutter) {
-                gutter.revalidateMarkup();
-                gutter.repaint();
-            }
-
-            editor.getComponent().repaint();
-        }
     }
 
     private void requestLineStatusTracker(@Nullable Editor editor) {

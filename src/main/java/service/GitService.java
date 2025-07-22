@@ -20,7 +20,6 @@ import java.util.function.Consumer;
 
 public class GitService {
     public static final String BRANCH_HEAD = "HEAD";
-    public static final String TAB_NAME_HEAD = "~";
     public static final Comparator<BranchTreeEntry> FAVORITE_BRANCH_COMPARATOR = Comparator.comparing(branch -> branch.isFav() ? -1 : 0);
     private final GitRepositoryManager repositoryManager;
     private final Project project;

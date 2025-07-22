@@ -1,3 +1,13 @@
+## [2025.1.3]
+
+### Fixes
+
+- Fixed [Preview tab should not open editor in "edit-mode"](https://github.com/comod/git-scope-pro/issues/53)
+- Fixed [Dissapearing diff-highlighting in 2025.1.2 ](https://github.com/comod/git-scope-pro/issues/52)
+- Fixed [Update README.md](https://github.com/comod/git-scope-pro/issues/50)
+- Fixed [Still invalid SinceBuild](https://github.com/comod/git-scope-pro/issues/30)
+- Improved [Prevent gitscope tool window from auto scrolling to top](https://github.com/comod/git-scope-pro/issues/33)
+
 ## [2025.1.2]
 
 ### Added
@@ -6,13 +16,13 @@
 
 ## [2025.1.1]
 
-### Fixed
+### Fixes
 
 - Support 2024.3.x - 2025.2.x
 
 ## [2025.1]
 
-### Fixed
+### Fixes
 
 - Major rework to fix issues with slow operation blocking GUI EDT thread. This aligns to current IntelliJ plugin
   requirements
@@ -30,7 +40,7 @@
 
 ## [2023.1.5]
 
-### Fixed
+### Fixes
 
 - "Only Changes Since Common Ancestor": Improved Git comparison accuracy by using GitHistoryUtils.history() with a
   two-dot syntax (git diff A..B)
@@ -44,19 +54,19 @@
 
 ## [2023.1.3]
 
-### Fixed
+### Fixes
 
 - @NotNull parameter 'value' of state/MyModelConverter.fromString must not be null
 
 ## [2023.1.2]
 
-### Fixed
+### Fixes
 
 - Fix compatibility issues
 
 ## [2023.1.1]
 
-### Fixed
+### Fixes
 
 - Complete overhaul of the plugin
 - Cleaner UI

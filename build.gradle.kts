@@ -11,7 +11,7 @@ fun properties(key: String) = project.findProperty(key).toString()
 
 plugins {
     id("java")
-    id("org.jetbrains.kotlin.jvm") version "2.1.21"
+    id("org.jetbrains.kotlin.jvm") version "2.2.0"
     id("org.jetbrains.intellij.platform") version "2.6.0"
     id("org.jetbrains.changelog") version "2.2.1"
 }
@@ -57,9 +57,15 @@ dependencies {
 
 intellijPlatform {
     signing {
-        certificateChain = providers.environmentVariable("CERTIFICATE_CHAIN")
-        privateKey = providers.environmentVariable("PRIVATE_KEY")
+        certificateChainFile = providers.environmentVariable("CERTIFICATE_CHAIN_FILE")
+            .map { File(it) }
+        privateKeyFile = providers.environmentVariable("PRIVATE_KEY_FILE")
+            .map { File(it) }
         password = providers.environmentVariable("PRIVATE_KEY_PASSWORD")
+    }
+
+    publishing {
+        token = providers.environmentVariable("PUBLISH_TOKEN")
     }
 
     pluginVerification {
@@ -67,6 +73,7 @@ intellijPlatform {
             recommended()
         }
     }
+
     pluginConfiguration {
         changeNotes.set(provider {
             val majorVersion = getMajorVersion(project.version.toString())
@@ -94,9 +101,15 @@ intellijPlatform {
     }
 }
 
+tasks {
+    buildSearchableOptions {
+        enabled = false
+    }
+}
+
 dependencies {
-    implementation("com.google.code.gson:gson:2.10.1")
-    implementation("io.reactivex.rxjava3:rxjava:3.1.6")
+    implementation("com.google.code.gson:gson:2.13.1")
+    implementation("io.reactivex.rxjava3:rxjava:3.1.10")
 }
 
 /**
