@@ -7,21 +7,17 @@ import com.intellij.psi.search.scope.packageSet.NamedScopeManager;
 import com.intellij.util.ArrayUtil;
 import system.Defs;
 
+import java.util.ArrayList;
 import java.util.Collection;
 
 public class MyScope {
-
-    public static final String OLD_SCOPE_NAME = "GitScope";
     public static final String SCOPE_ID = "GitScopePro";
-
     private final NamedScopeManager scopeManager;
     private MyPackageSet myPackageSet;
 
     public MyScope(Project project) {
-
         this.scopeManager = NamedScopeManager.getInstance(project);
         this.createScope();
-
     }
 
     public void createScope() {
@@ -37,23 +33,28 @@ public class MyScope {
                 scopeExists = true;
                 scope = myScope;
             }
-            // @todo Delete in newer Versions after some time
-            if (OLD_SCOPE_NAME.contentEquals(scope.getPresentableName())) {
-                continue;
-            }
             newNamedScopes = ArrayUtil.append(newNamedScopes, scope);
         }
 
         if (!scopeExists) {
             newNamedScopes = ArrayUtil.append(newNamedScopes, myScope);
         }
-
         this.scopeManager.setScopes(newNamedScopes);
 
     }
 
     public void update(Collection<Change> changes) {
-        this.myPackageSet.setChanges(changes);
+        // Only create/update scope if we have actual changes
+        if (changes != null && !changes.isEmpty()) {
+            if (this.myPackageSet == null) {
+                createScope();
+            }
+            this.myPackageSet.setChanges(changes);
+        } else {
+            // If no changes, set empty collection instead of null
+            if (this.myPackageSet != null) {
+                this.myPackageSet.setChanges(new ArrayList<>());
+            }
+        }
     }
-
 }

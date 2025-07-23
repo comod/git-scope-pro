@@ -24,8 +24,7 @@ import java.util.List;
  */
 @com.intellij.openapi.components.State(
         name = "GitScope",
-        storages = {@Storage(value = "GitScopePro.xml")},
-        reloadable = true
+        storages = {@Storage(value = "GitScopePro.xml")}
 )
 public class State implements PersistentStateComponent<State> {
 

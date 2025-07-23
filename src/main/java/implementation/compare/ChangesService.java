@@ -33,10 +33,8 @@ public class ChangesService extends GitCompareWithRefAction {
     }
     public static final Collection<Change> ERROR_STATE = new ErrorStateList();
     private final Project project;
-    private GitRepository repo;
+    private final GitService git;
     private Task.Backgroundable task;
-
-    private GitService git;
 
     public ChangesService(Project project) {
         this.project = project;
@@ -45,7 +43,7 @@ public class ChangesService extends GitCompareWithRefAction {
 
     @NotNull
     private static String getBranchToCompare(TargetBranchMap targetBranchByRepo, GitRepository repo) {
-        String branchToCompare = null;
+        String branchToCompare;
         if (targetBranchByRepo == null) {
             branchToCompare = GitService.BRANCH_HEAD;
         } else {
@@ -63,7 +61,7 @@ public class ChangesService extends GitCompareWithRefAction {
         final Project currentProject = this.project;
         final GitService currentGitService = this.git;
 
-        task = new Task.Backgroundable(currentProject, Defs.APPLICATION_NAME + ": Collecting Changes...", true) {
+        task = new Task.Backgroundable(currentProject, "Collecting " + Defs.APPLICATION_NAME, true) {
 
             private Collection<Change> changes;
 
@@ -130,6 +128,7 @@ public class ChangesService extends GitCompareWithRefAction {
         };
         task.queue();
     }
+
 
     private Boolean isLocalChangeOnly(String localChangePath, Collection<Change> changes) {
 
