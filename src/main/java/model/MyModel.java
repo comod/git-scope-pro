@@ -15,6 +15,7 @@ public class MyModel extends MyModelBase {
     private final boolean isHeadTab;
     private Collection<Change> changes;
     private boolean isActive;
+    private String customTabName; // Added field for custom tab name
 
     public MyModel(boolean isHeadTab) {
         this.isHeadTab = isHeadTab;
@@ -43,6 +44,12 @@ public class MyModel extends MyModelBase {
             return "HEAD";
         }
 
+        // Then check if we have a custom name
+        if (customTabName != null && !customTabName.isEmpty()) {
+            return customTabName;
+        }
+
+        // If no custom name, fall back to branch name logic
         TargetBranchMap branchMap = getTargetBranchMap();
         if (branchMap == null) {
             return "unknown";
@@ -64,6 +71,16 @@ public class MyModel extends MyModelBase {
             return "unknown";
         }
         return String.join(", ", branchNames);
+    }
+
+    // Getter and setter for custom tab name
+    public String getCustomTabName() {
+        return customTabName;
+    }
+
+    public void setCustomTabName(String customTabName) {
+        this.customTabName = customTabName;
+        changeObservable.onNext(field.tabName);
     }
 
     public Collection<Change> getChanges() {
@@ -101,6 +118,7 @@ public class MyModel extends MyModelBase {
     public enum field {
         changes,
         active,
-        targetBranch
+        targetBranch,
+        tabName
     }
 }

@@ -5,6 +5,8 @@ import git4idea.repo.GitRepository;
 public class MyModelBase {
     public TargetBranchMap targetBranchMap = null;
 
+    public String customTabName;
+
     public TargetBranchMap getTargetBranchMap() {
         return targetBranchMap;
     }
@@ -18,5 +20,12 @@ public class MyModelBase {
             targetBranchMap = TargetBranchMap.create();
         }
         targetBranchMap.add(repo.toString(), branch);
+    }
+    public String getCustomTabName() {
+        return customTabName;
+    }
+
+    public void setCustomTabName(String customTabName) {
+        this.customTabName = customTabName;
     }
 }

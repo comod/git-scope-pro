@@ -8,6 +8,7 @@ import com.intellij.openapi.wm.StatusBarWidget;
 import com.intellij.openapi.wm.StatusBarWidgetFactory;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
+import system.Defs;
 
 public class MyStatusBarWidgetFactory implements StatusBarWidgetFactory {
     @Override
@@ -17,7 +18,7 @@ public class MyStatusBarWidgetFactory implements StatusBarWidgetFactory {
 
     @Override
     public @NotNull @NlsContexts.ConfigurableName String getDisplayName() {
-        return "Git Scope";
+        return Defs.APPLICATION_NAME;
     }
 
     @Override

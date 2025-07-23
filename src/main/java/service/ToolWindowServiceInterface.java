@@ -8,6 +8,8 @@ public interface ToolWindowServiceInterface {
 
     void changeTabName(String title);
 
+    void setupTabTooltip(MyModel model);
+
     void addListener();
 
     void removeAllTabs();
