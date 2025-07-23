@@ -127,7 +127,7 @@ public class GitService {
     }
 
     public String getCurrentBranchName() {
-        List<String> branches = new ArrayList<String>();
+        List<String> branches = new ArrayList<>();
 
         this.getRepositories().forEach(repo -> {
             String currentBranchName = repo.getCurrentBranchName();

@@ -47,7 +47,7 @@ public class TargetBranchService {
         if (targetBranch == null) {
             return GitService.BRANCH_HEAD;
         }
-        List<String> branches = new ArrayList<String>();
+        List<String> branches = new ArrayList<>();
         gitService.getRepositoriesAsync(repositories -> {
             repositories.forEach(repo -> {
                 String currentBranchName = getTargetBranchByRepositoryDisplay(repo, targetBranch);

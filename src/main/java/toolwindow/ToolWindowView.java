@@ -16,9 +16,7 @@ public class ToolWindowView {
 
     private final MyModel myModel;
     private final Project project;
-    private final CurrentBranch currentBranch;
     private final JPanel rootPanel = new JPanel(new StackLayout());
-    private final TargetBranch targetBranch;
 
     private VcsTree vcsTree;
     private JPanel sceneA;
@@ -27,12 +25,8 @@ public class ToolWindowView {
     public ToolWindowView(Project project, MyModel myModel) {
         this.project = project;
         this.myModel = myModel;
-        this.currentBranch = new CurrentBranch(project);
-        this.targetBranch = new TargetBranch(project);
 
-        myModel.getObservable().subscribe(model -> {
-            render();
-        });
+        myModel.getObservable().subscribe(model -> render());
         draw();
         render();
     }

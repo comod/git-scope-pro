@@ -194,31 +194,28 @@ public class WindowPositionTracker {
             }
 
             // Create the scroll listener that will handle VCS tree loading detection and saving
-            AdjustmentListener scrollListener = new AdjustmentListener() {
-                @Override
-                public void adjustmentValueChanged(AdjustmentEvent e) {
-                    if (!e.getValueIsAdjusting()) {
-                        // Count the events and track transitions
-                        boolean hasUserActivity = userActivityTracker.hasRecentUserActivity();
-                        int scrollPosition = e.getValue();
+            AdjustmentListener scrollListener = e -> {
+                if (!e.getValueIsAdjusting()) {
+                    // Count the events and track transitions
+                    boolean hasUserActivity = userActivityTracker.hasRecentUserActivity();
+                    int scrollPosition = e.getValue();
 
-                        // Track the event
-                        trackScrollEvent(currentTabId, hasUserActivity, scrollPosition);
+                    // Track the event
+                    trackScrollEvent(currentTabId, hasUserActivity, scrollPosition);
 
-                        if (hasUserActivity) {
-                            userScrollEvents.incrementAndGet();
-                        } else {
-                            nonUserScrollEvents.incrementAndGet();
-                        }
+                    if (hasUserActivity) {
+                        userScrollEvents.incrementAndGet();
+                    } else {
+                        nonUserScrollEvents.incrementAndGet();
+                    }
 
-                        // Check if this is a scroll to position 0 without user activity - this indicates VCS tree has finished loading
-                        if (scrollPosition == 0 && !hasUserActivity) {
-                            handleVcsTreeLoaded();
-                        }
-                        // Only save if there was recent user activity (actual user scrolling via mouse or keyboard)
-                        else if (hasUserActivity) {
-                            scheduleScrollPositionSave();
-                        }
+                    // Check if this is a scroll to position 0 without user activity - this indicates VCS tree has finished loading
+                    if (scrollPosition == 0 && !hasUserActivity) {
+                        handleVcsTreeLoaded();
+                    }
+                    // Only save if there was recent user activity (actual user scrolling via mouse or keyboard)
+                    else if (hasUserActivity) {
+                        scheduleScrollPositionSave();
                     }
                 }
             };

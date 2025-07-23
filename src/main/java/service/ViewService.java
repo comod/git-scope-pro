@@ -31,7 +31,7 @@ public class ViewService {
     public static final int DEBOUNCE_MS = 50;
     public List<MyModel> collection = new ArrayList<>();
     public Integer currentTabIndex = 0;
-    private Project project;
+    private final Project project;
     private ToolWindowServiceInterface toolWindowService;
     private TargetBranchService targetBranchService;
     private ChangesService changesService;
@@ -227,8 +227,8 @@ public class ViewService {
             }
             return;
         }
-        String tabName = revision;
-        MyModel myModel = addTabAndModel(tabName);
+
+        MyModel myModel = addTabAndModel(revision);
 
         gitService.getRepositoriesAsync(repositories -> {
             repositories.forEach(repo -> {
