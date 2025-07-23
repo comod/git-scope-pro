@@ -71,4 +71,9 @@ public class ToolWindowView {
     public JPanel getRootPanel() {
         return rootPanel;
     }
+
+    public MyModel getModel() {
+        return myModel;
+    }
+
 }
