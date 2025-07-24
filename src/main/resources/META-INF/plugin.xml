@@ -14,13 +14,13 @@
 
     <applicationListeners>
         <listener class="listener.MyBulkFileListener" topic="com.intellij.openapi.vfs.newvfs.BulkFileListener"/>
+        <listener class="listener.MyDynamicPluginListener" topic="com.intellij.ide.plugins.DynamicPluginListener"/>
     </applicationListeners>
 
     <projectListeners>
         <listener class="listener.MyToolWindowListener" topic="com.intellij.openapi.wm.ex.ToolWindowManagerListener"/>
         <listener class="listener.VcsStartup" topic="com.intellij.openapi.vcs.VcsMappingListener"/>
         <listener class="listener.MyChangeListListener" topic="com.intellij.openapi.vcs.changes.ChangeListListener"/>
-        <listener class="listener.MyDynamicPluginListener" topic="com.intellij.ide.plugins.DynamicPluginListener"/>
         <listener class="listener.MyFileEditorManagerListener"
                   topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"/>
     </projectListeners>

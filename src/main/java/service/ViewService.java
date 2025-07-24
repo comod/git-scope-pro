@@ -1,7 +1,9 @@
 package service;
 
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.vcs.changes.Change;
 import implementation.compare.ChangesService;
 import implementation.lineStatusTracker.MyLineStatusTrackerImpl;
@@ -25,7 +27,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
-public class ViewService {
+public class ViewService implements Disposable {
 
     public static final String PLUS_TAB_LABEL = "+";
     public static final int DEBOUNCE_MS = 50;
@@ -53,6 +55,9 @@ public class ViewService {
         EventQueue.invokeLater(this::initDependencies);
     }
 
+    @Override
+    public void dispose() {}
+
     public void initDependencies() {
         this.toolWindowService = project.getService(ToolWindowServiceInterface.class);
         this.changesService = project.getService(ChangesService.class);
@@ -60,7 +65,7 @@ public class ViewService {
         this.gitService = project.getService(GitService.class);
         this.targetBranchService = project.getService(TargetBranchService.class);
         this.state = project.getService(State.class);
-        this.myLineStatusTrackerImpl = new MyLineStatusTrackerImpl(project);
+        this.myLineStatusTrackerImpl = new MyLineStatusTrackerImpl(project, this);
         this.myScope = new MyScope(project);
         this.debouncer = new Debounce();
     }
