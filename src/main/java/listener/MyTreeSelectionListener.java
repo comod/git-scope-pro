@@ -33,7 +33,6 @@ public class MyTreeSelectionListener implements TreeSelectionListener {
         if (object instanceof BranchTreeEntry favLabel) {
             String branchName = favLabel.getName();
             if (this.state.getTwoDotsCheckbox()) {
-                String currentBranch = this.gitService.getCurrentBranchName();
                 String twoDots = "..";
                 String head = "HEAD";
                 branchName = branchName + twoDots + head;
