@@ -132,11 +132,7 @@ public class VcsTree extends JPanel {
         }
 
         int newHashCode = calculateChangesHashCode(newChanges);
-        if (newHashCode == effectiveLastHashCode) {
-            return true;
-        }
-
-        return false;
+        return newHashCode == effectiveLastHashCode;
     }
 
     private int calculateChangesHashCode(Collection<Change> changes) {
