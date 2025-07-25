@@ -30,6 +30,11 @@ public class TabRename {
         // Create a rename action that will be added to the tab context menu
         AnAction renameAction = new AnAction("Rename Tab") {
             @Override
+            public @NotNull ActionUpdateThread getActionUpdateThread() {
+                return ActionUpdateThread.EDT;
+            }
+
+            @Override
             public void actionPerformed(@NotNull AnActionEvent e) {
                 // Get the right-clicked tab, not the selected one
                 Content targetContent = getContentFromContextMenuEvent(e);
@@ -71,6 +76,11 @@ public class TabRename {
 
         // Create a reset tab name action
         AnAction resetTabNameAction = new AnAction("Reset Tab Name") {
+            @Override
+            public @NotNull ActionUpdateThread getActionUpdateThread() {
+                return ActionUpdateThread.EDT;
+            }
+
             @Override
             public void actionPerformed(@NotNull AnActionEvent e) {
                 // Get the right-clicked tab

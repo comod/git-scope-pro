@@ -1,6 +1,8 @@
 package toolwindow.elements;
 
 import com.intellij.ide.ui.UISettings;
+import com.intellij.openapi.actionSystem.AnAction;
+import com.intellij.openapi.actionSystem.DefaultActionGroup;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Editor;
@@ -16,6 +18,7 @@ import com.intellij.openapi.vcs.changes.ui.SimpleAsyncChangesBrowser;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import org.jetbrains.annotations.NotNull;
+import toolwindow.VcsTreeActions;
 
 import javax.swing.*;
 import java.awt.event.MouseAdapter;
@@ -23,6 +26,7 @@ import java.awt.event.MouseEvent;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.*;
 
 public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
@@ -42,6 +46,14 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
 
         // Add mouse listener for single-click preview functionality
         addSingleClickPreviewSupport();
+    }
+
+    @Override
+    protected @NotNull List<AnAction> createPopupMenuActions() {
+        List<AnAction> actions = new ArrayList<>(super.createPopupMenuActions());
+        actions.add(new VcsTreeActions.ShowInProjectAction());
+        actions.add(new VcsTreeActions.RollbackAction());
+        return actions;
     }
 
     /**
