@@ -1,6 +1,8 @@
 package toolwindow;
 
+import com.intellij.icons.AllIcons;
 import com.intellij.openapi.actionSystem.*;
+import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.VcsDataKeys;
 import com.intellij.openapi.vcs.changes.Change;
@@ -8,7 +10,9 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ide.projectView.ProjectView;
 import model.MyModel;
 import org.jetbrains.annotations.NotNull;
+import service.ToolWindowServiceInterface;
 import service.ViewService;
+import toolwindow.elements.VcsTree;
 import utils.CustomRollback;
 
 public class VcsTreeActions {
@@ -76,6 +80,25 @@ public class VcsTreeActions {
         public void update(@NotNull AnActionEvent e) {
             Change[] changes = e.getData(VcsDataKeys.CHANGES);
             e.getPresentation().setEnabled(changes != null && changes.length > 0);
+        }
+    }
+
+    public static class SelectOpenedFileAction extends AnAction implements RightAlignedToolbarAction {
+        public SelectOpenedFileAction() {
+            super("Select Opened File", "Select the file currently open in the editor", AllIcons.General.Locate);
+        }
+
+        @Override
+        public void actionPerformed(@NotNull AnActionEvent e) {
+            Project project = e.getData(CommonDataKeys.PROJECT);
+            if (project == null) return;
+            ToolWindowServiceInterface toolWindowService = project.getService(ToolWindowServiceInterface.class);
+
+            FileEditorManager fem = FileEditorManager.getInstance(project);
+            VirtualFile file = fem.getSelectedFiles().length > 0 ? fem.getSelectedFiles()[0] : null;
+            if (file != null) {
+                toolWindowService.selectFile(file);
+            }
         }
     }
 }

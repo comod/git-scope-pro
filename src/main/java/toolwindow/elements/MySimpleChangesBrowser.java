@@ -1,8 +1,9 @@
 package toolwindow.elements;
 
 import com.intellij.ide.ui.UISettings;
+import com.intellij.openapi.actionSystem.ActionGroup;
 import com.intellij.openapi.actionSystem.AnAction;
-import com.intellij.openapi.actionSystem.DefaultActionGroup;
+import com.intellij.openapi.actionSystem.Separator;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Editor;
@@ -53,6 +54,14 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
         List<AnAction> actions = new ArrayList<>(super.createPopupMenuActions());
         actions.add(new VcsTreeActions.ShowInProjectAction());
         actions.add(new VcsTreeActions.RollbackAction());
+        return actions;
+    }
+
+    @Override
+    protected @NotNull List<AnAction> createToolbarActions() {
+        List<AnAction> actions = new ArrayList<>(super.createToolbarActions());
+
+        actions.add(new VcsTreeActions.SelectOpenedFileAction());
         return actions;
     }
 
@@ -157,6 +166,7 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
      * @return A CompletableFuture that will complete with the created browser component
      */
     public static CompletableFuture<MySimpleChangesBrowser> createAsync(@NotNull Project project,
+                                                                        @NotNull VcsTree vcsTree,
                                                                         @NotNull Collection<? extends Change> changes) {
         LOG.debug("Starting asynchronous creation of MySimpleChangesBrowser");
 

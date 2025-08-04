@@ -35,6 +35,7 @@
                 factoryClass="toolwindow.ToolWindowUIFactory"
                 canCloseContents="true"
         />
+        <selectInTarget implementation="implementation.scope.MyScopeInTarget"/>
 
         <!-- Config (Persistent) -->
         <projectService serviceImplementation="state.State"/>

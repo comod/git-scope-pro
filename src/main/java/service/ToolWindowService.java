@@ -2,6 +2,7 @@ package service;
 
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowManager;
 import com.intellij.ui.content.Content;
@@ -131,5 +132,13 @@ public final class ToolWindowService implements ToolWindowServiceInterface {
         }
         getContentManager().setSelectedContent(content);
         getContentManager().requestFocus(content, true);
+    }
+
+    @Override
+    public void selectFile(VirtualFile file) {
+        VcsTree vcsTree = getVcsTree();
+        if (vcsTree != null) {
+            vcsTree.selectFile(file);
+        }
     }
 }

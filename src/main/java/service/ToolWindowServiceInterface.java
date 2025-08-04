@@ -1,5 +1,6 @@
 package service;
 
+import com.intellij.openapi.vfs.VirtualFile;
 import model.MyModel;
 import toolwindow.elements.VcsTree;
 
@@ -23,4 +24,6 @@ public interface ToolWindowServiceInterface {
     void selectTabByIndex(int index);
 
     VcsTree getVcsTree();
+
+    void selectFile(VirtualFile file);
 }
