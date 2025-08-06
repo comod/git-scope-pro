@@ -1,13 +1,30 @@
 package utils;
 
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.vcs.FilePath;
+import com.intellij.openapi.vcs.VcsException;
+import com.intellij.openapi.vcs.changes.Change;
+import com.intellij.openapi.vcs.changes.ContentRevision;
+import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.vcsUtil.VcsUtil;
+import git4idea.GitContentRevision;
 import git4idea.GitReference;
+import git4idea.GitRevisionNumber;
+import git4idea.changes.GitChangeUtils;
 import git4idea.commands.Git;
 import git4idea.commands.GitCommand;
 import git4idea.commands.GitLineHandler;
+import git4idea.history.GitHistoryUtils;
 import git4idea.repo.GitRepository;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+
+import static com.intellij.openapi.vcs.history.VcsDiffUtil.createChangesWithCurrentContentForFile;
 
 /**
  * Utility class for Git operations
@@ -21,20 +38,11 @@ public class GitUtil {
      *
      * @param repository the target GitRepository
      * @param refSpec    the Git ref (commit hash, tag name, "HEAD~1", etc.)
-     * @return a GitReference wrapping the resolved hash, or null if it could not be resolved or is a branch
+     * @return a GitRevisionNumber
      */
     @Nullable
-    public static GitReference resolveGitReference(@NotNull GitRepository repository,
+    public static GitRevisionNumber resolveGitReference(@NotNull GitRepository repository,
                                                    @NotNull String refSpec) {
-        // 1) Exclude local branch names
-        boolean isBranch = repository.getBranches()
-                .getLocalBranches()
-                .stream()
-                .map(GitReference::getName)
-                .anyMatch(name -> name.equals(refSpec));
-        if (isBranch) {
-            return null;
-        }
 
         Project project = repository.getProject();
         Git git = Git.getInstance();
@@ -47,7 +55,7 @@ public class GitUtil {
                     .getOutputOrThrow()
                     .trim();
             if (!hash.isEmpty()) {
-                return wrapHashAsReference(hash);
+                return new GitRevisionNumber(hash);
             }
         } catch (Exception ignored) {
             // resolution failed, fall through
@@ -57,21 +65,21 @@ public class GitUtil {
         return null;
     }
 
-    /**
-     * Wraps a 40-character commit hash in a GitReference implementation
-     */
-    @SuppressWarnings("FinalMethodsInAnonymousClass")
-    @NotNull
-    private static GitReference wrapHashAsReference(@NotNull String fullHash) {
-        // Ensure it's 40 hex chars
-        if (fullHash.length() != 40) {
-            throw new IllegalArgumentException("Invalid hash length: " + fullHash);
+    public static @NotNull Collection<Change> getDiffChanges(@NotNull GitRepository repository,
+                                                             @NotNull VirtualFile file,
+                                                             @NotNull GitRevisionNumber revisionNumber) throws VcsException {
+        FilePath filePath = VcsUtil.getFilePath(file);
+
+        Project project = repository.getProject();
+        Collection<Change> changes =
+                GitChangeUtils.getDiffWithWorkingDir(project, repository.getRoot(), revisionNumber.toString(), Collections.singletonList(filePath), false);
+
+        if (changes.isEmpty() && GitHistoryUtils.getCurrentRevision(project, filePath, revisionNumber.toString()) == null) {
+            throw new VcsException("Could not get diff for base file:" + file + " and revision: " + revisionNumber);
         }
-        return new GitReference(fullHash) {
-            @Override
-            public @NotNull String getFullName() {
-                return fullHash;
-            }
-        };
+
+        ContentRevision contentRevision = GitContentRevision.createRevision(filePath, revisionNumber, project);
+        return changes.isEmpty() && !filePath.isDirectory() ? createChangesWithCurrentContentForFile(filePath, contentRevision) : changes;
     }
+
 }

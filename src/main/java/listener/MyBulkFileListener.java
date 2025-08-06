@@ -21,7 +21,7 @@ public class MyBulkFileListener implements BulkFileListener {
 
             ViewService viewService = project.getService(ViewService.class);
             if (viewService != null) {
-                viewService.collectChanges();
+                //viewService.collectChanges();
             }
         }
     }

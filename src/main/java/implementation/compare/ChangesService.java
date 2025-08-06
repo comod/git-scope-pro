@@ -12,6 +12,7 @@ import com.intellij.openapi.vcs.changes.ChangesUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import git4idea.GitCommit;
 import git4idea.GitReference;
+import git4idea.GitRevisionNumber;
 import git4idea.actions.GitCompareWithRefAction;
 import git4idea.history.GitHistoryUtils;
 import git4idea.repo.GitRepository;
@@ -19,6 +20,7 @@ import model.TargetBranchMap;
 import org.jetbrains.annotations.NotNull;
 import service.GitService;
 import system.Defs;
+import utils.GitUtil;
 
 import java.util.*;
 import java.util.function.Consumer;
@@ -164,7 +166,7 @@ public class ChangesService extends GitCompareWithRefAction {
         return new ArrayList<>(changeMap.values());
     }
 
-    public Collection<Change> doCollectChanges(Project project, GitRepository repo, String branchToCompare) {
+    public Collection<Change> doCollectChanges(Project project, GitRepository repo, String scopeRef) {
         VirtualFile file = repo.getRoot();
         Collection<Change> _changes = new ArrayList<>();
         try {
@@ -173,32 +175,36 @@ public class ChangesService extends GitCompareWithRefAction {
             Collection<Change> localChanges = changeListManager.getAllChanges();
 
             // Special handling for HEAD - just return local changes
-            if (branchToCompare.equals(GitService.BRANCH_HEAD)) {
+            if (scopeRef.equals(GitService.BRANCH_HEAD)) {
                 _changes.addAll(localChanges);
                 return _changes;
             }
 
             // Diff Changes
-            if (branchToCompare.contains("..")) {
-                _changes = getChangesByHistory(project, repo, branchToCompare);
+            if (scopeRef.contains("..")) {
+                _changes = getChangesByHistory(project, repo, scopeRef);
             } else {
                 GitReference gitReference;
 
-                // First try to find matching branch
-                gitReference = repo.getBranches().findBranchByName(branchToCompare);
-
+                // First try to find matching branch or tag
+                gitReference = repo.getBranches().findBranchByName(scopeRef);
                 if (gitReference == null) {
-                    // Then try a tag
-                    gitReference = repo.getTagHolder().getTag(branchToCompare);
+                    // ... try a tag
+                    gitReference = repo.getTagHolder().getTag(scopeRef);
                 }
+
+                GitRevisionNumber revisionNumber;
                 if (gitReference == null) {
                     // Finally resort to try a generic reference (HEAD~2, <hash>, ...)
-                    gitReference = utils.GitUtil.resolveGitReference(repo, branchToCompare);
+                    revisionNumber = GitUtil.resolveGitReference(repo, scopeRef);
+                }
+                else {
+                    revisionNumber = new GitRevisionNumber(gitReference.getFullName());
                 }
 
-                if (gitReference != null) {
+                if (revisionNumber != null) {
                     // We have a valid GitReference
-                    _changes = getDiffChanges(repo, file, gitReference);
+                    _changes = GitUtil.getDiffChanges(repo, file, revisionNumber);
                 }
                 else {
                     // We do not have a valid GitReference => return null immediately (no point trying to add localChanges)
