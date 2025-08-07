@@ -79,6 +79,7 @@ public class ChangesService extends GitCompareWithRefAction {
                     String branchToCompare = getBranchToCompare(targetBranchByRepo, repo);
 
                     Collection<Change> changesPerRepo = null;
+
                     // Make sure to pass the correct project reference
                     changesPerRepo = doCollectChanges(currentProject, repo, branchToCompare);
 
