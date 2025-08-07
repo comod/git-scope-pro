@@ -8,7 +8,6 @@ import com.intellij.openapi.vcs.changes.ContentRevision;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.vcsUtil.VcsUtil;
 import git4idea.GitContentRevision;
-import git4idea.GitReference;
 import git4idea.GitRevisionNumber;
 import git4idea.changes.GitChangeUtils;
 import git4idea.commands.Git;
@@ -19,10 +18,8 @@ import git4idea.repo.GitRepository;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.List;
 
 import static com.intellij.openapi.vcs.history.VcsDiffUtil.createChangesWithCurrentContentForFile;
 

@@ -4,8 +4,6 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.changes.Change;
 import model.MyModel;
 import org.jdesktop.swingx.StackLayout;
-import toolwindow.elements.CurrentBranch;
-import toolwindow.elements.TargetBranch;
 import toolwindow.elements.VcsTree;
 import java.util.Collection;
 

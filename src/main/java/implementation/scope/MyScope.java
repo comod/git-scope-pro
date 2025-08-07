@@ -8,7 +8,6 @@ import com.intellij.openapi.vcs.changes.Change;
 import com.intellij.profile.codeInspection.InspectionProjectProfileManager;
 import com.intellij.psi.search.scope.packageSet.NamedScope;
 import com.intellij.psi.search.scope.packageSet.NamedScopeManager;
-import com.intellij.util.ArrayUtil;
 import system.Defs;
 
 import java.util.*;

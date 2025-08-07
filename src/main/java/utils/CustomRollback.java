@@ -21,10 +21,7 @@ import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.progress.ProgressIndicator;
 import org.jetbrains.annotations.NotNull;
 import com.intellij.history.LocalHistory;
-import com.intellij.openapi.fileEditor.FileDocumentManager;
-import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.util.io.FileUtil;
-import com.intellij.openapi.application.WriteAction;
 
 import javax.swing.*;
 import java.awt.*;

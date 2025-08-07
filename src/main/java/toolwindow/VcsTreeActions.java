@@ -12,7 +12,6 @@ import model.MyModel;
 import org.jetbrains.annotations.NotNull;
 import service.ToolWindowServiceInterface;
 import service.ViewService;
-import toolwindow.elements.VcsTree;
 import utils.CustomRollback;
 
 public class VcsTreeActions {
