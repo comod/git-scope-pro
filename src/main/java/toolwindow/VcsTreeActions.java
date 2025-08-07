@@ -72,7 +72,7 @@ public class VcsTreeActions {
 
             ViewService viewService = project.getService(ViewService.class);
             MyModel currentModel = viewService.getCurrent();
-            rollback.rollbackChanges(project, changes, currentModel.getName());
+            rollback.rollbackChanges(project, changes, currentModel.getScopeRef());
         }
 
         @Override

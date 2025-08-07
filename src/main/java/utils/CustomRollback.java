@@ -7,9 +7,12 @@ import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.vcs.FileStatus;
 import com.intellij.openapi.vcs.changes.Change;
 import com.intellij.openapi.vcs.changes.ChangesUtil;
+import com.intellij.openapi.vcs.changes.VcsDirtyScopeManager;
 import com.intellij.openapi.vcs.changes.ui.AsyncChangesTreeImpl;
 import com.intellij.openapi.vcs.changes.ChangeListManager;
 import com.intellij.openapi.vcs.FilePath;
+import com.intellij.openapi.vfs.LocalFileSystem;
+import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vcs.VcsException;
 import com.intellij.ui.components.JBScrollPane;
@@ -349,8 +352,14 @@ public class CustomRollback {
                             }
                             if (checkoutFailed) {
                                 fail.accept(relBefore);
-                            } else if (rmFailed && relAfter != null) {
-                                // Optional: best-effort check only
+                            } else if (rmFailed) {
+                                // we just verify if the new path still exists and report if it does.
+                                String absAfter = rootPathNorm + "/" + relAfter;
+                                VirtualFile stillThere = LocalFileSystem.getInstance()
+                                        .refreshAndFindFileByPath(absAfter);
+                                if (stillThere != null && stillThere.exists()) {
+                                    fail.accept(relAfter);
+                                }
                             }
                             break;
                         }
@@ -365,8 +374,29 @@ public class CustomRollback {
                 }
             }
 
-            // No explicit VFS refresh: rely on IDE/VCS to pick up changes
-            // (pathsToRefresh kept for future use if needed)
+            // Refresh updated paths so the IDE picks up filesystem + VCS changes
+            if (!pathsToRefresh.isEmpty()) {
+                List<VirtualFile> toRefresh = new ArrayList<>();
+                for (String rel : pathsToRefresh) {
+                    String abs = rootPathNorm + "/" + rel;
+                    VirtualFile vf = LocalFileSystem.getInstance().refreshAndFindFileByPath(abs);
+                    if (vf != null) {
+                        toRefresh.add(vf);
+                    }
+                }
+                if (!toRefresh.isEmpty()) {
+                    // Async refresh is fine here; we also hint VCS to recalc statuses
+                    VfsUtil.markDirtyAndRefresh(true, false, false, toRefresh.toArray(VirtualFile[]::new));
+                    VcsDirtyScopeManager mgr = VcsDirtyScopeManager.getInstance(project);
+                    for (VirtualFile vf : toRefresh) {
+                        mgr.fileDirty(vf);
+                    }
+                } else {
+                    // Fallback: refresh whole root subtree and mark it dirty for VCS
+                    VfsUtil.markDirtyAndRefresh(true, true, false, root);
+                    VcsDirtyScopeManager.getInstance(project).dirDirtyRecursively(root);
+                }
+            }
         }
 
         return failedFiles;

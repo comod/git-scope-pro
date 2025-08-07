@@ -7,9 +7,7 @@ import io.reactivex.rxjava3.subjects.PublishSubject;
 import org.jetbrains.annotations.Nullable;
 import service.GitService;
 
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 
 public class MyModel extends MyModelBase {
@@ -41,70 +39,47 @@ public class MyModel extends MyModelBase {
         changeObservable.onNext(field.targetBranch);
     }
 
+    /**
+     * Returns the raw scope name for this model.
+     * - For HEAD tab: returns "HEAD" constant.
+     * - Otherwise: returns the first non-empty branch name from the map, or null if absent.
+     */
     @Nullable
     public String getName() {
-        // Handle HEAD tab case
         if (isHeadTab) {
             return GitService.BRANCH_HEAD;
         }
-
-        // Get the target branch map
-        TargetBranchMap targetBranchMap = getTargetBranchMap();
-        if (targetBranchMap == null || targetBranchMap.getValue().isEmpty()) {
-            return null;
-        }
-
-        // Get the actual branch names (not display names)
-        Map<String, String> branchMap = targetBranchMap.getValue();
-        List<String> branchNames = new ArrayList<>();
-
-        for (String branchName : branchMap.values()) {
-            if (branchName != null && !branchName.trim().isEmpty()) {
-                branchNames.add(branchName);
-            }
-        }
-
-        if (branchNames.isEmpty()) {
-            return null;
-        }
-
-        // Return the actual git scope name(s)
-        return String.join(", ", branchNames);
+        String first = getFirstBranchValue();
+        return (first == null || first.isEmpty()) ? null : first;
     }
 
-
+    /**
+     * Returns a user-facing display name.
+     * - For HEAD tab: "HEAD".
+     * - If a custom tab name is set: custom name.
+     * - Otherwise: the first non-empty branch name from the map (or "unknown" if none).
+     */
     public String getDisplayName() {
         if (isHeadTab) {
             return "HEAD";
         }
-
-        // Then check if we have a custom name
         if (customTabName != null && !customTabName.isEmpty()) {
             return customTabName;
         }
+        String first = getFirstBranchValue();
+        return (first == null || first.trim().isEmpty()) ? "unknown" : first;
+    }
 
-        // If no custom name, fall back to branch name logic
-        TargetBranchMap branchMap = getTargetBranchMap();
-        if (branchMap == null) {
-            return "unknown";
-        }
-
-        Map<String, String> branchMapValue = branchMap.getValue();
-        if (branchMapValue == null || branchMapValue.isEmpty()) {
-            return "unknown";
-        }
-
-        // Join all branch names with commas if there are multiple
-        List<String> branchNames = new ArrayList<>();
-        for (String branch : branchMapValue.values()) {
-            if (branch != null && !branch.trim().isEmpty()) {
-                branchNames.add(branch);
-            }
-        }
-        if (branchNames.isEmpty()) {
-            return "unknown";
-        }
-        return String.join(", ", branchNames);
+    /**
+     * Returns the scope reference similar to getName(), but strips the optional "..HEAD" suffix if present.
+     * Example: "feature/foo..HEAD" -> "feature/foo"
+     */
+    @Nullable
+    public String getScopeRef() {
+        String name = getName();
+        if (name == null) return null;
+        String suffix = ".." + GitService.BRANCH_HEAD;
+        return name.endsWith(suffix) ? name.substring(0, name.length() - suffix.length()) : name;
     }
 
     // Getter and setter for custom tab name
@@ -154,5 +129,20 @@ public class MyModel extends MyModelBase {
         active,
         targetBranch,
         tabName
+    }
+
+    // Helper: fetch the first non-empty branch value from the map (branchMapValue contains only one key anyway)
+    @Nullable
+    private String getFirstBranchValue() {
+        TargetBranchMap branchMap = getTargetBranchMap();
+        if (branchMap == null) return null;
+        Map<String, String> values = branchMap.getValue();
+        if (values == null || values.isEmpty()) return null;
+        for (String v : values.values()) {
+            if (v != null && !v.trim().isEmpty()) {
+                return v;
+            }
+        }
+        return null;
     }
 }
