@@ -107,6 +107,8 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
         try {
             FileEditorManager editorManager = FileEditorManager.getInstance(project);
 
+            // TODO: Reflection used to get access to preview tab method
+
             // Use reflection to create FileEditorOpenOptions
             Class<?> optionsClass = Class.forName("com.intellij.openapi.fileEditor.impl.FileEditorOpenOptions");
             Object options = optionsClass.getDeclaredConstructor().newInstance();

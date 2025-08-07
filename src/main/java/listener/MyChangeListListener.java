@@ -45,6 +45,8 @@ public class MyChangeListListener implements ChangeListListener {
 
         if (filesChanged) {
             // Only initiate the comparison if files have changed
+
+            // TODO: collectChanges: VcsTree is updated with modified content (needed?)
             viewService.collectChanges(true);
         }
     }

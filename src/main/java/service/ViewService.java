@@ -235,6 +235,7 @@ public class ViewService implements Disposable {
             });
 
             subscribeToObservable(myHeadModel);
+            // TODO: collectChanges: head tab initialized
             collectChanges(myHeadModel, true);
             latch.countDown();
         });
@@ -325,6 +326,7 @@ public class ViewService implements Disposable {
                     getTargetBranchDisplayAsync(model, tabName -> {
                         toolWindowService.changeTabName(tabName);
                     });
+                    // TODO: collectChanges: target branch selected (Git Scope selected)
                     collectChanges(model, true);
                     save();
                 }
@@ -334,6 +336,7 @@ public class ViewService implements Disposable {
                         doUpdateDebounced(changes);
                     }
                 }
+                // TODO: collectChanges: tab switched
                 case active -> collectChanges(model, true);
                 case tabName -> {
                     if (!isProcessingTabRename) {

@@ -242,6 +242,9 @@ public class MyLineStatusTrackerImpl implements Disposable {
      */
     private void updateTrackerBaseRevision(LineStatusTracker<?> tracker, String content) {
         try {
+
+            // TODO: Reflection used to get access to setBaseRevision method
+            // Find the setBaseRevision method in the tracker class hierarchy
             Method setBaseRevisionMethod = findMethodInHierarchy(tracker.getClass(), "setBaseRevision", CharSequence.class);
 
             if (setBaseRevisionMethod != null) {
