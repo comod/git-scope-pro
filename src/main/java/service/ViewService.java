@@ -235,7 +235,7 @@ public class ViewService implements Disposable {
             });
 
             subscribeToObservable(myHeadModel);
-            collectChanges(myHeadModel);
+            collectChanges(myHeadModel, true);
             latch.countDown();
         });
 
@@ -325,7 +325,7 @@ public class ViewService implements Disposable {
                     getTargetBranchDisplayAsync(model, tabName -> {
                         toolWindowService.changeTabName(tabName);
                     });
-                    collectChanges(model);
+                    collectChanges(model, true);
                     save();
                 }
                 case changes -> {
@@ -334,7 +334,7 @@ public class ViewService implements Disposable {
                         doUpdateDebounced(changes);
                     }
                 }
-                case active -> collectChanges(model);
+                case active -> collectChanges(model, true);
                 case tabName -> {
                     if (!isProcessingTabRename) {
                         String customName = model.getCustomTabName();
@@ -387,11 +387,11 @@ public class ViewService implements Disposable {
         return this.targetBranchService.getTargetBranchDisplay(model.getTargetBranchMap());
     }
 
-    public void collectChanges() {
-        collectChanges(getCurrent());
+    public void collectChanges(boolean checkFs) {
+        collectChanges(getCurrent(), checkFs);
     }
 
-    public void collectChanges(MyModel model) {
+    public void collectChanges(MyModel model, boolean checkFs) {
         if (model == null) {
             return;
         }
@@ -410,7 +410,7 @@ public class ViewService implements Disposable {
                         model.setChanges(changes);
                     }
                 });
-            });
+            }, checkFs);
         });
     }
 

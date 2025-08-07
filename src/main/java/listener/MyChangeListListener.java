@@ -45,7 +45,7 @@ public class MyChangeListListener implements ChangeListListener {
 
         if (filesChanged) {
             // Only initiate the comparison if files have changed
-            viewService.collectChanges();
+            viewService.collectChanges(true);
         }
     }
 

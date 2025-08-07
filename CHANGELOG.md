@@ -1,3 +1,18 @@
+## [2025.2]
+
+### Fixes
+
+- Fixed additional minor EDT issues
+- Improved performance of various operations (scope detection, window population, scope filtering).
+  This should improve performance when used with large scopes.
+
+### Added
+
+- Support 2025.3 EAP
+- Added [possibility to rename a tab once created](https://github.com/comod/git-scope-pro/issues/54)
+- Added [show in project and rollback actions](https://github.com/comod/git-scope-pro/issues/58)
+- Added ['Select In' -> 'Git Scope' action](https://github.com/comod/git-scope-pro/issues/59)
+
 ## [2025.1.3]
 
 ### Fixes

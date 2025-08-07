@@ -166,68 +166,27 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
     public static CompletableFuture<MySimpleChangesBrowser> createAsync(@NotNull Project project,
                                                                         @NotNull VcsTree vcsTree,
                                                                         @NotNull Collection<? extends Change> changes) {
-        LOG.debug("Starting asynchronous creation of MySimpleChangesBrowser");
-
-        // Track operation time for diagnostics
-        long startTime = System.currentTimeMillis();
-
-        // Check if project is already disposed
+        CompletableFuture<MySimpleChangesBrowser> future = new CompletableFuture<>();
         if (project.isDisposed()) {
-            LOG.debug("Project is already disposed, not creating browser");
-            CompletableFuture<MySimpleChangesBrowser> failedFuture = new CompletableFuture<>();
-            failedFuture.completeExceptionally(new IllegalStateException("Project disposed"));
-            return failedFuture;
+            future.completeExceptionally(new IllegalStateException("Project disposed"));
+            return future;
         }
 
-        // Use application pool executor for background tasks
-        Executor backgroundExecutor = AppExecutorUtil.getAppExecutorService();
+        ApplicationManager.getApplication().invokeLater(() -> {
+            try {
+                if (project.isDisposed()) {
+                    future.completeExceptionally(new IllegalStateException("Project disposed"));
+                    return;
+                }
+                // No pre-processing: SimpleAsyncChangesBrowser will handle async work internally
+                MySimpleChangesBrowser browser = new MySimpleChangesBrowser(project, changes);
+                future.complete(browser);
+            } catch (Throwable t) {
+                future.completeExceptionally(t);
+            }
+        });
 
-        // Step 1: Pre-process all changes in background thread
-        // This will create a completely prepared set of changes that won't trigger slow operations when used in the UI
-        return CompletableFuture.supplyAsync(() -> {
-                    LOG.debug("Preparing changes in background thread");
-                    try {
-                        // Make a defensive copy of changes
-                        Collection<Change> fullyPreparedChanges = new ArrayList<>(changes.size());
-
-                        // Pre-compute all necessary data in background thread to avoid EDT slow operations
-                        for (Change change : changes) {
-                            if (change != null) {
-                                // Pre-load data completely in this thread
-                                VirtualFile file = change.getVirtualFile();
-                                if (file != null && file.isValid() && !project.isDisposed()) {
-                                    // Touch the file path to ensure it's loaded
-                                    String path = file.getPath();
-
-                                    // Pre-load change path info
-                                    ChangesUtil.getFilePath(change);
-                                }
-
-                                // Add the change after pre-loading data
-                                fullyPreparedChanges.add(change);
-                            }
-                        }
-
-                        LOG.debug("Completed preparation of " + fullyPreparedChanges.size() + " changes in background thread");
-                        return fullyPreparedChanges;
-                    } catch (Exception e) {
-                        LOG.error("Error preparing changes", e);
-                        throw new CompletionException(e);
-                    }
-                }, backgroundExecutor)
-                // Step 2: Create the browser on EDT with fully prepared data
-                .thenApplyAsync(preparedChanges -> {
-                    try {
-                        // Create browser on EDT, but with all data fully prepared
-                        MySimpleChangesBrowser browser = new MySimpleChangesBrowser(project, preparedChanges);
-                        long elapsedTime = System.currentTimeMillis() - startTime;
-                        LOG.debug("Browser component created successfully in " + elapsedTime + "ms");
-                        return browser;
-                    } catch (Exception e) {
-                        LOG.error("Error creating browser component", e);
-                        throw new RuntimeException(e);
-                    }
-                }, ApplicationManager.getApplication()::invokeLater);
+        return future;
     }
 
     /**

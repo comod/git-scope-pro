@@ -23,6 +23,7 @@ import system.Defs;
 import utils.GitUtil;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 public class ChangesService extends GitCompareWithRefAction {
@@ -57,8 +58,10 @@ public class ChangesService extends GitCompareWithRefAction {
         return branchToCompare;
     }
 
+    // Cache for storing changes per repository
+    private final Map<String, Collection<Change>> changesCache = new ConcurrentHashMap<>();
 
-    public void collectChangesWithCallback(TargetBranchMap targetBranchByRepo, Consumer<Collection<Change>> callBack) {
+    public void collectChangesWithCallback(TargetBranchMap targetBranchByRepo, Consumer<Collection<Change>> callBack, boolean checkFs) {
         // Capture the current project reference to ensure consistency
         final Project currentProject = this.project;
         final GitService currentGitService = this.git;
@@ -70,18 +73,30 @@ public class ChangesService extends GitCompareWithRefAction {
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
                 Collection<Change> _changes = new ArrayList<>();
-                List<String> errorRepos = new ArrayList<>(); // Track problematic repos instead of failing entirely
+                List<String> errorRepos = new ArrayList<>();
 
-                // IMPORTANT: Use the captured project and git service to ensure we're working with the right context
                 Collection<GitRepository> repositories = currentGitService.getRepositories();
 
                 repositories.forEach(repo -> {
                     String branchToCompare = getBranchToCompare(targetBranchByRepo, repo);
-
+                    
+                    // Use only repo path as cache key
+                    String cacheKey = repo.getRoot().getPath();
+                    
                     Collection<Change> changesPerRepo = null;
 
-                    // Make sure to pass the correct project reference
-                    changesPerRepo = doCollectChanges(currentProject, repo, branchToCompare);
+                    if (!checkFs && changesCache.containsKey(cacheKey)) {
+                        // Use cached changes if checkFs is false and cache exists
+                        changesPerRepo = changesCache.get(cacheKey);
+                    } else {
+                        // Fetch fresh changes
+                        changesPerRepo = doCollectChanges(currentProject, repo, branchToCompare);
+                        
+                        // Cache the results (but don't cache error states)
+                        if (!(changesPerRepo instanceof ErrorStateList)) {
+                            changesCache.put(cacheKey, new ArrayList<>(changesPerRepo)); // Store a copy to avoid modification issues
+                        }
+                    }
 
                     if (changesPerRepo instanceof ErrorStateList) {
                         errorRepos.add(repo.getRoot().getPath());
@@ -131,7 +146,17 @@ public class ChangesService extends GitCompareWithRefAction {
         };
         task.queue();
     }
-
+    
+    // Method to clear cache when needed
+    public void clearCache() {
+        changesCache.clear();
+    }
+    
+    // Method to clear cache for specific repo
+    public void clearCache(GitRepository repo) {
+        String cacheKey = repo.getRoot().getPath();
+        changesCache.remove(cacheKey);
+    }
 
     private Boolean isLocalChangeOnly(String localChangePath, Collection<Change> changes) {
 
