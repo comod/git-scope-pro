@@ -1,5 +1,6 @@
 package implementation.lineStatusTracker;
 
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Document;
@@ -12,13 +13,13 @@ import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Computable;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vcs.VcsException;
 import com.intellij.openapi.vcs.changes.Change;
 import com.intellij.openapi.vcs.changes.ContentRevision;
 import com.intellij.openapi.vcs.ex.LineStatusTracker;
 import com.intellij.openapi.vcs.impl.LineStatusTrackerManagerI;
-import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.messages.MessageBus;
 import com.intellij.util.messages.MessageBusConnection;
@@ -26,33 +27,46 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Method;
-import java.util.*;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-public class MyLineStatusTrackerImpl {
+public class MyLineStatusTrackerImpl implements Disposable {
     private static final Logger LOG = Logger.getInstance(MyLineStatusTrackerImpl.class);
+
     private final MessageBusConnection messageBusConnection;
-    private final Map<String, TrackerInfo> trackerInfoMap = new HashMap<>();
     private final LineStatusTrackerManagerI trackerManager;
 
-    // Store both the requester and the base content for each file
-    private static class TrackerInfo {
-        Object requester;
-        String baseContent;
+    // Single, consistent requester for this component's lifetime
+    private final Object requester = new Object();
+    private final AtomicBoolean disposing = new AtomicBoolean(false);
 
-        TrackerInfo(Object requester, String baseContent) {
-            this.requester = requester;
+    // Track per-document holds and base content
+    private final Map<Document, TrackerInfo> trackers = new HashMap<>();
+
+    private static final class TrackerInfo {
+        volatile boolean held;
+        volatile String baseContent;
+
+        TrackerInfo(boolean held, String baseContent) {
+            this.held = held;
             this.baseContent = baseContent;
         }
     }
 
-    public MyLineStatusTrackerImpl(Project project) {
+    @Override
+    public void dispose() {
+        releaseAll();
+    }
+
+    public MyLineStatusTrackerImpl(Project project, Disposable parentDisposable) {
         this.trackerManager = project.getService(LineStatusTrackerManagerI.class);
 
-        // Subscribe to file editor events
         MessageBus messageBus = project.getMessageBus();
         this.messageBusConnection = messageBus.connect();
 
-        // Listen to file open events
+        // Listen to file open/close events
         messageBusConnection.subscribe(
                 FileEditorManagerListener.FILE_EDITOR_MANAGER,
                 new FileEditorManagerListener() {
@@ -63,8 +77,18 @@ public class MyLineStatusTrackerImpl {
                             requestLineStatusTracker(editor);
                         }
                     }
+
+                    @Override
+                    public void fileClosed(@NotNull FileEditorManager source, @NotNull VirtualFile file) {
+                        Document doc = FileDocumentManager.getInstance().getDocument(file);
+                        if (doc != null) {
+                            safeRelease(doc);
+                        }
+                    }
                 }
         );
+
+        Disposer.register(parentDisposable, this);
     }
 
     private boolean isDiffView(Editor editor) {
@@ -81,22 +105,21 @@ public class MyLineStatusTrackerImpl {
     }
 
     public void update(Collection<Change> changes, @Nullable VirtualFile targetFile) {
-        if (changes == null) {
+        if (changes == null || disposing.get()) {
             return;
         }
 
-        // Move VFS operations to background thread
         ApplicationManager.getApplication().executeOnPooledThread(() -> {
-            // Collect all necessary data from VFS in background thread with read action
+            if (disposing.get()) return;
+
             Map<String, ContentRevision> fileToRevisionMap = collectFileRevisionMap(changes);
 
-            // Switch to EDT only for UI updates
             ApplicationManager.getApplication().invokeLater(() -> {
+                if (disposing.get()) return;
+
                 Editor[] editors = EditorFactory.getInstance().getAllEditors();
                 for (Editor editor : editors) {
-                    if (isDiffView(editor)) {
-                        continue;
-                    }
+                    if (isDiffView(editor)) continue;
                     updateLineStatusByChangesForEditorSafe(editor, fileToRevisionMap);
                     refreshEditor(editor);
                 }
@@ -110,7 +133,7 @@ public class MyLineStatusTrackerImpl {
             for (Change change : changes) {
                 if (change == null) continue;
 
-                VirtualFile vcsFile = change.getVirtualFile(); // Safe on background thread
+                VirtualFile vcsFile = change.getVirtualFile(); // background thread
                 if (vcsFile == null) continue;
 
                 String filePath = vcsFile.getPath();
@@ -124,7 +147,7 @@ public class MyLineStatusTrackerImpl {
     }
 
     private void updateLineStatusByChangesForEditorSafe(Editor editor, Map<String, ContentRevision> fileToRevisionMap) {
-        if (editor == null) return;
+        if (editor == null || disposing.get()) return;
 
         Document doc = editor.getDocument();
         VirtualFile file = FileDocumentManager.getInstance().getFile(doc);
@@ -133,61 +156,63 @@ public class MyLineStatusTrackerImpl {
         String filePath = file.getPath();
         ContentRevision contentRevision = fileToRevisionMap.get(filePath);
 
-        String content = "";
+        String content;
         if (contentRevision == null) {
             content = doc.getCharsSequence().toString();
         } else {
             try {
                 String revisionContent = contentRevision.getContent();
-                if (revisionContent != null) {
-                    content = revisionContent;
-                }
+                content = revisionContent != null ? revisionContent : "";
             } catch (VcsException e) {
                 LOG.warn("Error getting content for revision", e);
                 return;
             }
         }
 
-        // Update the tracker with the content
         updateTrackerBaseContent(doc, content);
     }
 
     /**
-     * Update the base content of the line status tracker using the setBaseRevision method
+     * Ensure a tracker is requested once for the given document.
+     */
+    private synchronized void ensureRequested(@NotNull Document document) {
+        if (disposing.get()) return;
+
+        TrackerInfo info = trackers.computeIfAbsent(document, k -> new TrackerInfo(false, ""));
+
+        if (!info.held) {
+            try {
+                trackerManager.requestTrackerFor(document, requester);
+                info.held = true;
+            } catch (Exception e) {
+                LOG.error("Failed to request line status tracker", e);
+            }
+        }
+    }
+
+    /**
+     * Update the base content of the line status tracker for the document.
      */
     private void updateTrackerBaseContent(Document document, String content) {
-        if (content == null) return;
+        if (content == null || disposing.get()) return;
 
-        content = StringUtil.convertLineSeparators(content);
-        final String finalContent = content;
+        final String finalContent = StringUtil.convertLineSeparators(content);
 
         ApplicationManager.getApplication().invokeLater(() -> {
+            if (disposing.get()) return;
+
             try {
-                VirtualFile file = FileDocumentManager.getInstance().getFile(document);
-                if (file == null) return;
+                ensureRequested(document);
 
-                String filePath = file.getPath();
-
-                // Update our cache
-                TrackerInfo trackerInfo = trackerInfoMap.get(filePath);
-                if (trackerInfo != null) {
-                    trackerInfo.baseContent = finalContent;
-                } else {
-                    // Create a new requester if we don't have one
-                    Object requester = new Object();
-                    trackerInfo = new TrackerInfo(requester, finalContent);
-                    trackerInfoMap.put(filePath, trackerInfo);
-
-                    // Request a tracker for this document if we don't have one
-                    trackerManager.requestTrackerFor(document, requester);
+                TrackerInfo info = trackers.get(document);
+                if (info != null) {
+                    info.baseContent = finalContent;
                 }
 
-                // Get the actual LineStatusTracker instance and update its base content
                 LineStatusTracker<?> tracker = trackerManager.getLineStatusTracker(document);
                 if (tracker != null) {
                     updateTrackerBaseRevision(tracker, finalContent);
                 }
-
             } catch (Exception e) {
                 LOG.error("Error updating line status tracker with new base content", e);
             }
@@ -195,11 +220,28 @@ public class MyLineStatusTrackerImpl {
     }
 
     /**
-     * Use reflection to call the setBaseRevision method on the tracker
+     * Request a tracker for the editor’s document (no duplicate requester).
+     */
+    private void requestLineStatusTracker(@Nullable Editor editor) {
+        if (editor == null || disposing.get()) return;
+
+        Document document = editor.getDocument();
+        ensureRequested(document);
+
+        ApplicationManager.getApplication().invokeLater(() -> {
+            if (disposing.get()) return;
+
+            if (editor.getGutter() instanceof EditorGutterComponentEx gutter) {
+                gutter.revalidateMarkup();
+            }
+        });
+    }
+
+    /**
+     * Use reflection to call the setBaseRevision method on the tracker.
      */
     private void updateTrackerBaseRevision(LineStatusTracker<?> tracker, String content) {
         try {
-            // Find the setBaseRevision method in the tracker class hierarchy
             Method setBaseRevisionMethod = findMethodInHierarchy(tracker.getClass(), "setBaseRevision", CharSequence.class);
 
             if (setBaseRevisionMethod != null) {
@@ -221,7 +263,7 @@ public class MyLineStatusTrackerImpl {
     }
 
     /**
-     * Helper method to find a method in the class hierarchy
+     * Helper to find a method in the class hierarchy.
      */
     private Method findMethodInHierarchy(Class<?> clazz, String methodName, Class<?>... parameterTypes) {
         Class<?> currentClass = clazz;
@@ -229,69 +271,66 @@ public class MyLineStatusTrackerImpl {
             try {
                 return currentClass.getDeclaredMethod(methodName, parameterTypes);
             } catch (NoSuchMethodException e) {
-                // Try superclass
                 currentClass = currentClass.getSuperclass();
             }
         }
         return null;
     }
 
-    private void requestLineStatusTracker(@Nullable Editor editor) {
-        if (editor == null) return;
+    /**
+     * Release for a specific document if we hold it.
+     */
+    private synchronized void safeRelease(@NotNull Document document) {
+        TrackerInfo info = trackers.get(document);
+        if (info == null || !info.held) return;
 
-        VirtualFile file = FileDocumentManager.getInstance().getFile(editor.getDocument());
-        if (file == null) return;
-
-        String filePath = file.getPath();
-        if (trackerInfoMap.containsKey(filePath)) {
-            return;
-        }
-
-        Document document = editor.getDocument();
-
-        // Request a tracker for this document
         try {
-            Object requester = new Object(); // Unique requester object
-
-            // Add to our map with empty base content for now
-            trackerInfoMap.put(filePath, new TrackerInfo(requester, ""));
-
-            // Request a tracker for this document
-            trackerManager.requestTrackerFor(document, requester);
-
-            // Force refresh of editor gutter after requesting tracker
-            ApplicationManager.getApplication().invokeLater(() -> {
-                if (editor.getGutter() instanceof EditorGutterComponentEx gutter) {
-                    gutter.revalidateMarkup();
-                }
-            });
+            LineStatusTracker<?> tracker = trackerManager.getLineStatusTracker(document);
+            if (tracker != null) {
+                trackerManager.releaseTrackerFor(document, requester);
+            }
+            info.held = false;
         } catch (Exception e) {
-            LOG.error("Failed to request line status tracker", e);
+            LOG.warn("Error releasing tracker for document", e);
         }
     }
 
     /**
-     * Clean up all trackers when the plugin is unloaded or project is closed
+     * Release all trackers we hold. Prevents new requests, and avoids underflow by
+     * releasing only entries still marked as held and having a tracker instance.
      */
     public void releaseAll() {
-        for (Map.Entry<String, TrackerInfo> entry : trackerInfoMap.entrySet()) {
-            try {
-                String filePath = entry.getKey();
-                TrackerInfo trackerInfo = entry.getValue();
-
-                VirtualFile file = LocalFileSystem.getInstance().findFileByPath(filePath);
-                if (file != null) {
-                    Document document = FileDocumentManager.getInstance().getDocument(file);
-                    if (document != null) {
-                        trackerManager.releaseTrackerFor(document, trackerInfo.requester);
-                    }
-                }
-            } catch (Exception e) {
-                LOG.warn("Error releasing tracker", e);
-            }
+        if (!disposing.compareAndSet(false, true)) {
+            return; // already disposing
         }
 
-        trackerInfoMap.clear();
-        messageBusConnection.disconnect();
+        if (messageBusConnection != null) {
+            messageBusConnection.disconnect();
+        }
+
+        Runnable release = () -> {
+            for (Map.Entry<Document, TrackerInfo> entry : trackers.entrySet()) {
+                Document document = entry.getKey();
+                TrackerInfo info = entry.getValue();
+                if (info == null || !info.held) continue;
+
+                try {
+                    LineStatusTracker<?> tracker = trackerManager.getLineStatusTracker(document);
+                    if (tracker != null) {
+                        trackerManager.releaseTrackerFor(document, requester);
+                    }
+                    info.held = false;
+                } catch (Exception e) {
+                    LOG.warn("Error releasing tracker", e);
+                }
+            }
+            trackers.clear();
+        };
+
+        if (ApplicationManager.getApplication().isDispatchThread()) {
+            release.run();
+        } else {
+            ApplicationManager.getApplication().invokeAndWait(release);
+        }
     }
 }
