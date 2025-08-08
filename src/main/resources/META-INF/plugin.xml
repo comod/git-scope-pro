@@ -2,7 +2,7 @@
 <idea-plugin require-restart="true">
     <id>Git Scope</id>
     <name>Git Scope</name>
-    <vendor>WOELKIT</vendor>
+    <vendor>WOELKIT, M.Wållberg</vendor>
     <version>auto</version>
     <description>Create custom Git "scopes" for any target branch.</description>
     <change-notes>auto</change-notes>
