@@ -12,6 +12,7 @@ import com.intellij.openapi.vcs.changes.ChangesUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import git4idea.GitCommit;
 import git4idea.GitReference;
+import git4idea.GitRevisionNumber;
 import git4idea.actions.GitCompareWithRefAction;
 import git4idea.history.GitHistoryUtils;
 import git4idea.repo.GitRepository;
@@ -19,8 +20,11 @@ import model.TargetBranchMap;
 import org.jetbrains.annotations.NotNull;
 import service.GitService;
 import system.Defs;
+import utils.GitCommitReflection;
+import utils.GitUtil;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 public class ChangesService extends GitCompareWithRefAction {
@@ -33,10 +37,8 @@ public class ChangesService extends GitCompareWithRefAction {
     }
     public static final Collection<Change> ERROR_STATE = new ErrorStateList();
     private final Project project;
-    private GitRepository repo;
+    private final GitService git;
     private Task.Backgroundable task;
-
-    private GitService git;
 
     public ChangesService(Project project) {
         this.project = project;
@@ -45,7 +47,7 @@ public class ChangesService extends GitCompareWithRefAction {
 
     @NotNull
     private static String getBranchToCompare(TargetBranchMap targetBranchByRepo, GitRepository repo) {
-        String branchToCompare = null;
+        String branchToCompare;
         if (targetBranchByRepo == null) {
             branchToCompare = GitService.BRANCH_HEAD;
         } else {
@@ -57,30 +59,45 @@ public class ChangesService extends GitCompareWithRefAction {
         return branchToCompare;
     }
 
+    // Cache for storing changes per repository
+    private final Map<String, Collection<Change>> changesCache = new ConcurrentHashMap<>();
 
-    public void collectChangesWithCallback(TargetBranchMap targetBranchByRepo, Consumer<Collection<Change>> callBack) {
+    public void collectChangesWithCallback(TargetBranchMap targetBranchByRepo, Consumer<Collection<Change>> callBack, boolean checkFs) {
         // Capture the current project reference to ensure consistency
         final Project currentProject = this.project;
         final GitService currentGitService = this.git;
 
-        task = new Task.Backgroundable(currentProject, Defs.APPLICATION_NAME + ": Collecting Changes...", true) {
+        task = new Task.Backgroundable(currentProject, "Collecting " + Defs.APPLICATION_NAME, true) {
 
             private Collection<Change> changes;
 
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
                 Collection<Change> _changes = new ArrayList<>();
-                List<String> errorRepos = new ArrayList<>(); // Track problematic repos instead of failing entirely
+                List<String> errorRepos = new ArrayList<>();
 
-                // IMPORTANT: Use the captured project and git service to ensure we're working with the right context
                 Collection<GitRepository> repositories = currentGitService.getRepositories();
 
                 repositories.forEach(repo -> {
                     String branchToCompare = getBranchToCompare(targetBranchByRepo, repo);
-
+                    
+                    // Use only repo path as cache key
+                    String cacheKey = repo.getRoot().getPath();
+                    
                     Collection<Change> changesPerRepo = null;
-                    // Make sure to pass the correct project reference
-                    changesPerRepo = doCollectChanges(currentProject, repo, branchToCompare);
+
+                    if (!checkFs && changesCache.containsKey(cacheKey)) {
+                        // Use cached changes if checkFs is false and cache exists
+                        changesPerRepo = changesCache.get(cacheKey);
+                    } else {
+                        // Fetch fresh changes
+                        changesPerRepo = doCollectChanges(currentProject, repo, branchToCompare);
+                        
+                        // Cache the results (but don't cache error states)
+                        if (!(changesPerRepo instanceof ErrorStateList)) {
+                            changesCache.put(cacheKey, new ArrayList<>(changesPerRepo)); // Store a copy to avoid modification issues
+                        }
+                    }
 
                     if (changesPerRepo instanceof ErrorStateList) {
                         errorRepos.add(repo.getRoot().getPath());
@@ -130,6 +147,17 @@ public class ChangesService extends GitCompareWithRefAction {
         };
         task.queue();
     }
+    
+    // Method to clear cache when needed
+    public void clearCache() {
+        changesCache.clear();
+    }
+    
+    // Method to clear cache for specific repo
+    public void clearCache(GitRepository repo) {
+        String cacheKey = repo.getRoot().getPath();
+        changesCache.remove(cacheKey);
+    }
 
     private Boolean isLocalChangeOnly(String localChangePath, Collection<Change> changes) {
 
@@ -157,7 +185,8 @@ public class ChangesService extends GitCompareWithRefAction {
         List<GitCommit> commits = GitHistoryUtils.history(project, repo.getRoot(), branchToCompare);
         Map<FilePath, Change> changeMap = new HashMap<>();
         for (GitCommit commit : commits) {
-            for (Change change : commit.getChanges()) {
+            // TODO: Reflection used to avoid triggering experimental API usage
+            for (Change change : GitCommitReflection.getChanges(commit)) {
                 FilePath path = ChangesUtil.getFilePath(change);
                 changeMap.put(path, change);
             }
@@ -165,7 +194,7 @@ public class ChangesService extends GitCompareWithRefAction {
         return new ArrayList<>(changeMap.values());
     }
 
-    public Collection<Change> doCollectChanges(Project project, GitRepository repo, String branchToCompare) {
+    public Collection<Change> doCollectChanges(Project project, GitRepository repo, String scopeRef) {
         VirtualFile file = repo.getRoot();
         Collection<Change> _changes = new ArrayList<>();
         try {
@@ -174,32 +203,36 @@ public class ChangesService extends GitCompareWithRefAction {
             Collection<Change> localChanges = changeListManager.getAllChanges();
 
             // Special handling for HEAD - just return local changes
-            if (branchToCompare.equals(GitService.BRANCH_HEAD)) {
+            if (scopeRef.equals(GitService.BRANCH_HEAD)) {
                 _changes.addAll(localChanges);
                 return _changes;
             }
 
             // Diff Changes
-            if (branchToCompare.contains("..")) {
-                _changes = getChangesByHistory(project, repo, branchToCompare);
+            if (scopeRef.contains("..")) {
+                _changes = getChangesByHistory(project, repo, scopeRef);
             } else {
                 GitReference gitReference;
 
-                // First try to find matching branch
-                gitReference = repo.getBranches().findBranchByName(branchToCompare);
-
+                // First try to find matching branch or tag
+                gitReference = repo.getBranches().findBranchByName(scopeRef);
                 if (gitReference == null) {
-                    // Then try a tag
-                    gitReference = repo.getTagHolder().getTag(branchToCompare);
+                    // ... try a tag
+                    gitReference = repo.getTagHolder().getTag(scopeRef);
                 }
+
+                GitRevisionNumber revisionNumber;
                 if (gitReference == null) {
                     // Finally resort to try a generic reference (HEAD~2, <hash>, ...)
-                    gitReference = utils.GitUtil.resolveGitReference(repo, branchToCompare);
+                    revisionNumber = GitUtil.resolveGitReference(repo, scopeRef);
+                }
+                else {
+                    revisionNumber = new GitRevisionNumber(gitReference.getFullName());
                 }
 
-                if (gitReference != null) {
+                if (revisionNumber != null) {
                     // We have a valid GitReference
-                    _changes = getDiffChanges(repo, file, gitReference);
+                    _changes = GitUtil.getDiffChanges(repo, file, revisionNumber);
                 }
                 else {
                     // We do not have a valid GitReference => return null immediately (no point trying to add localChanges)

@@ -13,8 +13,6 @@ import java.awt.*;
 
 public class MyStatusBarPanel extends JPanel {
     private final TextPanel textLabel;
-    private final JBLabel iconLabel;
-
     public MyStatusBarPanel() {
         super();
 
@@ -24,7 +22,7 @@ public class MyStatusBarPanel extends JPanel {
 
         // Create icon label with properly scaled icon
         Icon scaledIcon = IconUtil.scale(Defs.ICON, null, 0.75f);
-        iconLabel = new JBLabel(scaledIcon);
+        JBLabel iconLabel = new JBLabel(scaledIcon);
         iconLabel.setOpaque(false);
         iconLabel.setAlignmentY(Component.CENTER_ALIGNMENT);
         add(Box.createHorizontalStrut(4));

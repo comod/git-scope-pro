@@ -61,6 +61,7 @@ private JPanel createManualInputPanel(GitRepository repository, BranchTree branc
                 if (!ref.isEmpty()) {
                     BranchTreeEntry entry = BranchTreeEntry.create(ref, false, repository);
                     Tree tree = (Tree) branchTree.getTreeComponent();
+
                     DefaultMutableTreeNode root = (DefaultMutableTreeNode) tree.getModel().getRoot();
 
                     // Find or create "Manual Input" node

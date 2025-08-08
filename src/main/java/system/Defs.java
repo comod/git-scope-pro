@@ -5,9 +5,7 @@ import com.intellij.icons.AllIcons;
 import javax.swing.*;
 
 public class Defs {
-
     public static String APPLICATION_NAME = "Git Scope";
-    public static String Arrow = "➙";
+    public static String TOOL_WINDOW_NAME = "Git Scope";
     public static Icon ICON = AllIcons.Actions.Diff;
-
 }

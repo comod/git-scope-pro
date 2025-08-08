@@ -2,7 +2,7 @@ package service;
 
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.project.Project;
-
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowManager;
 import com.intellij.ui.content.Content;
@@ -10,9 +10,11 @@ import com.intellij.ui.content.ContentFactory;
 import com.intellij.ui.content.ContentManager;
 import listener.MyTabContentListener;
 import model.MyModel;
-import toolwindow.ToolWindowView;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import system.Defs;
+import toolwindow.TabRename;
+import toolwindow.ToolWindowView;
 import toolwindow.elements.VcsTree;
 
 import java.util.HashMap;
@@ -22,9 +24,11 @@ import java.util.Map;
 public final class ToolWindowService implements ToolWindowServiceInterface {
     private final Project project;
     private final Map<Content, ToolWindowView> contentToViewMap = new HashMap<>();
+    private final TabRename tabRename;
 
     public ToolWindowService(Project project) {
         this.project = project;
+        this.tabRename = new TabRename(project);
     }
 
     @Override
@@ -35,7 +39,7 @@ public final class ToolWindowService implements ToolWindowServiceInterface {
 
     public ToolWindow getToolWindow() {
         ToolWindowManager toolWindowManager = ToolWindowManager.getInstance(project);
-        ToolWindow toolWindow = toolWindowManager.getToolWindow("Git Scope");
+        ToolWindow toolWindow = toolWindowManager.getToolWindow(Defs.TOOL_WINDOW_NAME);
         assert toolWindow != null;
         return toolWindow;
     }
@@ -49,13 +53,10 @@ public final class ToolWindowService implements ToolWindowServiceInterface {
         ToolWindowView toolWindowView = new ToolWindowView(project, myModel);
         Content content = ContentFactory.getInstance().createContent(toolWindowView.getRootPanel(), tabName, false);
         content.setCloseable(closeable);
-
         contentToViewMap.put(content, toolWindowView);
-
         ContentManager contentManager = getContentManager();
         contentManager.addContent(content);
-
-        int index = contentManager.getIndexOfContent(content);
+        content.setDisplayName(tabName);
     }
 
     @Override
@@ -81,14 +82,22 @@ public final class ToolWindowService implements ToolWindowServiceInterface {
         }
     }
 
-
     public void addListener() {
-        getContentManager().addContentManagerListener(new MyTabContentListener(project));
+        ContentManager contentManager = getContentManager();
+        contentManager.addContentManagerListener(new MyTabContentListener(project));
+
+        // Register the rename action in the tab context menu
+        tabRename.registerRenameTabAction();
+    }
+
+    @Override
+    public void setupTabTooltip(MyModel model) {
+        tabRename.setupTabTooltip(model, contentToViewMap);
     }
 
     @Override
     public void changeTabName(String title) {
-        getToolWindow().setTitle(title);
+        tabRename.changeTabName(title, getContentManager());
     }
 
     public void removeTab(int index) {
@@ -125,4 +134,11 @@ public final class ToolWindowService implements ToolWindowServiceInterface {
         getContentManager().requestFocus(content, true);
     }
 
+    @Override
+    public void selectFile(VirtualFile file) {
+        VcsTree vcsTree = getVcsTree();
+        if (vcsTree != null) {
+            vcsTree.selectFile(file);
+        }
+    }
 }

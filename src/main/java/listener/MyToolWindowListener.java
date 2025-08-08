@@ -8,11 +8,9 @@ import service.ViewService;
 import org.jetbrains.annotations.NotNull;
 
 public class MyToolWindowListener implements ToolWindowManagerListener {
-    private final Project project;
     private final ViewService viewService;
 
     public MyToolWindowListener(Project project) {
-        this.project = project;
         this.viewService = project.getService(ViewService.class);
     }
 

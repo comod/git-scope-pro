@@ -1,5 +1,6 @@
 package service;
 
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.changes.Change;
@@ -25,13 +26,14 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
-public class ViewService {
+public class ViewService implements Disposable {
 
     public static final String PLUS_TAB_LABEL = "+";
     public static final int DEBOUNCE_MS = 50;
     public List<MyModel> collection = new ArrayList<>();
     public Integer currentTabIndex = 0;
-    private Project project;
+    private final Project project;
+    private boolean isProcessingTabRename = false;
     private ToolWindowServiceInterface toolWindowService;
     private TargetBranchService targetBranchService;
     private ChangesService changesService;
@@ -53,6 +55,9 @@ public class ViewService {
         EventQueue.invokeLater(this::initDependencies);
     }
 
+    @Override
+    public void dispose() {}
+
     public void initDependencies() {
         this.toolWindowService = project.getService(ToolWindowServiceInterface.class);
         this.changesService = project.getService(ChangesService.class);
@@ -60,7 +65,7 @@ public class ViewService {
         this.gitService = project.getService(GitService.class);
         this.targetBranchService = project.getService(TargetBranchService.class);
         this.state = project.getService(State.class);
-        this.myLineStatusTrackerImpl = new MyLineStatusTrackerImpl(project);
+        this.myLineStatusTrackerImpl = new MyLineStatusTrackerImpl(project, this);
         this.myScope = new MyScope(project);
         this.debouncer = new Debounce();
     }
@@ -79,16 +84,25 @@ public class ViewService {
 
         load.forEach(myModelBase -> {
             MyModel myModel = new MyModel();
-            TargetBranchMap targetBranchMap = myModelBase.targetBranchMap;
+
+            // Load the target branch map
+            TargetBranchMap targetBranchMap = myModelBase.getTargetBranchMap();
             if (targetBranchMap == null) {
                 return;
             }
             myModel.setTargetBranchMap(targetBranchMap);
+
+            // Load the custom tab name
+            String customTabName = myModelBase.getCustomTabName();
+            if (customTabName != null && !customTabName.isEmpty()) {
+                myModel.setCustomTabName(customTabName);
+            }
+
             collection.add(myModel);
         });
 
         setCollection(collection);
-        
+
         // Restore the active tab index
         Integer savedTabIndex = this.state.getCurrentTabIndex();
         if (savedTabIndex != null) {
@@ -111,15 +125,25 @@ public class ViewService {
         List<MyModelBase> modelData = new ArrayList<>();
         collection.forEach(myModel -> {
             MyModelBase myModelBase = new MyModelBase();
+
+            // Save the target branch map
             TargetBranchMap targetBranchMap = myModel.getTargetBranchMap();
             if (targetBranchMap == null) {
                 return;
             }
-            myModelBase.targetBranchMap = targetBranchMap;
+            myModelBase.setTargetBranchMap(targetBranchMap);
+
+            // Save the custom tab name
+            String customTabName = myModel.getCustomTabName();
+            if (customTabName != null && !customTabName.isEmpty()) {
+                myModelBase.setCustomTabName(customTabName);
+            }
+
             modelData.add(myModelBase);
         });
 
         this.state.setModelData(modelData);
+
         // Save the current active tab index
         this.state.setCurrentTabIndex(this.currentTabIndex);
     }
@@ -179,6 +203,11 @@ public class ViewService {
                 for (MyModel model : modelCollection) {
                     String tabName = model.getDisplayName();
                     toolWindowService.addTab(model, tabName, true);
+
+                    // Set up tooltip for each tab that has a custom name
+                    if (model.getCustomTabName() != null && !model.getCustomTabName().isEmpty()) {
+                        toolWindowService.setupTabTooltip(model);
+                    }
                 }
             }
 
@@ -206,7 +235,8 @@ public class ViewService {
             });
 
             subscribeToObservable(myHeadModel);
-            collectChanges(myHeadModel);
+            // TODO: collectChanges: head tab initialized
+            collectChanges(myHeadModel, true);
             latch.countDown();
         });
 
@@ -227,13 +257,20 @@ public class ViewService {
             }
             return;
         }
-        String tabName = revision;
-        MyModel myModel = addTabAndModel(tabName);
+
+        MyModel myModel = addTabAndModel(revision);
 
         gitService.getRepositoriesAsync(repositories -> {
             repositories.forEach(repo -> {
                 myModel.addTargetBranch(repo, revision);
             });
+
+            // Set up tooltip after target branches are added
+            if (myModel.getCustomTabName() != null && !myModel.getCustomTabName().isEmpty()) {
+                ApplicationManager.getApplication().invokeLater(() -> {
+                    toolWindowService.setupTabTooltip(myModel);
+                });
+            }
         });
     }
 
@@ -252,6 +289,11 @@ public class ViewService {
 
         // Make sure to add the tab with closeable set to true
         toolWindowService.addTab(myModel, tabName, true);
+
+        // Set up tooltip for the new tab
+        if (myModel.getCustomTabName() != null && !myModel.getCustomTabName().isEmpty()) {
+            toolWindowService.setupTabTooltip(myModel);
+        }
 
         // Add plus tab after the new tab
         addPlusTab();
@@ -284,7 +326,8 @@ public class ViewService {
                     getTargetBranchDisplayAsync(model, tabName -> {
                         toolWindowService.changeTabName(tabName);
                     });
-                    collectChanges(model);
+                    // TODO: collectChanges: target branch selected (Git Scope selected)
+                    collectChanges(model, true);
                     save();
                 }
                 case changes -> {
@@ -293,9 +336,18 @@ public class ViewService {
                         doUpdateDebounced(changes);
                     }
                 }
-                case active -> {
-                    collectChanges(model);
+                // TODO: collectChanges: tab switched
+                case active -> collectChanges(model, true);
+                case tabName -> {
+                    if (!isProcessingTabRename) {
+                        String customName = model.getCustomTabName();
+                        if (customName != null && !customName.isEmpty()) {
+                            toolWindowService.changeTabName(customName);
+                            toolWindowService.setupTabTooltip(model);
+                        }
+                    }
                 }
+
             }
 
         }, (e -> {
@@ -307,14 +359,25 @@ public class ViewService {
         getTargetBranchDisplayAsync(current, callback);
     }
 
+    // Update the getTargetBranchDisplayAsync method to use custom names
     private void getTargetBranchDisplayAsync(MyModel model, Consumer<String> callback) {
         // Special handling for HEAD model
         if (model.isHeadTab()) {
             callback.accept(GitService.BRANCH_HEAD);
             return;
         }
+
+        // Check for custom name first
+        String customName = model.getCustomTabName();
+        if (customName != null && !customName.isEmpty()) {
+            callback.accept(customName);
+            return;
+        }
+
+        // Fall back to the standard branch-based name
         this.targetBranchService.getTargetBranchDisplayAsync(model.getTargetBranchMap(), callback);
     }
+
 
     @Deprecated
     private String getTargetBranchDisplayCurrent() {
@@ -327,11 +390,11 @@ public class ViewService {
         return this.targetBranchService.getTargetBranchDisplay(model.getTargetBranchMap());
     }
 
-    public void collectChanges() {
-        collectChanges(getCurrent());
+    public void collectChanges(boolean checkFs) {
+        collectChanges(getCurrent(), checkFs);
     }
 
-    public void collectChanges(MyModel model) {
+    public void collectChanges(MyModel model, boolean checkFs) {
         if (model == null) {
             return;
         }
@@ -350,7 +413,7 @@ public class ViewService {
                         model.setChanges(changes);
                     }
                 });
-            });
+            }, checkFs);
         });
     }
 
@@ -407,6 +470,52 @@ public class ViewService {
         }
         currentTabIndex = index;
         save();
+    }
+
+    public void onTabRenamed(int tabIndex, String newName) {
+        // Skip renaming for special tabs
+        if (tabIndex == 0 || tabIndex >= collection.size() + 1) {
+            return; // HEAD tab or Plus tab
+        }
+
+        if (isProcessingTabRename) {
+            return;
+        }
+
+        try {
+            isProcessingTabRename = true;
+
+            // Update the model with custom name if needed
+            int modelIndex = getModelIndex(tabIndex);
+            if (modelIndex >= 0 && modelIndex < collection.size()) {
+                MyModel model = collection.get(modelIndex);
+
+                // Only update if the name has actually changed
+                String currentCustomName = model.getCustomTabName();
+                if (!newName.equals(currentCustomName)) {
+                    model.setCustomTabName(newName);
+                    save();
+                }
+            }
+        } finally {
+            isProcessingTabRename = false;
+        }
+    }
+
+    // Add a method to get the display name considering custom names
+    public String getDisplayNameForTab(MyModel model) {
+        if (model.isHeadTab()) {
+            return GitService.BRANCH_HEAD;
+        }
+
+        // Check for custom name first
+        String customName = model.getCustomTabName();
+        if (customName != null && !customName.isEmpty()) {
+            return customName;
+        }
+
+        // Fall back to the standard branch-based name
+        return model.getDisplayName();
     }
 
     public int getCurrentModelIndex() {

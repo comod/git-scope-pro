@@ -5,10 +5,10 @@
 Create custom "scopes" for any target branch. Selectable in a tool window, which is then called **GIT SCOPE**.
 The Current "scope" is displayed as a
 
-- diff in the tool window
+- Diff in the tool window
 - "line status" in the "line gutter"
-- custom "scope" and finally as a
-- status bar widget
+- Custom "scope" and finally as a
+- Status bar widget
 
 ### Story
 
@@ -36,7 +36,7 @@ In the "New*" tab you get a few different options to define the scope:
    git reference such as `HEAD~2`, `<short hash>`, ...
 3. If you want to bind the scope to the common ancestor for `HEAD` and the current selection, you can check the common
    ancestor checkbox.
-4. If the list of branches are long, it can be filtered using the search box.
+4. If the list of branches is long, it can be filtered using the search box.
 
 ![](docs/icon.svg) **Change Browser:**
 
@@ -44,6 +44,17 @@ Whenever the scope selection is done, the tab will turn into a "change browser" 
 displays the current diff of the **GIT SCOPE**.
 
 ![](docs/toolwindow.png)
+
+Right click on any file will present a number of actions:
+
+![](docs/show_in_project.png)
+
+- **Show Diff**: Opens a diff window showing the diff of the selected file(s) `<selected-scope>..HEAD`
+- **Show in Project**: Highlight this file in the Project tool window
+- **Rollback...**: Rollback the selected files(s) to `<selected-scope>` version. Note that this will checkout the
+  selected scope version of the file(s), and will in many cases leave you with a modified file that no longer show up in
+  the Git Scope window since it is identical to the version pointed to by the scope. Commit the files using the
+  standard Commit tool window.
 
 ![](docs/icon.svg) **Line Status Gutter:**
 
@@ -58,7 +69,7 @@ READ: https://www.jetbrains.com/help/phpstorm/file-status-highlights.html
 
 ![](docs/icon.svg) **Scope:**
 
-Adds a custom *Scope* (used to do inspections, search/replace, ect), i.e. search results are filtered by **GIT SCOPE**.
+Adds a custom *Scope* (used to do inspections, search/replace, etc), i.e. search results are filtered by **GIT SCOPE**.
 
 READ: https://www.jetbrains.com/help/phpstorm/scopes.html
 
@@ -71,6 +82,15 @@ widget.
 
 ![](docs/statusbar.png)
 
+![](docs/icon.svg) **Rename Tab**
+
+The tab name is per default set to the selected scope reference. If the selected scope is a git hash, you can rename the
+scope tab name by right clicking on the tab and selecting "Rename Tab". Any renamed tab will show the original Git Scope
+reference as a tooltip. You can rest the tab name to the original Git Scope scope reference by right clicking on the tab
+and selecting "Reset Tab Name".
+
+![](docs/rename.png)
+
 ![](docs/icon.svg) **Use Commit as Git Scope**
 
 In the Git panel, you can right-click on any commit and select "Use Commit as Git Scope" to automatically add the
@@ -80,15 +100,29 @@ commit as a new Git Scope.
 
 ![](docs/icon.svg) **Project Panel Filter**
 
-The Project panel can also be filtered to show only files part of the current Git Scope.
+The Project tool window can be filtered to show only files that are part of the current Git scope. When this filter is
+enabled, the IDE controls the Project view’s lifecycle and updates. As a result, the Project tool window might not
+immediately reflect changes to the Git scope.
 
 ![](docs/projfilter.png)
+
+![](docs/icon.svg) **Select In**
+
+Git Scope appears in the Select In dialog, so you can locate any file directly in the Git Scope tool window from Select
+In.
+
+![](docs/selectin.png)
+
+The Git Scope window itself also has the "Select Opened File" action button, so you can highlight any file directly in
+the Git Scope tool window (if the file is part of the current selected scope):
+
+![](docs/select_opened.png)
 
 ## Shortcuts (Added by this Plugin)
 
 | Shortcut | Description                                      |
 |----------|--------------------------------------------------|
-| Alt+H    | Toggle between HEAD and last git scope selection |
+| Alt+H    | Toggle between HEAD and last Git Scope selection |
 
 ## More Useful Shortcuts
 

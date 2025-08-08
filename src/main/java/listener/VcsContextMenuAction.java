@@ -13,6 +13,7 @@ import service.ViewService;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 public class VcsContextMenuAction extends CopyRevisionNumberAction {
 
@@ -31,11 +32,11 @@ public class VcsContextMenuAction extends CopyRevisionNumberAction {
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
         List<VcsRevisionNumber> revisions = getRevisionNumbersFromContext(e);
-        revisions = ContainerUtil.reverse(revisions); // we want hashes from old to new, e.g. to be able to pass to native client in terminal
+        revisions = ContainerUtil.reverse(revisions);
         String rev = getHashesAsString(revisions);
 
         Project project = e.getProject();
-        ViewService viewService = project.getService(ViewService.class);
+        ViewService viewService = Objects.requireNonNull(project).getService(ViewService.class);
         viewService.addRevisionTab(rev);
     }
 }

@@ -3,8 +3,11 @@ package toolwindow.elements;
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.vcs.FilePath;
 import com.intellij.openapi.vcs.changes.Change;
+import com.intellij.openapi.vcs.changes.ChangesUtil;
 import com.intellij.openapi.vcs.changes.ContentRevision;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import implementation.compare.ChangesService;
@@ -14,10 +17,8 @@ import state.WindowPositionTracker.ScrollPosition;
 
 import javax.swing.*;
 import java.awt.*;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -84,6 +85,26 @@ public class VcsTree extends JPanel {
         });
     }
 
+    public void selectFile(VirtualFile file) {
+        if (currentBrowser == null) { return; }
+        List<Change> changes = currentBrowser.getAllChanges();
+
+        Change targetChange = null;
+        for (Change change : changes) {
+            FilePath afterPath = ChangesUtil.getAfterPath(change);
+            FilePath beforePath = ChangesUtil.getBeforePath(change);
+            if ((afterPath != null && file.equals(afterPath.getVirtualFile())) ||
+                    (beforePath != null && file.equals(beforePath.getVirtualFile()))) {
+                targetChange = change;
+                break;
+            }
+        }
+
+        if (targetChange != null) {
+            currentBrowser.selectEntries(Collections.singletonList(targetChange));
+        }
+    }
+
     private String getCurrentTabId() {
         try {
             ViewService viewService = project.getService(ViewService.class);
@@ -132,11 +153,7 @@ public class VcsTree extends JPanel {
         }
 
         int newHashCode = calculateChangesHashCode(newChanges);
-        if (newHashCode == effectiveLastHashCode) {
-            return true;
-        }
-
-        return false;
+        return newHashCode == effectiveLastHashCode;
     }
 
     private int calculateChangesHashCode(Collection<Change> changes) {
@@ -185,7 +202,7 @@ public class VcsTree extends JPanel {
         if (changes == null || changes.isEmpty() || changes instanceof ChangesService.ErrorStateMarker) {
             JLabel statusLabel = createStatusLabel(changes);
             SwingUtilities.invokeLater(() -> setComponentIfCurrent(statusLabel, sequenceNumber));
-            currentBrowser = null;
+            //currentBrowser = null;
             return;
         }
 
@@ -201,7 +218,7 @@ public class VcsTree extends JPanel {
                     if (!isCurrentSequence(sequenceNumber)) {
                         throw new CompletionException(new InterruptedException("Update cancelled - sequence outdated"));
                     }
-                    return MySimpleChangesBrowser.createAsync(project, changesCopy);
+                    return MySimpleChangesBrowser.createAsync(project, this, changesCopy);
                 })
 
                 .thenAccept(browser -> {
@@ -337,6 +354,5 @@ public class VcsTree extends JPanel {
         }
         lastChangesPerTab.clear();
         lastChangesHashCodePerTab.clear();
-        currentBrowser = null;
     }
 }

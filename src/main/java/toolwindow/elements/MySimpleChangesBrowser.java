@@ -1,6 +1,7 @@
 package toolwindow.elements;
 
 import com.intellij.ide.ui.UISettings;
+import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Editor;
@@ -11,11 +12,10 @@ import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.TextEditor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.changes.Change;
-import com.intellij.openapi.vcs.changes.ChangesUtil;
 import com.intellij.openapi.vcs.changes.ui.SimpleAsyncChangesBrowser;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.util.concurrency.AppExecutorUtil;
 import org.jetbrains.annotations.NotNull;
+import toolwindow.VcsTreeActions;
 
 import javax.swing.*;
 import java.awt.event.MouseAdapter;
@@ -23,6 +23,7 @@ import java.awt.event.MouseEvent;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.*;
 
 public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
@@ -44,6 +45,22 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
         addSingleClickPreviewSupport();
     }
 
+    @Override
+    protected @NotNull List<AnAction> createPopupMenuActions() {
+        List<AnAction> actions = new ArrayList<>(super.createPopupMenuActions());
+        actions.add(new VcsTreeActions.ShowInProjectAction());
+        actions.add(new VcsTreeActions.RollbackAction());
+        return actions;
+    }
+
+    @Override
+    protected @NotNull List<AnAction> createToolbarActions() {
+        List<AnAction> actions = new ArrayList<>(super.createToolbarActions());
+
+        actions.add(new VcsTreeActions.SelectOpenedFileAction());
+        return actions;
+    }
+
     /**
      * Adds mouse listener to support single-click preview functionality
      */
@@ -58,6 +75,12 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
                 }
 
                 if (e.getClickCount() == 1) {
+                    
+                    // Check if Shift or Ctrl is pressed - if so, skip opening file
+                    if (e.isShiftDown() || e.isControlDown()) {
+                        return; // Let the default selection behavior handle it
+                    }
+
                     Change[] selectedChanges = getSelectedChanges().toArray(new Change[0]);
 
                     if (!uiSettings.getOpenInPreviewTabIfPossible()) {
@@ -83,6 +106,8 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
     private void openInPreviewTab(Project project, VirtualFile file) {
         try {
             FileEditorManager editorManager = FileEditorManager.getInstance(project);
+
+            // TODO: Reflection used to get access to preview tab method
 
             // Use reflection to create FileEditorOpenOptions
             Class<?> optionsClass = Class.forName("com.intellij.openapi.fileEditor.impl.FileEditorOpenOptions");
@@ -139,69 +164,29 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
      * @return A CompletableFuture that will complete with the created browser component
      */
     public static CompletableFuture<MySimpleChangesBrowser> createAsync(@NotNull Project project,
+                                                                        @NotNull VcsTree vcsTree,
                                                                         @NotNull Collection<? extends Change> changes) {
-        LOG.debug("Starting asynchronous creation of MySimpleChangesBrowser");
-
-        // Track operation time for diagnostics
-        long startTime = System.currentTimeMillis();
-
-        // Check if project is already disposed
+        CompletableFuture<MySimpleChangesBrowser> future = new CompletableFuture<>();
         if (project.isDisposed()) {
-            LOG.debug("Project is already disposed, not creating browser");
-            CompletableFuture<MySimpleChangesBrowser> failedFuture = new CompletableFuture<>();
-            failedFuture.completeExceptionally(new IllegalStateException("Project disposed"));
-            return failedFuture;
+            future.completeExceptionally(new IllegalStateException("Project disposed"));
+            return future;
         }
 
-        // Use application pool executor for background tasks
-        Executor backgroundExecutor = AppExecutorUtil.getAppExecutorService();
+        ApplicationManager.getApplication().invokeLater(() -> {
+            try {
+                if (project.isDisposed()) {
+                    future.completeExceptionally(new IllegalStateException("Project disposed"));
+                    return;
+                }
+                // No pre-processing: SimpleAsyncChangesBrowser will handle async work internally
+                MySimpleChangesBrowser browser = new MySimpleChangesBrowser(project, changes);
+                future.complete(browser);
+            } catch (Throwable t) {
+                future.completeExceptionally(t);
+            }
+        });
 
-        // Step 1: Pre-process all changes in background thread
-        // This will create a completely prepared set of changes that won't trigger slow operations when used in the UI
-        return CompletableFuture.supplyAsync(() -> {
-                    LOG.debug("Preparing changes in background thread");
-                    try {
-                        // Make a defensive copy of changes
-                        Collection<Change> fullyPreparedChanges = new ArrayList<>(changes.size());
-
-                        // Pre-compute all necessary data in background thread to avoid EDT slow operations
-                        for (Change change : changes) {
-                            if (change != null) {
-                                // Pre-load data completely in this thread
-                                VirtualFile file = change.getVirtualFile();
-                                if (file != null && file.isValid() && !project.isDisposed()) {
-                                    // Touch the file path to ensure it's loaded
-                                    String path = file.getPath();
-
-                                    // Pre-load change path info
-                                    ChangesUtil.getFilePath(change);
-                                }
-
-                                // Add the change after pre-loading data
-                                fullyPreparedChanges.add(change);
-                            }
-                        }
-
-                        LOG.debug("Completed preparation of " + fullyPreparedChanges.size() + " changes in background thread");
-                        return fullyPreparedChanges;
-                    } catch (Exception e) {
-                        LOG.error("Error preparing changes", e);
-                        throw new CompletionException(e);
-                    }
-                }, backgroundExecutor)
-                // Step 2: Create the browser on EDT with fully prepared data
-                .thenApplyAsync(preparedChanges -> {
-                    try {
-                        // Create browser on EDT, but with all data fully prepared
-                        MySimpleChangesBrowser browser = new MySimpleChangesBrowser(project, preparedChanges);
-                        long elapsedTime = System.currentTimeMillis() - startTime;
-                        LOG.debug("Browser component created successfully in " + elapsedTime + "ms");
-                        return browser;
-                    } catch (Exception e) {
-                        LOG.error("Error creating browser component", e);
-                        throw new RuntimeException(e);
-                    }
-                }, ApplicationManager.getApplication()::invokeLater);
+        return future;
     }
 
     /**
