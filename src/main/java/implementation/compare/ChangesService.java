@@ -20,6 +20,7 @@ import model.TargetBranchMap;
 import org.jetbrains.annotations.NotNull;
 import service.GitService;
 import system.Defs;
+import utils.GitCommitReflection;
 import utils.GitUtil;
 
 import java.util.*;
@@ -184,7 +185,8 @@ public class ChangesService extends GitCompareWithRefAction {
         List<GitCommit> commits = GitHistoryUtils.history(project, repo.getRoot(), branchToCompare);
         Map<FilePath, Change> changeMap = new HashMap<>();
         for (GitCommit commit : commits) {
-            for (Change change : commit.getChanges()) {
+            // TODO: Reflection used to avoid triggering experimental API usage
+            for (Change change : GitCommitReflection.getChanges(commit)) {
                 FilePath path = ChangesUtil.getFilePath(change);
                 changeMap.put(path, change);
             }
