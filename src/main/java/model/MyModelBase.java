@@ -21,6 +21,7 @@ public class MyModelBase {
         }
         targetBranchMap.add(repo.toString(), branch);
     }
+
     public String getCustomTabName() {
         return customTabName;
     }

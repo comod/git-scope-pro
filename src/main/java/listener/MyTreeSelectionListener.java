@@ -37,6 +37,7 @@ public class MyTreeSelectionListener implements TreeSelectionListener {
                 String head = "HEAD";
                 branchName = branchName + twoDots + head;
             }
+
             // Check if this is HEAD - if so, close current tab and switch to HEAD tab
             if (GitService.BRANCH_HEAD.equals(branchName)) {
                 // Remove the current "New*" tab first

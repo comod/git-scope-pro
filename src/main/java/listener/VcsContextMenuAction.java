@@ -32,7 +32,7 @@ public class VcsContextMenuAction extends CopyRevisionNumberAction {
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
         List<VcsRevisionNumber> revisions = getRevisionNumbersFromContext(e);
-        revisions = ContainerUtil.reverse(revisions); // we want hashes from old to new, e.g. to be able to pass to native client in terminal
+        revisions = ContainerUtil.reverse(revisions);
         String rev = getHashesAsString(revisions);
 
         Project project = e.getProject();

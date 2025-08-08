@@ -4,6 +4,8 @@ import com.intellij.openapi.vcs.changes.Change;
 import git4idea.repo.GitRepository;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.subjects.PublishSubject;
+import org.jetbrains.annotations.Nullable;
+import service.GitService;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -38,6 +40,38 @@ public class MyModel extends MyModelBase {
         super.addTargetBranch(repo, branch);
         changeObservable.onNext(field.targetBranch);
     }
+
+    @Nullable
+    public String getName() {
+        // Handle HEAD tab case
+        if (isHeadTab) {
+            return GitService.BRANCH_HEAD;
+        }
+
+        // Get the target branch map
+        TargetBranchMap targetBranchMap = getTargetBranchMap();
+        if (targetBranchMap == null || targetBranchMap.getValue().isEmpty()) {
+            return null;
+        }
+
+        // Get the actual branch names (not display names)
+        Map<String, String> branchMap = targetBranchMap.getValue();
+        List<String> branchNames = new ArrayList<>();
+
+        for (String branchName : branchMap.values()) {
+            if (branchName != null && !branchName.trim().isEmpty()) {
+                branchNames.add(branchName);
+            }
+        }
+
+        if (branchNames.isEmpty()) {
+            return null;
+        }
+
+        // Return the actual git scope name(s)
+        return String.join(", ", branchNames);
+    }
+
 
     public String getDisplayName() {
         if (isHeadTab) {
