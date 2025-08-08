@@ -1,53 +1,65 @@
 package implementation.scope;
 
+import com.intellij.codeInspection.ex.InspectionProfileImpl;
+import com.intellij.ide.projectView.ProjectView;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.changes.Change;
+import com.intellij.profile.codeInspection.InspectionProjectProfileManager;
 import com.intellij.psi.search.scope.packageSet.NamedScope;
 import com.intellij.psi.search.scope.packageSet.NamedScopeManager;
 import com.intellij.util.ArrayUtil;
 import system.Defs;
 
-import java.util.ArrayList;
-import java.util.Collection;
+import java.util.*;
 
 public class MyScope {
-    public static final String SCOPE_ID = "GitScopePro";
+    public static final String OLD_SCOPE_ID = "GitScopePro";
+    public static final String SCOPE_ID = "GitScope";
     private final NamedScopeManager scopeManager;
+    private final Project myProject;
     private MyPackageSet myPackageSet;
 
     public MyScope(Project project) {
         this.scopeManager = NamedScopeManager.getInstance(project);
-        this.createScope();
+        this.myProject = project;
+        this.createSearchScope();
+        this.updateProjectScope();
     }
 
-    public void createScope() {
+    public void createSearchScope() {
         this.myPackageSet = new MyPackageSet();
-        NamedScope myScope = new NamedScope(SCOPE_ID, new MyScopeNameSupplier(), Defs.ICON, this.myPackageSet);
-        boolean scopeExists = false;
+    }
 
-        NamedScope[] scopes = this.scopeManager.getEditableScopes();
-        NamedScope[] newNamedScopes = new NamedScope[0];
+    private void updateProjectScope()
+    {
+        NamedScope myScope = new NamedScope(
+                SCOPE_ID,
+                () -> "Git Scope",
+                Defs.ICON,
+                this.myPackageSet
+        );
 
-        for (NamedScope scope : scopes) {
-            if (SCOPE_ID.contentEquals(scope.getScopeId())) {
-                scopeExists = true;
-                scope = myScope;
-            }
-            newNamedScopes = ArrayUtil.append(newNamedScopes, scope);
-        }
+        List<NamedScope> scopes = new ArrayList<>(Arrays.asList(scopeManager.getEditableScopes()));
+        scopes.removeIf(scope -> SCOPE_ID.equals(scope.getScopeId()));
+        scopes.removeIf(scope -> OLD_SCOPE_ID.equals(scope.getScopeId()));
+        scopes.add(myScope);
+        scopeManager.setScopes(scopes.toArray(new NamedScope[0]));
+    }
 
-        if (!scopeExists) {
-            newNamedScopes = ArrayUtil.append(newNamedScopes, myScope);
-        }
-        this.scopeManager.setScopes(newNamedScopes);
-
+    private void updateProjectFilter()
+    {
+        InspectionProfileImpl profile = InspectionProjectProfileManager.getInstance(myProject).getCurrentProfile();
+        profile.scopesChanged();
+        scopeManager.setScopes(scopeManager.getEditableScopes());
+        ProjectView.getInstance(myProject).refresh();
     }
 
     public void update(Collection<Change> changes) {
         // Only create/update scope if we have actual changes
         if (changes != null && !changes.isEmpty()) {
             if (this.myPackageSet == null) {
-                createScope();
+                createSearchScope();
             }
             this.myPackageSet.setChanges(changes);
         } else {
@@ -55,6 +67,10 @@ public class MyScope {
             if (this.myPackageSet != null) {
                 this.myPackageSet.setChanges(new ArrayList<>());
             }
+        }
+
+        if (changes != null) {
+            ApplicationManager.getApplication().invokeLater(this::updateProjectFilter);
         }
     }
 }
