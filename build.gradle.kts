@@ -6,14 +6,15 @@ import javax.xml.xpath.XPathFactory
 import javax.xml.xpath.XPathConstants
 import org.w3c.dom.Document
 import org.gradle.api.provider.Provider
+import org.gradle.util.GradleVersion
 
 fun properties(key: String) = project.findProperty(key).toString()
 
 plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "2.2.0"
-    id("org.jetbrains.intellij.platform") version "2.6.0"
-    id("org.jetbrains.changelog") version "2.2.1"
+    id("org.jetbrains.intellij.platform") version "2.7.1"
+    id("org.jetbrains.changelog") version "2.4.0"
 }
 
 group = properties("pluginGroup")
@@ -48,8 +49,9 @@ changelog {
 val ideaVersion = findIdeaVersion(providers.gradleProperty("platformVersion"))
 dependencies {
     intellijPlatform {
-        val type = providers.gradleProperty("platformType")
-        create(type, ideaVersion)
+        val type: String = providers.gradleProperty("platformType").get()
+        val version: String = ideaVersion
+        create(type, version)
         bundledPlugins(providers.gradleProperty("platformBundledPlugins").map { it.split(',') })
         pluginVerifier()
     }
@@ -104,6 +106,36 @@ intellijPlatform {
 tasks {
     buildSearchableOptions {
         enabled = false
+    }
+    wrapper {
+        gradleVersion = providers.gradleProperty("gradleVersion").get()
+        distributionType = Wrapper.DistributionType.BIN
+    }
+
+    register<DefaultTask>("verifyWrapperVersion") {
+        // Wire expected version as a declared input so the action doesn't capture Project
+        val expectedVersion = providers.gradleProperty("gradleVersion").orElse("")
+        inputs.property("expectedGradleVersion", expectedVersion)
+
+        doLast {
+            val expected = inputs.properties["expectedGradleVersion"] as String
+            if (expected.isBlank()) return@doLast
+
+            val actual = GradleVersion.current().version
+            if (expected != actual) {
+                throw GradleException(
+                    "Gradle Wrapper is $actual but expected is gradleVersion=$expected. " +
+                            "Run: ./gradlew wrapper --gradle-version $expected"
+                )
+            }
+        }
+    }
+}
+
+// Verify that we have the expected version of the Gradle wrapper
+listOf("build", "buildPlugin").forEach { taskName ->
+    tasks.matching { it.name == taskName }.configureEach {
+        dependsOn(tasks.named("verifyWrapperVersion"))
     }
 }
 
