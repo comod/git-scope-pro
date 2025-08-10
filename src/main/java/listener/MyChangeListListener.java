@@ -43,12 +43,8 @@ public class MyChangeListListener implements ChangeListListener {
         // Update for next trigger
         previousChangeHashes = currentChangeHashes;
 
-        if (filesChanged) {
-            // Only initiate the comparison if files have changed
-
-            // TODO: collectChanges: VcsTree is updated with modified content (needed?)
-            viewService.collectChanges(true);
-        }
+        // TODO: collectChanges: VcsTree is updated
+        viewService.collectChanges(filesChanged);
     }
 
     private String getFilePath(Change change) {
