@@ -5,6 +5,7 @@
 - Fixed additional minor EDT issues
 - Improved performance of various operations (scope detection, window population, scope filtering).
   This should improve performance when used with large scopes.
+- Message/build window could lose automatic links to source code (compilation errors) on scope updates.
 
 ### Added
 

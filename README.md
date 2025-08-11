@@ -2,21 +2,21 @@
 
 <!-- Plugin description -->
 
-Create custom "scopes" for any target branch. Selectable in a tool window, which is then called **GIT SCOPE**.
-The Current "scope" is displayed as a
-
-- Diff in the tool window
-- "line status" in the "line gutter"
-- Custom "scope" and finally as a
-- Status bar widget
-
 ### Story
 
 I think every developer loves to check their changes with **version control** before committing.
-But there is a big problem after committing the code: All changes in **version control** and also the line status
-disappear completely.
-Usually a branch contains more than one commit. This plugin helps you to make these commits visible again in an
-intuitive way!
+But there is a big problem with the current IntelliJ-based IDEs after committing the code: All changes in **version
+control** and also the line status disappear completely. Usually a branch contains more than one commit. This plugin
+helps you to make these commits visible again in an intuitive way!
+
+To make changes visible you can create custom "scopes" for any target branch, tag or any valid git reference. Each of
+the defined scopes will be selectable as a tab in the **GIT SCOPE** tool window. The current selected "scope" is
+displayed as a:
+
+- Overall project tree diff in the **GIT SCOPE** tool window
+- Editor "line status" in the "line gutter" for each opened file (if file gutter is enabled)
+- Custom "scope" that can be used for example when searching and finally as a
+- Status bar widget
 
 ### Plugin Features
 
@@ -33,9 +33,11 @@ In the "New*" tab you get a few different options to define the scope:
    with the main repo being the first repo in the list.
 2. Alternatively, you can manually type the branch, tag or git reference and press Enter. A git reference can be any
    valid
-   git reference such as `HEAD~2`, `<short hash>`, ...
-3. If you want to bind the scope to the common ancestor for `HEAD` and the current selection, you can check the common
-   ancestor checkbox.
+   git reference such as `HEAD~2`, `<long hash>`, `<short hash>`, ...
+3. If you want to bind the scope to the common ancestor for `HEAD` and the current selected scope reference, you can
+   check the common ancestor checkbox. This makes it possible to for example select `master` and your scope will be
+   compared to the common ancestor of `master` and `HEAD`. And you are free to pull new changes onto `master` without
+   affecting the scope.
 4. If the list of branches is long, it can be filtered using the search box.
 
 ![](docs/icon.svg) **Change Browser:**

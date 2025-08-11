@@ -1,9 +1,12 @@
 package service;
 
+import com.intellij.ide.projectView.impl.ProjectViewListener;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.changes.Change;
+import com.intellij.util.concurrency.AppExecutorUtil;
+import com.intellij.util.concurrency.SequentialTaskExecutor;
 import implementation.compare.ChangesService;
 import implementation.lineStatusTracker.MyLineStatusTrackerImpl;
 import io.reactivex.rxjava3.core.Observable;
@@ -11,6 +14,7 @@ import model.Debounce;
 import model.MyModel;
 import model.MyModelBase;
 import model.TargetBranchMap;
+import org.jetbrains.annotations.NotNull;
 import state.State;
 import implementation.scope.MyScope;
 import system.Defs;
@@ -21,15 +25,20 @@ import java.awt.*;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
 public class ViewService implements Disposable {
 
     public static final String PLUS_TAB_LABEL = "+";
     public static final int DEBOUNCE_MS = 50;
+    public static final int AFTER_PROJECT_INIT_REFRESH_TIME = 5;  // sec
+    public static final int HEAD_TAB_INIT_TIMEOUT = 5;  // sec
     public List<MyModel> collection = new ArrayList<>();
     public Integer currentTabIndex = 0;
     private final Project project;
@@ -48,15 +57,22 @@ public class ViewService implements Disposable {
     private MyModel myHeadModel;
     private boolean isInit;
     private int lastTabIndex;
+    private Integer savedTabIndex;
     private final AtomicBoolean tabInitializationInProgress = new AtomicBoolean(false);
+    private final AtomicBoolean projectViewInitHandled = new AtomicBoolean(false);
 
     public ViewService(Project project) {
         this.project = project;
         EventQueue.invokeLater(this::initDependencies);
     }
 
+    private final @NotNull ExecutorService changesExecutor =
+            SequentialTaskExecutor.createSequentialApplicationPoolExecutor("ViewServiceChanges");
+    private final AtomicLong applyGeneration = new AtomicLong(0);
+
     @Override
-    public void dispose() {}
+    public void dispose() {
+    }
 
     public void initDependencies() {
         this.toolWindowService = project.getService(ToolWindowServiceInterface.class);
@@ -68,6 +84,9 @@ public class ViewService implements Disposable {
         this.myLineStatusTrackerImpl = new MyLineStatusTrackerImpl(project, this);
         this.myScope = new MyScope(project);
         this.debouncer = new Debounce();
+
+        // TODO: Workaround for disappearing gutter during IDE startup
+        subscribeToProjectViewInit();
     }
 
     private void doUpdateDebounced(Collection<Change> changes) {
@@ -103,18 +122,30 @@ public class ViewService implements Disposable {
 
         setCollection(collection);
 
-        // Restore the active tab index
-        Integer savedTabIndex = this.state.getCurrentTabIndex();
-        if (savedTabIndex != null) {
-            this.currentTabIndex = savedTabIndex;
-            // Schedule tab selection after UI is ready
-            EventQueue.invokeLater(() -> {
-                if (toolWindowService != null) {
-                    toolWindowService.selectTabByIndex(savedTabIndex);
-                    setActiveModel();
-                }
-            });
-        }
+        // Remember the saved active tab index
+        savedTabIndex = this.state.getCurrentTabIndex();
+    }
+
+    private void subscribeToProjectViewInit() {
+        project.getMessageBus()
+                .connect(this)
+                .subscribe(ProjectViewListener.TOPIC, new ProjectViewListener() {
+                    @Override
+                    public void initCompleted() {
+                        if (project.isDisposed()) return;
+                        if (projectViewInitHandled.compareAndSet(false, true)) {
+                            if (toolWindowService != null) {
+                                AppExecutorUtil.getAppScheduledExecutorService().schedule(() -> {
+                                    ApplicationManager.getApplication().invokeLater(() -> {
+                                        toggleActionInvoked();
+                                        toggleActionInvoked();
+                                    });
+                                }, AFTER_PROJECT_INIT_REFRESH_TIME, TimeUnit.SECONDS);
+
+                            }
+                        }
+                    }
+                });
     }
 
     public void save() {
@@ -182,6 +213,16 @@ public class ViewService implements Disposable {
 
         // Set the active model
         setActiveModel();
+
+        if (savedTabIndex != null) {
+            this.currentTabIndex = savedTabIndex;
+            runAfterCurrentChangeCollection(() -> {
+                if (toolWindowService != null) {
+                    toolWindowService.selectTabByIndex(savedTabIndex);
+                    setActiveModel();
+                }
+            });
+        }
     }
 
     public void initTabsSequentially() {
@@ -235,6 +276,7 @@ public class ViewService implements Disposable {
             });
 
             subscribeToObservable(myHeadModel);
+
             // TODO: collectChanges: head tab initialized
             collectChanges(myHeadModel, true);
             latch.countDown();
@@ -242,7 +284,7 @@ public class ViewService implements Disposable {
 
         try {
             // Wait for the head tab initialization to complete with a timeout
-            latch.await(5, TimeUnit.SECONDS);
+            latch.await(HEAD_TAB_INIT_TIMEOUT, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             // Handle interruption if necessary
         }
@@ -390,32 +432,51 @@ public class ViewService implements Disposable {
         return this.targetBranchService.getTargetBranchDisplay(model.getTargetBranchMap());
     }
 
-    public void collectChanges(boolean checkFs) {
-        collectChanges(getCurrent(), checkFs);
+    public CompletableFuture<Void> collectChanges(boolean checkFs) {
+        return collectChanges(getCurrent(), checkFs);
     }
 
-    public void collectChanges(MyModel model, boolean checkFs) {
+    public CompletableFuture<Void> collectChanges(MyModel model, boolean checkFs) {
+        CompletableFuture<Void> done = new CompletableFuture<>();
         if (model == null) {
-            return;
+            done.complete(null);
+            return done;
         }
-
         TargetBranchMap targetBranchMap = model.getTargetBranchMap();
         if (targetBranchMap == null) {
-            return;
+            done.complete(null);
+            return done;
         }
 
-        // Run potentially slow operations in the background
-        ApplicationManager.getApplication().executeOnPooledThread(() -> {
+        final long gen = applyGeneration.get();
+
+        // serialize collection behind a single-threaded executor
+        changesExecutor.execute(() -> {
             changesService.collectChangesWithCallback(targetBranchMap, changes -> {
-                // Update UI on EDT
                 ApplicationManager.getApplication().invokeLater(() -> {
-                    if (!project.isDisposed()) {
-                        model.setChanges(changes);
+                    try {
+                        if (!project.isDisposed() && applyGeneration.get() == gen) {
+                            model.setChanges(changes);
+                        }
+                    } finally {
+                        done.complete(null);
                     }
                 });
             }, checkFs);
         });
+
+        return done;
     }
+
+    // helper to enqueue UI work strictly after the currently queued collections
+    public void runAfterCurrentChangeCollection(Runnable uiTask) {
+        changesExecutor.execute(() ->
+                ApplicationManager.getApplication().invokeLater(() -> {
+                    if (!project.isDisposed()) uiTask.run();
+                })
+        );
+    }
+
 
     public MyModel addModel() {
         MyModel model = new MyModel();
@@ -469,6 +530,7 @@ public class ViewService implements Disposable {
             lastTabIndex = currentTabIndex;
         }
         currentTabIndex = index;
+        applyGeneration.incrementAndGet(); // bump generation on tab change
         save();
     }
 

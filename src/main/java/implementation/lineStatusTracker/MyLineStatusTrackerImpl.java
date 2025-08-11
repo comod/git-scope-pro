@@ -120,8 +120,10 @@ public class MyLineStatusTrackerImpl implements Disposable {
                 Editor[] editors = EditorFactory.getInstance().getAllEditors();
                 for (Editor editor : editors) {
                     if (isDiffView(editor)) continue;
-                    updateLineStatusByChangesForEditorSafe(editor, fileToRevisionMap);
-                    refreshEditor(editor);
+                    if (updateLineStatusByChangesForEditorSafe(editor, fileToRevisionMap))
+                    {
+                        refreshEditor(editor);
+                    }
                 }
             });
         });
@@ -146,12 +148,12 @@ public class MyLineStatusTrackerImpl implements Disposable {
         });
     }
 
-    private void updateLineStatusByChangesForEditorSafe(Editor editor, Map<String, ContentRevision> fileToRevisionMap) {
-        if (editor == null || disposing.get()) return;
+    private boolean updateLineStatusByChangesForEditorSafe(Editor editor, Map<String, ContentRevision> fileToRevisionMap) {
+        if (editor == null || disposing.get()) return false;
 
         Document doc = editor.getDocument();
         VirtualFile file = FileDocumentManager.getInstance().getFile(doc);
-        if (file == null) return;
+        if (file == null) return false;
 
         String filePath = file.getPath();
         ContentRevision contentRevision = fileToRevisionMap.get(filePath);
@@ -165,11 +167,12 @@ public class MyLineStatusTrackerImpl implements Disposable {
                 content = revisionContent != null ? revisionContent : "";
             } catch (VcsException e) {
                 LOG.warn("Error getting content for revision", e);
-                return;
+                return false;
             }
         }
 
         updateTrackerBaseContent(doc, content);
+        return true;
     }
 
     /**
