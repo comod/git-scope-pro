@@ -1,12 +1,13 @@
-import java.io.*
-import java.net.*
+import org.w3c.dom.Document
+import java.io.BufferedReader
+import java.io.ByteArrayInputStream
+import java.io.InputStreamReader
+import java.net.HttpURLConnection
+import java.net.URL
 import java.nio.file.Files
 import javax.xml.parsers.DocumentBuilderFactory
-import javax.xml.xpath.XPathFactory
 import javax.xml.xpath.XPathConstants
-import org.w3c.dom.Document
-import org.gradle.api.provider.Provider
-import org.gradle.util.GradleVersion
+import javax.xml.xpath.XPathFactory
 
 fun properties(key: String) = project.findProperty(key).toString()
 
@@ -53,7 +54,9 @@ dependencies {
         val version: String = ideaVersion
         create(type, version)
         bundledPlugins(providers.gradleProperty("platformBundledPlugins").map { it.split(',') })
-        pluginVerifier()
+
+        // https://github.com/JetBrains/intellij-platform-gradle-plugin/issues/2003
+        pluginVerifier("1.388")
     }
 }
 
@@ -90,7 +93,7 @@ intellijPlatform {
             } else {
                 // Fallback to current version only
                 changelog.renderItem(
-                    changelog.getOrNull(properties("pluginVersion").toString())
+                    changelog.getOrNull(properties("pluginVersion"))
                         ?: changelog.getLatest(),
                     org.jetbrains.changelog.Changelog.OutputType.HTML
                 )
@@ -98,9 +101,10 @@ intellijPlatform {
         })
         ideaVersion {
             sinceBuild = properties("pluginSinceBuild")
-            untilBuild = properties("pluginUntilBuild")
+            untilBuild = provider { null }
         }
     }
+
 }
 
 tasks {
