@@ -18,6 +18,7 @@ public class MyFileEditorManagerListener implements FileEditorManagerListener {
     @Override
     public void fileOpened(@NotNull FileEditorManager source, @NotNull VirtualFile vFile) {
         // TODO: collectChanges: File Opened event
+        viewService.incrementUpdate();
         viewService.collectChanges(false);
     }
 }

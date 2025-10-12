@@ -1,3 +1,10 @@
+## [2025.2.1]
+
+### Fixes
+
+- Fixed [crash at plugin startup](https://github.com/comod/git-scope-pro/issues/63)
+- Fixed [file list (and gutter) not updating when switching branches](https://github.com/comod/git-scope-pro/issues/62)
+
 ## [2025.2]
 
 ### Fixes
