@@ -177,7 +177,6 @@ private JPanel createManualInputPanel(GitRepository repository, BranchTree branc
         return new KeyListener() {
             @Override
             public void keyTyped(KeyEvent e) {
-                //System.out.println(e);
                 String text = search.getText();
                 if (e.getKeyChar() == KeyEvent.VK_BACK_SPACE) {
                     search.setText(removeLastChar(text));

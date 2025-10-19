@@ -1,20 +1,13 @@
-import org.w3c.dom.Document
-import java.io.BufferedReader
-import java.io.ByteArrayInputStream
-import java.io.InputStreamReader
-import java.net.HttpURLConnection
-import java.net.URL
-import java.nio.file.Files
-import javax.xml.parsers.DocumentBuilderFactory
-import javax.xml.xpath.XPathConstants
-import javax.xml.xpath.XPathFactory
 
 fun properties(key: String) = project.findProperty(key).toString()
 
+val platformVersion = properties("platformVersion")
+val platformType = properties("platformType")
+
 plugins {
     id("java")
-    id("org.jetbrains.kotlin.jvm") version "2.2.0"
-    id("org.jetbrains.intellij.platform") version "2.7.1"
+    id("org.jetbrains.kotlin.jvm") version "2.2.20"
+    id("org.jetbrains.intellij.platform") version "2.10.0"
     id("org.jetbrains.changelog") version "2.4.0"
 }
 
@@ -30,9 +23,11 @@ repositories {
 
 kotlin {
     jvmToolchain(21)
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+    }
 }
 
-// Configure changelog plugin
 fun getMajorVersion(version: String): String {
     val parts = version.split(".")
     return if (parts.size >= 2) "${parts[0]}.${parts[1]}" else version
@@ -46,17 +41,16 @@ changelog {
     keepUnreleasedSection.set(true)
 }
 
-// pluginIdeaVersion comes from properties and it set to LATEST-STABLE, LATEST-EAP-SNAPSHOT, or a specific version number
-val ideaVersion = findIdeaVersion(providers.gradleProperty("platformVersion"))
 dependencies {
     intellijPlatform {
         val type: String = providers.gradleProperty("platformType").get()
-        val version: String = ideaVersion
-        create(type, version)
-        bundledPlugins(providers.gradleProperty("platformBundledPlugins").map { it.split(',') })
+        val version: String = providers.gradleProperty("platformVersion").get()
 
-        // https://github.com/JetBrains/intellij-platform-gradle-plugin/issues/2003
-        pluginVerifier("1.388")
+
+        create(type, version) {
+            useInstaller = !version.endsWith("EAP-SNAPSHOT")
+        }
+        bundledPlugins(providers.gradleProperty("platformBundledPlugins").map { it.split(',') })
     }
 }
 
@@ -134,7 +128,13 @@ tasks {
             }
         }
     }
+    // Set the JVM compatibility versions
+    withType<JavaCompile> {
+        sourceCompatibility = "21"
+        targetCompatibility = "21"
+    }
 }
+
 
 // Verify that we have the expected version of the Gradle wrapper
 listOf("build", "buildPlugin").forEach { taskName ->
@@ -146,104 +146,4 @@ listOf("build", "buildPlugin").forEach { taskName ->
 dependencies {
     implementation("com.google.code.gson:gson:2.13.1")
     implementation("io.reactivex.rxjava3:rxjava:3.1.10")
-}
-
-/**
- * Find the latest stable or EAP IDE version from the JetBrains website, otherwise simply returns the given IDE version string.
- * @param ideaVersion can be LATEST-STABLE, LATEST-EAP-SNAPSHOT or a specific IDE version string (year.maj.min).
- */
-fun findIdeaVersion(ideaVersion: Provider<String>): String {
-    // Get the actual value from the Provider
-    val versionValue = ideaVersion.get()
-
-    /** Find the latest IntelliJ EAP version from the JetBrains website. Result is cached locally for 24h. */
-    fun findLatestIdeaVersion(isStable: Boolean): String {
-
-        /** Read a remote file as String. */
-        fun readRemoteContent(url: URL): String {
-            val t1 = System.currentTimeMillis()
-            val content = StringBuilder()
-            val conn = url.openConnection() as HttpURLConnection
-            conn.requestMethod = "GET"
-            BufferedReader(InputStreamReader(conn.inputStream)).use { rd ->
-                var line: String? = rd.readLine()
-                while (line != null) {
-                    content.append(line)
-                    line = rd.readLine()
-                }
-            }
-            val t2 = System.currentTimeMillis()
-            logger.quiet("Download $url, took ${t2 - t1} ms (${content.length} B)")
-            return content.toString()
-        }
-
-        /** Find the latest IntelliJ version from the given url and xpath expression that picks the desired IDE version and channel.
-         * The result is cached for 24hr.*/
-        fun getOnlineLatestIdeVersion(definitionsUrl: URL, xpathExpression: String): String {
-            val definitionsStr = readRemoteContent(definitionsUrl)
-            val builderFactory = DocumentBuilderFactory.newInstance()
-            val builder = builderFactory.newDocumentBuilder()
-            val xmlDocument: Document = builder.parse(ByteArrayInputStream(definitionsStr.toByteArray()))
-            val xPath = XPathFactory.newInstance().newXPath()
-            return xPath.compile(xpathExpression).evaluate(xmlDocument, XPathConstants.STRING) as String
-        }
-
-        val t1 = System.currentTimeMillis()
-        // IMPORTANT if not available, migrate to https://data.services.jetbrains.com/products?code=IC
-        @Suppress("DEPRECATION")
-        val definitionsUrl = URL("https://www.jetbrains.com/updates/updates.xml")
-        val xpathExpression =
-            if (isStable) "/products/product[@name='IntelliJ IDEA']/channel[@id='IC-IU-RELEASE-licensing-RELEASE']/build[1]/@version"
-            else "/products/product[@name='IntelliJ IDEA']/channel[@id='IC-IU-EAP-licensing-EAP']/build[1]/@fullNumber"
-        val cachedLatestVersionFile =
-            File(System.getProperty("java.io.tmpdir") + (if (isStable) "/jle-ij-latest-stable-version.txt" else "/jle-ij-latest-eap-version.txt"))
-        var latestVersion: String
-        try {
-            if (cachedLatestVersionFile.exists()) {
-
-                val cacheDurationMs = 24 * 60 * 60_000 // 24hr
-                if (cachedLatestVersionFile.exists() && cachedLatestVersionFile.lastModified() < (System.currentTimeMillis() - cacheDurationMs)) {
-                    logger.quiet("Cache expired, find latest EAP IDE version from $definitionsUrl then update cached file $cachedLatestVersionFile")
-                    latestVersion = getOnlineLatestIdeVersion(definitionsUrl, xpathExpression)
-                    cachedLatestVersionFile.delete()
-                    Files.writeString(cachedLatestVersionFile.toPath(), latestVersion, Charsets.UTF_8)
-
-                } else {
-                    logger.quiet("Find latest EAP IDE version from cached file $cachedLatestVersionFile")
-                    latestVersion = Files.readString(cachedLatestVersionFile.toPath())
-                }
-
-            } else {
-                logger.quiet("Find latest EAP IDE version from $definitionsUrl")
-                latestVersion = getOnlineLatestIdeVersion(definitionsUrl, xpathExpression)
-                Files.writeString(cachedLatestVersionFile.toPath(), latestVersion, Charsets.UTF_8)
-            }
-
-        } catch (e: Exception) {
-            if (cachedLatestVersionFile.exists()) {
-                logger.warn("Error: ${e.message}. Will find latest EAP IDE version from cached file $cachedLatestVersionFile")
-                latestVersion = Files.readString(cachedLatestVersionFile.toPath())
-            } else {
-                throw RuntimeException(e)
-            }
-        }
-        if (logger.isDebugEnabled) {
-            val t2 = System.currentTimeMillis()
-            logger.debug("Operation took ${t2 - t1} ms")
-        }
-        return latestVersion
-    }
-
-    if (versionValue == "LATEST-STABLE") {
-        val version = findLatestIdeaVersion(true)
-        logger.quiet("Found latest stable IDE version: $version")
-        return version
-    }
-    if (versionValue == "LATEST-EAP-SNAPSHOT") {
-        val version = findLatestIdeaVersion(false)
-        logger.quiet("Found latest EAP IDE version: $version")
-        return version
-    }
-    logger.warn("Will use user-defined IDE version: $versionValue")
-    return versionValue
 }

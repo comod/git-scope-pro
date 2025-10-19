@@ -1,11 +1,9 @@
 package service;
 
-import com.intellij.ide.projectView.impl.ProjectViewListener;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.changes.Change;
-import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.util.concurrency.SequentialTaskExecutor;
 import implementation.compare.ChangesService;
 import implementation.lineStatusTracker.MyLineStatusTrackerImpl;
@@ -37,7 +35,6 @@ public class ViewService implements Disposable {
 
     public static final String PLUS_TAB_LABEL = "+";
     public static final int DEBOUNCE_MS = 50;
-    public static final int AFTER_PROJECT_INIT_REFRESH_TIME = 5;  // sec
     public static final int HEAD_TAB_INIT_TIMEOUT = 5;  // sec
     public List<MyModel> collection = new ArrayList<>();
     public Integer currentTabIndex = 0;
@@ -59,7 +56,6 @@ public class ViewService implements Disposable {
     private int lastTabIndex;
     private Integer savedTabIndex;
     private final AtomicBoolean tabInitializationInProgress = new AtomicBoolean(false);
-    private final AtomicBoolean projectViewInitHandled = new AtomicBoolean(false);
 
     public ViewService(Project project) {
         this.project = project;
@@ -84,9 +80,6 @@ public class ViewService implements Disposable {
         this.myLineStatusTrackerImpl = new MyLineStatusTrackerImpl(project, this);
         this.myScope = new MyScope(project);
         this.debouncer = new Debounce();
-
-        // TODO: Workaround for disappearing gutter during IDE startup
-        subscribeToProjectViewInit();
     }
 
     private void doUpdateDebounced(Collection<Change> changes) {
@@ -124,28 +117,6 @@ public class ViewService implements Disposable {
 
         // Remember the saved active tab index
         savedTabIndex = this.state.getCurrentTabIndex();
-    }
-
-    private void subscribeToProjectViewInit() {
-        project.getMessageBus()
-                .connect(this)
-                .subscribe(ProjectViewListener.TOPIC, new ProjectViewListener() {
-                    @Override
-                    public void initCompleted() {
-                        if (project.isDisposed()) return;
-                        if (projectViewInitHandled.compareAndSet(false, true)) {
-                            if (toolWindowService != null) {
-                                AppExecutorUtil.getAppScheduledExecutorService().schedule(() -> {
-                                    ApplicationManager.getApplication().invokeLater(() -> {
-                                        toggleActionInvoked();
-                                        toggleActionInvoked();
-                                    });
-                                }, AFTER_PROJECT_INIT_REFRESH_TIME, TimeUnit.SECONDS);
-
-                            }
-                        }
-                    }
-                });
     }
 
     public void save() {
@@ -278,6 +249,7 @@ public class ViewService implements Disposable {
             subscribeToObservable(myHeadModel);
 
             // TODO: collectChanges: head tab initialized
+            incrementUpdate();
             collectChanges(myHeadModel, true);
             latch.countDown();
         });
@@ -369,6 +341,7 @@ public class ViewService implements Disposable {
                         toolWindowService.changeTabName(tabName);
                     });
                     // TODO: collectChanges: target branch selected (Git Scope selected)
+                    incrementUpdate();
                     collectChanges(model, true);
                     save();
                 }
@@ -398,6 +371,9 @@ public class ViewService implements Disposable {
 
     private void getTargetBranchDisplayCurrent(Consumer<String> callback) {
         MyModel current = getCurrent();
+        if (current == null) {
+            return;
+        }
         getTargetBranchDisplayAsync(current, callback);
     }
 
@@ -430,6 +406,10 @@ public class ViewService implements Disposable {
     @Deprecated
     private String getTargetBranchDisplay(MyModel model) {
         return this.targetBranchService.getTargetBranchDisplay(model.getTargetBranchMap());
+    }
+
+    public void incrementUpdate() {
+        applyGeneration.incrementAndGet();
     }
 
     public CompletableFuture<Void> collectChanges(boolean checkFs) {
@@ -530,7 +510,7 @@ public class ViewService implements Disposable {
             lastTabIndex = currentTabIndex;
         }
         currentTabIndex = index;
-        applyGeneration.incrementAndGet(); // bump generation on tab change
+        applyGeneration.incrementAndGet(); // bump generation on tab change to invalidate any ongoing update
         save();
     }
 
@@ -592,7 +572,10 @@ public class ViewService implements Disposable {
         this.collection.forEach(myModel -> {
             myModel.setActive(false);
         });
-        this.getCurrent().setActive(true);
+        MyModel current = this.getCurrent();
+        if (current != null) {
+            current.setActive(true);
+        }
     }
 
     public void onUpdate(Collection<Change> changes) {
