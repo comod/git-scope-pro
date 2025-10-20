@@ -18,6 +18,16 @@ displayed as a:
 - Custom "scope" that can be used for example when searching and finally as a
 - Status bar widget
 
+### Plugin Basics
+
+The plugin will add a new tool window named **Git Scope**:
+
+![](docs/tool_window.png)
+
+By default, it will appear as a secondary tool window on the left side, but you can move it anywhere to suit your
+workflow. All features of this plugin are managed through the Git Scope tool window — no additional settings or
+preferences are added. In other words; the plugin extends the GUI of the Jetbrains IDE.
+
 ### Plugin Features
 
 ![](docs/icon.svg) **New Scope:**
