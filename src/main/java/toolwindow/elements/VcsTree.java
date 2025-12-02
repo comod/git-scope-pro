@@ -1,7 +1,6 @@
 package toolwindow.elements;
 
 import com.intellij.icons.AllIcons;
-import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.FilePath;
 import com.intellij.openapi.vcs.changes.Change;
@@ -14,6 +13,7 @@ import implementation.compare.ChangesService;
 import service.ViewService;
 import state.WindowPositionTracker;
 import state.WindowPositionTracker.ScrollPosition;
+import system.Defs;
 
 import javax.swing.*;
 import java.awt.*;
@@ -28,7 +28,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 public class VcsTree extends JPanel {
-    private static final Logger LOG = Logger.getInstance(VcsTree.class);
+    private static final com.intellij.openapi.diagnostic.Logger LOG = Defs.getLogger(VcsTree.class);
     private static final int UPDATE_TIMEOUT_SECONDS = 30;
 
     private final Project project;

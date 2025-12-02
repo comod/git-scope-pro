@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
 public class ViewService implements Disposable {
+    private static final com.intellij.openapi.diagnostic.Logger LOG = Defs.getLogger(ViewService.class);
 
     public static final String PLUS_TAB_LABEL = "+";
     public static final int DEBOUNCE_MS = 50;
@@ -352,7 +353,10 @@ public class ViewService implements Disposable {
                     }
                 }
                 // TODO: collectChanges: tab switched
-                case active -> collectChanges(model, true);
+                case active -> {
+                    incrementUpdate(); // Increment generation to cancel any stale updates for previous tab
+                    collectChanges(model, true);
+                }
                 case tabName -> {
                     if (!isProcessingTabRename) {
                         String customName = model.getCustomTabName();
@@ -409,7 +413,8 @@ public class ViewService implements Disposable {
     }
 
     public void incrementUpdate() {
-        applyGeneration.incrementAndGet();
+        long newGen = applyGeneration.incrementAndGet();
+        LOG.debug("incrementUpdate() -> generation = " + newGen);
     }
 
     public CompletableFuture<Void> collectChanges(boolean checkFs) {
@@ -419,24 +424,31 @@ public class ViewService implements Disposable {
     public CompletableFuture<Void> collectChanges(MyModel model, boolean checkFs) {
         CompletableFuture<Void> done = new CompletableFuture<>();
         if (model == null) {
+            LOG.warn("collectChanges() called but model is null");
             done.complete(null);
             return done;
         }
         TargetBranchMap targetBranchMap = model.getTargetBranchMap();
         if (targetBranchMap == null) {
+            LOG.warn("collectChanges() called but targetBranchMap is null");
             done.complete(null);
             return done;
         }
 
         final long gen = applyGeneration.get();
+        LOG.debug("collectChanges() scheduled with generation = " + gen);
 
         // serialize collection behind a single-threaded executor
         changesExecutor.execute(() -> {
             changesService.collectChangesWithCallback(targetBranchMap, changes -> {
                 ApplicationManager.getApplication().invokeLater(() -> {
                     try {
-                        if (!project.isDisposed() && applyGeneration.get() == gen) {
+                        long currentGen = applyGeneration.get();
+                        if (!project.isDisposed() && currentGen == gen) {
+                            LOG.debug("Applying changes for generation " + gen);
                             model.setChanges(changes);
+                        } else {
+                            LOG.debug("Discarding changes for generation " + gen + " (current generation is " + currentGen + ")");
                         }
                     } finally {
                         done.complete(null);
@@ -510,7 +522,9 @@ public class ViewService implements Disposable {
             lastTabIndex = currentTabIndex;
         }
         currentTabIndex = index;
-        applyGeneration.incrementAndGet(); // bump generation on tab change to invalidate any ongoing update
+        // Don't increment generation here - it will be incremented when setActiveModel() triggers collectChanges()
+        // This prevents a race condition where events between setTabIndex() and the observable firing get lost
+        LOG.debug("setTabIndex(" + index + ")");
         save();
     }
 

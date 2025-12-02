@@ -2,7 +2,6 @@ package implementation.lineStatusTracker;
 
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.EditorFactory;
@@ -26,6 +25,7 @@ import com.intellij.util.messages.MessageBus;
 import com.intellij.util.messages.MessageBusConnection;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import system.Defs;
 
 import java.lang.reflect.Method;
 import java.util.Collection;
@@ -34,7 +34,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class MyLineStatusTrackerImpl implements Disposable {
-    private static final Logger LOG = Logger.getInstance(MyLineStatusTrackerImpl.class);
+    private static final com.intellij.openapi.diagnostic.Logger LOG = Defs.getLogger(MyLineStatusTrackerImpl.class);
 
     private final MessageBusConnection messageBusConnection;
     private final LineStatusTrackerManagerI trackerManager;

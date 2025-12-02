@@ -1,9 +1,9 @@
 package utils;
 
-import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.vcs.changes.Change;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import system.Defs;
 
 import java.lang.reflect.Method;
 import java.util.Collection;
@@ -19,7 +19,7 @@ import java.util.Collections;
  */
 public final class GitCommitReflection {
 
-    private static final Logger LOG = Logger.getInstance(GitCommitReflection.class);
+    private static final com.intellij.openapi.diagnostic.Logger LOG = Defs.getLogger(GitCommitReflection.class);
 
     private GitCommitReflection() {}
 
