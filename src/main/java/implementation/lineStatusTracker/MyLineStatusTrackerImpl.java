@@ -7,6 +7,7 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.EditorFactory;
 import com.intellij.openapi.editor.EditorKind;
+import com.intellij.openapi.editor.ex.DocumentEx;
 import com.intellij.openapi.editor.ex.EditorGutterComponentEx;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditorManager;
@@ -96,12 +97,11 @@ public class MyLineStatusTrackerImpl implements Disposable {
     }
 
     private void refreshEditor(Editor editor) {
-        editor.getMarkupModel().removeAllHighlighters();
+        // Don't remove all highlighters - this removes indent guides and other system decorations
+        // The platform manages system highlighters automatically through the daemon code analyzer
         if (editor.getGutter() instanceof EditorGutterComponentEx gutter) {
             gutter.revalidateMarkup();
-            gutter.repaint();
         }
-        editor.getComponent().repaint();
     }
 
     public void update(Collection<Change> changes, @Nullable VirtualFile targetFile) {
@@ -223,7 +223,7 @@ public class MyLineStatusTrackerImpl implements Disposable {
     }
 
     /**
-     * Request a tracker for the editor’s document (no duplicate requester).
+     * Request a tracker for the editor's document (no duplicate requester).
      */
     private void requestLineStatusTracker(@Nullable Editor editor) {
         if (editor == null || disposing.get()) return;
@@ -231,17 +231,12 @@ public class MyLineStatusTrackerImpl implements Disposable {
         Document document = editor.getDocument();
         ensureRequested(document);
 
-        ApplicationManager.getApplication().invokeLater(() -> {
-            if (disposing.get()) return;
-
-            if (editor.getGutter() instanceof EditorGutterComponentEx gutter) {
-                gutter.revalidateMarkup();
-            }
-        });
+        // Platform handles gutter repainting automatically - no need to force it
     }
 
     /**
      * Use reflection to call the setBaseRevision method on the tracker.
+     * Uses bulk update mode to batch document changes and reduce daemon restarts.
      */
     private void updateTrackerBaseRevision(LineStatusTracker<?> tracker, String content) {
         try {
@@ -254,7 +249,24 @@ public class MyLineStatusTrackerImpl implements Disposable {
                 setBaseRevisionMethod.setAccessible(true);
                 ApplicationManager.getApplication().runWriteAction(() -> {
                     try {
-                        setBaseRevisionMethod.invoke(tracker, content);
+                        // Use bulk update mode to batch changes and prevent flickering
+                        Document document = tracker.getDocument();
+                        if (document instanceof DocumentEx) {
+                            DocumentEx docEx = (DocumentEx) document;
+                            boolean wasBulkUpdate = docEx.isInBulkUpdate();
+                            try {
+                                if (!wasBulkUpdate) {
+                                    docEx.setInBulkUpdate(true);
+                                }
+                                setBaseRevisionMethod.invoke(tracker, content);
+                            } finally {
+                                if (!wasBulkUpdate) {
+                                    docEx.setInBulkUpdate(false);
+                                }
+                            }
+                        } else {
+                            setBaseRevisionMethod.invoke(tracker, content);
+                        }
                     } catch (Exception e) {
                         LOG.error("Failed to invoke setBaseRevision method", e);
                     }
