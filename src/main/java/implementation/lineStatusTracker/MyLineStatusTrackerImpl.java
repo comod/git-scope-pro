@@ -6,10 +6,15 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.EditorFactory;
 import com.intellij.openapi.editor.EditorKind;
+import com.intellij.openapi.editor.event.EditorFactoryEvent;
+import com.intellij.openapi.editor.event.EditorFactoryListener;
 import com.intellij.openapi.editor.ex.DocumentEx;
+import com.intellij.util.DocumentUtil;
 import com.intellij.openapi.editor.ex.EditorGutterComponentEx;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
+import com.intellij.openapi.fileEditor.FileEditor;
 import com.intellij.openapi.fileEditor.FileEditorManager;
+import com.intellij.openapi.fileEditor.FileEditorManagerEvent;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Computable;
@@ -28,16 +33,16 @@ import org.jetbrains.annotations.Nullable;
 import system.Defs;
 
 import java.lang.reflect.Method;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class MyLineStatusTrackerImpl implements Disposable {
     private static final com.intellij.openapi.diagnostic.Logger LOG = Defs.getLogger(MyLineStatusTrackerImpl.class);
 
+    private final Project project;
     private final MessageBusConnection messageBusConnection;
     private final LineStatusTrackerManagerI trackerManager;
+    private final CommitDiffWorkaround commitDiffWorkaround;
 
     // Single, consistent requester for this component's lifetime
     private final Object requester = new Object();
@@ -48,11 +53,15 @@ public class MyLineStatusTrackerImpl implements Disposable {
 
     private static final class TrackerInfo {
         volatile boolean held;
-        volatile String baseContent;
+        volatile String customBaseContent;  // Custom base (target branch)
+        volatile String headBaseContent;     // HEAD revision (for commit panel diffs)
+        volatile boolean isShowingHeadBase;  // Currently showing HEAD base (vs custom base)
 
         TrackerInfo(boolean held, String baseContent) {
             this.held = held;
-            this.baseContent = baseContent;
+            this.customBaseContent = baseContent;
+            this.headBaseContent = null;
+            this.isShowingHeadBase = false;
         }
     }
 
@@ -62,12 +71,72 @@ public class MyLineStatusTrackerImpl implements Disposable {
     }
 
     public MyLineStatusTrackerImpl(Project project, Disposable parentDisposable) {
+        this.project = project;
         this.trackerManager = project.getService(LineStatusTrackerManagerI.class);
+
+        // Initialize the commit diff workaround with our base revision switcher implementation
+        this.commitDiffWorkaround = new CommitDiffWorkaround(project, new CommitDiffWorkaround.BaseRevisionSwitcher() {
+            @Override
+            public void switchToHeadBase(@NotNull Document document, @NotNull String headContent) {
+                LineStatusTracker<?> tracker = trackerManager.getLineStatusTracker(document);
+                if (tracker != null) {
+                    updateTrackerBaseRevision(tracker, headContent);
+                }
+            }
+
+            @Override
+            public void switchToCustomBase(@NotNull Document document, @NotNull String customContent) {
+                LineStatusTracker<?> tracker = trackerManager.getLineStatusTracker(document);
+                if (tracker != null) {
+                    updateTrackerBaseRevision(tracker, customContent);
+                }
+            }
+
+            @Override
+            public @Nullable String getCachedHeadContent(@NotNull Document document) {
+                TrackerInfo info = trackers.get(document);
+                return info != null ? info.headBaseContent : null;
+            }
+
+            @Override
+            public @Nullable String getCachedCustomBaseContent(@NotNull Document document) {
+                TrackerInfo info = trackers.get(document);
+                return info != null ? info.customBaseContent : null;
+            }
+
+            @Override
+            public void cacheHeadContent(@NotNull Document document, @NotNull String headContent) {
+                TrackerInfo info = trackers.get(document);
+                if (info != null) {
+                    info.headBaseContent = headContent;
+                }
+            }
+
+            @Override
+            public boolean isTracked(@NotNull Document document) {
+                TrackerInfo info = trackers.get(document);
+                return info != null && info.held;
+            }
+
+            @Override
+            public void markShowingHeadBase(@NotNull Document document, boolean showing) {
+                TrackerInfo info = trackers.get(document);
+                if (info != null) {
+                    info.isShowingHeadBase = showing;
+                }
+            }
+
+            @Override
+            public boolean isShowingHeadBase(@NotNull Document document) {
+                TrackerInfo info = trackers.get(document);
+                return info != null && info.isShowingHeadBase;
+            }
+        });
 
         MessageBus messageBus = project.getMessageBus();
         this.messageBusConnection = messageBus.connect();
 
-        // Listen to file open/close events
+        // Listen to file open/close/selection events
         messageBusConnection.subscribe(
                 FileEditorManagerListener.FILE_EDITOR_MANAGER,
                 new FileEditorManagerListener() {
@@ -83,13 +152,56 @@ public class MyLineStatusTrackerImpl implements Disposable {
                     public void fileClosed(@NotNull FileEditorManager source, @NotNull VirtualFile file) {
                         Document doc = FileDocumentManager.getInstance().getDocument(file);
                         if (doc != null) {
-                            safeRelease(doc);
+                            // Workaround: Don't release if commit diff editors still need this document
+                            if (!commitDiffWorkaround.hasCommitDiffEditorsFor(doc)) {
+                                safeRelease(doc);
+                            }
                         }
+
+                        // Workaround: Check if closing this file returns focus to commit diff
+                        FileEditor selectedEditor = source.getSelectedEditor();
+                        if (selectedEditor != null &&
+                            selectedEditor.getClass().getSimpleName().equals("BackendDiffRequestProcessorEditor")) {
+                            commitDiffWorkaround.handleSwitchedToCommitDiff();
+                        }
+                    }
+
+                    @Override
+                    public void selectionChanged(@NotNull FileEditorManagerEvent event) {
+                        handleEditorSelectionChanged(event);
                     }
                 }
         );
 
+        // Listen to editor lifecycle to detect commit panel diff editors
+        EditorFactory.getInstance().addEditorFactoryListener(
+                new EditorFactoryListener() {
+                    @Override
+                    public void editorCreated(@NotNull EditorFactoryEvent event) {
+                        Editor editor = event.getEditor();
+                        if (editor.getEditorKind() == EditorKind.DIFF) {
+                            // Check if it's a commit panel diff - hierarchy might not be ready yet
+                            ApplicationManager.getApplication().invokeLater(() -> {
+                                if (commitDiffWorkaround.isCommitPanelDiff(editor)) {
+                                    commitDiffWorkaround.handleCommitDiffEditorCreated(editor);
+                                }
+                            });
+                        }
+                    }
+
+                    @Override
+                    public void editorReleased(@NotNull EditorFactoryEvent event) {
+                        Editor editor = event.getEditor();
+                        if (commitDiffWorkaround.isCommitPanelDiff(editor)) {
+                            commitDiffWorkaround.handleCommitDiffEditorReleased(editor);
+                        }
+                    }
+                },
+                parentDisposable
+        );
+
         Disposer.register(parentDisposable, this);
+        Disposer.register(parentDisposable, commitDiffWorkaround);
     }
 
     private boolean isDiffView(Editor editor) {
@@ -209,7 +321,12 @@ public class MyLineStatusTrackerImpl implements Disposable {
 
                 TrackerInfo info = trackers.get(document);
                 if (info != null) {
-                    info.baseContent = finalContent;
+                    info.customBaseContent = finalContent;
+
+                    // Workaround: Skip custom base update if commit diff is active (showing HEAD base)
+                    if (commitDiffWorkaround.shouldSkipCustomBaseUpdate(document)) {
+                        return;
+                    }
                 }
 
                 LineStatusTracker<?> tracker = trackerManager.getLineStatusTracker(document);
@@ -251,24 +368,15 @@ public class MyLineStatusTrackerImpl implements Disposable {
                     try {
                         // Use bulk update mode to batch changes and prevent flickering
                         Document document = tracker.getDocument();
-                        if (document instanceof DocumentEx) {
-                            DocumentEx docEx = (DocumentEx) document;
-                            boolean wasBulkUpdate = docEx.isInBulkUpdate();
+                        DocumentUtil.executeInBulk(document, () -> {
                             try {
-                                if (!wasBulkUpdate) {
-                                    docEx.setInBulkUpdate(true);
-                                }
                                 setBaseRevisionMethod.invoke(tracker, content);
-                            } finally {
-                                if (!wasBulkUpdate) {
-                                    docEx.setInBulkUpdate(false);
-                                }
+                            } catch (Exception e) {
+                                LOG.error("Failed to invoke setBaseRevision method", e);
                             }
-                        } else {
-                            setBaseRevisionMethod.invoke(tracker, content);
-                        }
+                        });
                     } catch (Exception e) {
-                        LOG.error("Failed to invoke setBaseRevision method", e);
+                        LOG.error("Failed to execute in bulk mode", e);
                     }
                 });
             } else {
@@ -349,6 +457,25 @@ public class MyLineStatusTrackerImpl implements Disposable {
             release.run();
         } else {
             ApplicationManager.getApplication().invokeAndWait(release);
+        }
+    }
+
+    /**
+     * Handle editor selection changed - detect switching to/from commit diff tabs.
+     * Delegates to CommitDiffWorkaround for handling commit panel diff base revision switching.
+     */
+    private void handleEditorSelectionChanged(@NotNull FileEditorManagerEvent event) {
+        FileEditor oldEditor = event.getOldEditor();
+        FileEditor newEditor = event.getNewEditor();
+
+        // Workaround: Check if switching away from commit diff editor
+        if (oldEditor != null && oldEditor.getClass().getSimpleName().equals("BackendDiffRequestProcessorEditor")) {
+            commitDiffWorkaround.handleSwitchedAwayFromCommitDiff();
+        }
+
+        // Workaround: Check if switching to commit diff editor
+        if (newEditor != null && newEditor.getClass().getSimpleName().equals("BackendDiffRequestProcessorEditor")) {
+            commitDiffWorkaround.handleSwitchedToCommitDiff();
         }
     }
 }

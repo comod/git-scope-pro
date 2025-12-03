@@ -424,13 +424,11 @@ public class ViewService implements Disposable {
     public CompletableFuture<Void> collectChanges(MyModel model, boolean checkFs) {
         CompletableFuture<Void> done = new CompletableFuture<>();
         if (model == null) {
-            LOG.warn("collectChanges() called but model is null");
             done.complete(null);
             return done;
         }
         TargetBranchMap targetBranchMap = model.getTargetBranchMap();
         if (targetBranchMap == null) {
-            LOG.warn("collectChanges() called but targetBranchMap is null");
             done.complete(null);
             return done;
         }
