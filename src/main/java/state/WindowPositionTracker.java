@@ -1,6 +1,6 @@
 package state;
 
-import com.intellij.openapi.diagnostic.Logger;
+import system.Defs;
 
 import javax.swing.*;
 import java.awt.*;
@@ -15,7 +15,7 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 public class WindowPositionTracker {
-    private static final Logger LOG = Logger.getInstance(WindowPositionTracker.class);
+    private static final com.intellij.openapi.diagnostic.Logger LOG = Defs.getLogger(WindowPositionTracker.class);
     private static final int SCROLL_SAVE_DELAY_MS = 500;
     private static final long USER_ACTIVITY_TIMEOUT = 2000; // 2 seconds
     private static final int MAX_SCROLL_EVENTS_PER_TAB = 100; // Limit scroll event history size

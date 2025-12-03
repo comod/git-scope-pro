@@ -3,7 +3,6 @@ package toolwindow.elements;
 import com.intellij.ide.ui.UISettings;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.LogicalPosition;
 import com.intellij.openapi.editor.ScrollType;
@@ -15,6 +14,7 @@ import com.intellij.openapi.vcs.changes.Change;
 import com.intellij.openapi.vcs.changes.ui.SimpleAsyncChangesBrowser;
 import com.intellij.openapi.vfs.VirtualFile;
 import org.jetbrains.annotations.NotNull;
+import system.Defs;
 import toolwindow.VcsTreeActions;
 
 import javax.swing.*;
@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.concurrent.*;
 
 public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
-    private static final Logger LOG = Logger.getInstance(MySimpleChangesBrowser.class);
+    private static final com.intellij.openapi.diagnostic.Logger LOG = Defs.getLogger(MySimpleChangesBrowser.class);
     private final Project myProject;
     UISettings uiSettings = UISettings.getInstance();
 

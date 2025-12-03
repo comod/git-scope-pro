@@ -6,9 +6,9 @@ val platformType = properties("platformType")
 
 plugins {
     id("java")
-    id("org.jetbrains.kotlin.jvm") version "2.2.20"
-    id("org.jetbrains.intellij.platform") version "2.10.0"
-    id("org.jetbrains.changelog") version "2.4.0"
+    id("org.jetbrains.kotlin.jvm") version "2.2.21"
+    id("org.jetbrains.intellij.platform") version "2.10.5"
+    id("org.jetbrains.changelog") version "2.5.0"
 }
 
 group = properties("pluginGroup")
@@ -103,6 +103,9 @@ intellijPlatform {
 
 tasks {
     buildSearchableOptions {
+        enabled = false
+    }
+    prepareJarSearchableOptions {
         enabled = false
     }
     wrapper {

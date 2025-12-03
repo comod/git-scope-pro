@@ -1,3 +1,11 @@
+## [2025.3]
+
+### Fixes
+
+- Fixed [Indent guides broken on PyCharm](https://github.com/comod/git-scope-pro/issues/68)
+- Fixed [File list does not update after switching branch](https://github.com/comod/git-scope-pro/issues/62)
+- Fixed [Commit panel diff sometimes not working](https://github.com/comod/git-scope-pro/issues/56)
+
 ## [2025.2.1]
 
 ### Fixes

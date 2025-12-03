@@ -1,6 +1,5 @@
 package listener;
 
-import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.ui.content.ContentManagerEvent;
@@ -8,6 +7,7 @@ import com.intellij.ui.content.ContentManagerListener;
 import org.jetbrains.annotations.NotNull;
 import service.ViewService;
 import service.ToolWindowServiceInterface;
+import system.Defs;
 import toolwindow.elements.VcsTree;
 
 import javax.swing.*;
@@ -16,7 +16,7 @@ import java.util.Objects;
 import static service.ViewService.PLUS_TAB_LABEL;
 
 public class MyTabContentListener implements ContentManagerListener {
-    private static final Logger LOG = Logger.getInstance(MyTabContentListener.class);
+    private static final com.intellij.openapi.diagnostic.Logger LOG = Defs.getLogger(MyTabContentListener.class);
 
     private final Project project;
     // Use lazy initialization for the service
