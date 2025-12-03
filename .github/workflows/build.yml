@@ -13,11 +13,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Download JetBrains Runtime (JBR 21)
         run: |
-          wget https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-21.0.8-linux-x64-b1038.68.tar.gz -O jbr.tar.gz
+          wget https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-21.0.9-linux-x64-b1038.76.tar.gz -O jbr.tar.gz
           mkdir -p jbr
           tar -xzf jbr.tar.gz -C jbr --strip-components=1
 
@@ -37,7 +37,7 @@ jobs:
         run: ./gradlew buildPlugin
 
       - name: Upload Plugin Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: plugin-artifact
           path: build/distributions/*.zip

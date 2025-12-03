@@ -1,9 +1,10 @@
 ## [2025.3]
 
 ### Fixes
+
 - Fixed [Indent guides broken on PyCharm](https://github.com/comod/git-scope-pro/issues/68)
 - Fixed [File list does not update after switching branch](https://github.com/comod/git-scope-pro/issues/62)
-- Fixed [Unable to calculate diff when viewing Commit panel diffs with custom base revision](https://github.com/comod/git-scope-pro/issues/56) - Commit panel diffs now automatically switch to HEAD base revision when active, and restore custom base when inactive
+- Fixed [Commit panel diff sometimes not working](https://github.com/comod/git-scope-pro/issues/56)
 
 ## [2025.2.1]
 
