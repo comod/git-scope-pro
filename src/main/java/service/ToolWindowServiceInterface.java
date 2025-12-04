@@ -1,6 +1,7 @@
 package service;
 
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.wm.ToolWindow;
 import model.MyModel;
 import toolwindow.elements.VcsTree;
 
@@ -26,4 +27,8 @@ public interface ToolWindowServiceInterface {
     VcsTree getVcsTree();
 
     void selectFile(VirtualFile file);
+
+    ToolWindow getToolWindow();
+
+    MyModel getModelForContent(com.intellij.ui.content.Content content);
 }

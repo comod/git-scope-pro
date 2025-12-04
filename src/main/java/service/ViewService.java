@@ -4,6 +4,8 @@ import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.changes.Change;
+import com.intellij.ui.content.Content;
+import com.intellij.ui.content.ContentManager;
 import com.intellij.util.concurrency.SequentialTaskExecutor;
 import implementation.compare.ChangesService;
 import implementation.lineStatusTracker.MyLineStatusTrackerImpl;
@@ -41,6 +43,7 @@ public class ViewService implements Disposable {
     public Integer currentTabIndex = 0;
     private final Project project;
     private boolean isProcessingTabRename = false;
+    private boolean isProcessingTabReorder = false;
     private ToolWindowServiceInterface toolWindowService;
     private TargetBranchService targetBranchService;
     private ChangesService changesService;
@@ -132,6 +135,7 @@ public class ViewService implements Disposable {
             // Save the target branch map
             TargetBranchMap targetBranchMap = myModel.getTargetBranchMap();
             if (targetBranchMap == null) {
+                LOG.warn("Skipping model with null targetBranchMap during save");
                 return;
             }
             myModelBase.setTargetBranchMap(targetBranchMap);
@@ -299,8 +303,26 @@ public class ViewService implements Disposable {
     }
 
     public MyModel addTabAndModel(String tabName) {
-        int currentIndexOfPlusTab = collection.size() + 1;
         MyModel myModel = addModel();
+
+        // Get ContentManager to find current + tab position
+        ContentManager contentManager = toolWindowService.getToolWindow().getContentManager();
+        int contentCountBefore = contentManager.getContentCount();
+
+        // Find the + tab (should be at the last position)
+        int plusTabIndex = -1;
+        for (int i = 0; i < contentCountBefore; i++) {
+            Content content = contentManager.getContent(i);
+            if (content != null && PLUS_TAB_LABEL.equals(content.getTabName())) {
+                plusTabIndex = i;
+                break;
+            }
+        }
+
+        // Remove the old + tab first
+        if (plusTabIndex >= 0) {
+            toolWindowService.removeTab(plusTabIndex);
+        }
 
         // Make sure to add the tab with closeable set to true
         toolWindowService.addTab(myModel, tabName, true);
@@ -313,14 +335,11 @@ public class ViewService implements Disposable {
         // Add plus tab after the new tab
         addPlusTab();
 
-        // Remove the old plus tab
-        toolWindowService.removeTab(currentIndexOfPlusTab);
-
         // Set the current tab index and active model
         setTabIndex(collection.size());
         setActiveModel();
 
-        // Select the new tab
+        // Select the new tab (should be second to last, before the + tab)
         toolWindowService.selectNewTab();
 
         return myModel;
@@ -476,16 +495,32 @@ public class ViewService implements Disposable {
     }
 
     public MyModel getCurrent() {
-        int currentModelIndex = getCurrentModelIndex();
-        List<MyModel> collection = this.getCollection();
-        int size = collection.size();
-        if (currentModelIndex >= size) {
+        // Get the currently selected tab's model directly from ContentManager
+        ContentManager contentManager = toolWindowService.getToolWindow().getContentManager();
+        Content selectedContent = contentManager.getSelectedContent();
+
+        if (selectedContent == null) {
             return myHeadModel;
         }
-        if (getTabIndex() == 0) {
+
+        // Check if it's the HEAD tab
+        if (selectedContent.getTabName().equals(GitService.BRANCH_HEAD)) {
             return myHeadModel;
         }
-        return collection.get(currentModelIndex);
+
+        // Check if it's the + tab
+        if (selectedContent.getTabName().equals(PLUS_TAB_LABEL)) {
+            return myHeadModel; // or handle differently
+        }
+
+        // Get the model for this content
+        MyModel model = toolWindowService.getModelForContent(selectedContent);
+        if (model != null) {
+            return model;
+        }
+
+        // Fallback to HEAD
+        return myHeadModel;
     }
 
     public List<MyModel> getCollection() {
@@ -503,6 +538,60 @@ public class ViewService implements Disposable {
             this.collection.remove(modelIndex);
             save();
         }
+    }
+
+    public void onTabReordered(int oldIndex, int newIndex) {
+        // Note: The isProcessingTabReorder flag should already be set by the caller
+        // before any UI changes are made, to prevent listener interference
+
+        // After tabs are reordered in the UI, we need to rebuild the collection
+        // to match the new tab order
+        rebuildCollectionFromTabOrder();
+
+        // Save the new order
+        save();
+    }
+
+    /**
+     * Rebuilds the collection based on the current tab order in ContentManager.
+     * This ensures that collection[i] corresponds to tab[i+1] (accounting for HEAD at index 0).
+     */
+    private void rebuildCollectionFromTabOrder() {
+        ContentManager contentManager = toolWindowService.getToolWindow().getContentManager();
+        List<MyModel> newCollection = new ArrayList<>();
+
+        // Iterate through all tabs (skip HEAD at index 0, skip + at end)
+        int contentCount = contentManager.getContentCount();
+        for (int i = 1; i < contentCount; i++) {
+            Content content = contentManager.getContent(i);
+            if (content != null && !PLUS_TAB_LABEL.equals(content.getTabName())) {
+                // Find the model for this content
+                MyModel model = findModelForContent(content);
+                if (model != null && !model.isHeadTab()) {
+                    newCollection.add(model);
+                } else {
+                    LOG.warn("Model not found for tab at index " + i + ": " + content.getTabName());
+                }
+            }
+        }
+
+        // Replace the collection with the reordered one
+        this.collection = newCollection;
+    }
+
+    /**
+     * Finds the MyModel associated with a Content object by using the ToolWindowService.
+     */
+    private MyModel findModelForContent(Content content) {
+        return toolWindowService.getModelForContent(content);
+    }
+
+    public boolean isProcessingTabReorder() {
+        return isProcessingTabReorder;
+    }
+
+    public void setProcessingTabReorder(boolean processing) {
+        this.isProcessingTabReorder = processing;
     }
 
     public void removeCurrentTab() {

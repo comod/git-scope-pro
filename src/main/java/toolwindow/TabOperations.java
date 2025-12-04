@@ -19,14 +19,20 @@ import java.awt.*;
 import java.lang.reflect.Field;
 import java.util.Map;
 
-public class TabRename {
+public class TabOperations {
     private final Project project;
 
-    public TabRename(Project project) {
+    public TabOperations(Project project) {
         this.project = project;
     }
 
-    public void registerRenameTabAction() {
+    public void registerTabActions() {
+        // Create move left action
+        AnAction moveLeftAction = new TabMoveActions.MoveTabLeft();
+
+        // Create move right action
+        AnAction moveRightAction = new TabMoveActions.MoveTabRight();
+
         // Create a rename action that will be added to the tab context menu
         AnAction renameAction = new AnAction("Rename Tab") {
             @Override
@@ -133,6 +139,24 @@ public class TabRename {
         // Get the action manager and register our actions
         ActionManager actionManager = ActionManager.getInstance();
 
+        // Register the move left action
+        String moveLeftActionId = "GitScope.MoveTabLeft";
+        if (actionManager.getAction(moveLeftActionId) == null) {
+            actionManager.registerAction(moveLeftActionId, moveLeftAction);
+        } else {
+            actionManager.unregisterAction(moveLeftActionId);
+            actionManager.registerAction(moveLeftActionId, moveLeftAction);
+        }
+
+        // Register the move right action
+        String moveRightActionId = "GitScope.MoveTabRight";
+        if (actionManager.getAction(moveRightActionId) == null) {
+            actionManager.registerAction(moveRightActionId, moveRightAction);
+        } else {
+            actionManager.unregisterAction(moveRightActionId);
+            actionManager.registerAction(moveRightActionId, moveRightAction);
+        }
+
         // Register the rename action
         String renameActionId = "GitScope.RenameTab";
         if (actionManager.getAction(renameActionId) == null) {
@@ -158,16 +182,23 @@ public class TabRename {
             AnAction[] actions = contextMenuGroup.getChildActionsOrStubs();
             for (AnAction action : actions) {
                 if (action.getTemplateText() != null &&
-                        (action.getTemplateText().equals("Rename Tab") || action.getTemplateText().equals("Reset Tab Name"))) {
+                        (action.getTemplateText().equals("Rename Tab") ||
+                         action.getTemplateText().equals("Reset Tab Name") ||
+                         action.getTemplateText().equals("Move Tab Left") ||
+                         action.getTemplateText().equals("Move Tab Right"))) {
                     contextMenuGroup.remove(action);
                 }
             }
 
             // Add our actions to the group in the desired order:
-            // 1. Rename Tab
-            // 2. Reset Tab Name
-            contextMenuGroup.add(resetTabNameAction, Constraints.FIRST);  // Added second, appears first from bottom
-            contextMenuGroup.add(renameAction, Constraints.FIRST);        // Added first, appears first from top
+            // 1. Move Tab Left
+            // 2. Move Tab Right
+            // 3. Rename Tab
+            // 4. Reset Tab Name
+            contextMenuGroup.add(resetTabNameAction, Constraints.FIRST);
+            contextMenuGroup.add(renameAction, Constraints.FIRST);
+            contextMenuGroup.add(moveRightAction, Constraints.FIRST);
+            contextMenuGroup.add(moveLeftAction, Constraints.FIRST);
         }
     }
 

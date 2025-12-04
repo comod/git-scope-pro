@@ -1,3 +1,9 @@
+## [2025.3.1]
+
+### Added
+
+- Support reorder git scope tabs via right-click popup menu
+
 ## [2025.3]
 
 ### Fixes

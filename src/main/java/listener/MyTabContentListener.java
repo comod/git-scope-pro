@@ -80,6 +80,11 @@ public class MyTabContentListener implements ContentManagerListener {
         if (Objects.equals(tabName, PLUS_TAB_LABEL)) {
             return;
         }
-        getViewService().removeTab(event.getIndex()); // Get service only when needed
+
+        // Don't remove the model if we're just reordering tabs
+        ViewService viewService = getViewService();
+        if (viewService != null && !viewService.isProcessingTabReorder()) {
+            viewService.removeTab(event.getIndex());
+        }
     }
 }
