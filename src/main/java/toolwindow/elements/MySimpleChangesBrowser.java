@@ -31,6 +31,12 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
     private final Project myProject;
     UISettings uiSettings = UISettings.getInstance();
 
+    // Reuse action instances to avoid creating new instances on every toolbar update (IntelliJ 2025.3+ requirement)
+    // These must be static to be shared across all browser instances
+    private static final AnAction SELECT_OPENED_FILE_ACTION = new VcsTreeActions.SelectOpenedFileAction();
+    private static final AnAction SHOW_IN_PROJECT_ACTION = new VcsTreeActions.ShowInProjectAction();
+    private static final AnAction ROLLBACK_ACTION = new VcsTreeActions.RollbackAction();
+
     /**
      * Constructor for MySimpleChangesBrowser.
      * This MUST be called from the EDT, but only AFTER all slow operations
@@ -48,16 +54,15 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
     @Override
     protected @NotNull List<AnAction> createPopupMenuActions() {
         List<AnAction> actions = new ArrayList<>(super.createPopupMenuActions());
-        actions.add(new VcsTreeActions.ShowInProjectAction());
-        actions.add(new VcsTreeActions.RollbackAction());
+        actions.add(SHOW_IN_PROJECT_ACTION);
+        actions.add(ROLLBACK_ACTION);
         return actions;
     }
 
     @Override
     protected @NotNull List<AnAction> createToolbarActions() {
         List<AnAction> actions = new ArrayList<>(super.createToolbarActions());
-
-        actions.add(new VcsTreeActions.SelectOpenedFileAction());
+        actions.add(SELECT_OPENED_FILE_ACTION);
         return actions;
     }
 

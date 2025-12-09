@@ -195,10 +195,19 @@ public class TabOperations {
             // 2. Move Tab Right
             // 3. Rename Tab
             // 4. Reset Tab Name
-            contextMenuGroup.add(resetTabNameAction, Constraints.FIRST);
-            contextMenuGroup.add(renameAction, Constraints.FIRST);
-            contextMenuGroup.add(moveRightAction, Constraints.FIRST);
-            contextMenuGroup.add(moveLeftAction, Constraints.FIRST);
+            // Note: Add null checks to prevent IllegalArgumentException in IntelliJ 2025.3+
+            if (resetTabNameAction != null) {
+                contextMenuGroup.add(resetTabNameAction, Constraints.FIRST);
+            }
+            if (renameAction != null) {
+                contextMenuGroup.add(renameAction, Constraints.FIRST);
+            }
+            if (moveRightAction != null) {
+                contextMenuGroup.add(moveRightAction, Constraints.FIRST);
+            }
+            if (moveLeftAction != null) {
+                contextMenuGroup.add(moveLeftAction, Constraints.FIRST);
+            }
         }
     }
 
