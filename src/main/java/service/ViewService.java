@@ -135,7 +135,7 @@ public class ViewService implements Disposable {
             // Save the target branch map
             TargetBranchMap targetBranchMap = myModel.getTargetBranchMap();
             if (targetBranchMap == null) {
-                LOG.warn("Skipping model with null targetBranchMap during save");
+                LOG.debug("Skipping model with null targetBranchMap during save");
                 return;
             }
             myModelBase.setTargetBranchMap(targetBranchMap);
