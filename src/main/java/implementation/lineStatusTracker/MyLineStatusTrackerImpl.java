@@ -364,10 +364,24 @@ public class MyLineStatusTrackerImpl implements Disposable {
 
             if (setBaseRevisionMethod != null) {
                 setBaseRevisionMethod.setAccessible(true);
+                // Guard against concurrent disposal
+                if (disposing.get()) {
+                    return;
+                }
+                
                 ApplicationManager.getApplication().runWriteAction(() -> {
                     try {
+                        // Double-check disposal state inside write action
+                        if (disposing.get()) {
+                            return;
+                        }
+                        
                         // Use bulk update mode to batch changes and prevent flickering
                         Document document = tracker.getDocument();
+                        if (document == null) {
+                            return;
+                        }
+                        
                         DocumentUtil.executeInBulk(document, () -> {
                             try {
                                 setBaseRevisionMethod.invoke(tracker, content);
