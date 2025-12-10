@@ -208,14 +208,6 @@ public class MyLineStatusTrackerImpl implements Disposable {
         return editor.getEditorKind() == EditorKind.DIFF;
     }
 
-    private void refreshEditor(Editor editor) {
-        // Don't remove all highlighters - this removes indent guides and other system decorations
-        // The platform manages system highlighters automatically through the daemon code analyzer
-        if (editor.getGutter() instanceof EditorGutterComponentEx gutter) {
-            gutter.revalidateMarkup();
-        }
-    }
-
     public void update(Collection<Change> changes, @Nullable VirtualFile targetFile) {
         if (changes == null || disposing.get()) {
             return;
@@ -232,10 +224,8 @@ public class MyLineStatusTrackerImpl implements Disposable {
                 Editor[] editors = EditorFactory.getInstance().getAllEditors();
                 for (Editor editor : editors) {
                     if (isDiffView(editor)) continue;
-                    if (updateLineStatusByChangesForEditorSafe(editor, fileToRevisionMap))
-                    {
-                        refreshEditor(editor);
-                    }
+                    // Platform handles gutter repainting automatically - no need to force it
+                    updateLineStatusByChangesForEditorSafe(editor, fileToRevisionMap);
                 }
             });
         });
