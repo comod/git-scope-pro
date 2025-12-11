@@ -1,8 +1,12 @@
 ## [2025.3.1]
 
+### Fixes
+
+- Fixed [runtime issues on 2025.3 line of IDEs](https://github.com/comod/git-scope-pro/issues/72)
+
 ### Added
 
-- Support reorder git scope tabs via right-click popup menu
+- Added [support to reorder git scope tabs](https://github.com/comod/git-scope-pro/issues/73) 
 
 ## [2025.3]
 
