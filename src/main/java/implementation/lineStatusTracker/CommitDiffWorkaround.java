@@ -206,6 +206,9 @@ public class CommitDiffWorkaround implements Disposable {
     /**
      * Handle editor selection changed away from a commit diff editor.
      * Call this when the user switches away from a commit panel diff tab.
+     *
+     * Note: This safely restores ALL tracked documents. Documents that still have
+     * commit diff editors open will be skipped by restoreCustomBaseForDocument().
      */
     public void handleSwitchedAwayFromCommitDiff() {
         restoreCustomBaseForAllDocuments();
@@ -271,6 +274,18 @@ public class CommitDiffWorkaround implements Disposable {
         });
     }
 
+    /**
+     * Activate HEAD base for all documents that have commit diff editors.
+     *
+     * Design note: This activates HEAD base for ALL documents with commit diffs, not just
+     * the currently visible one. This is intentional - when viewing commit diffs, we enter
+     * "commit review mode" where all files should show diffs against HEAD, not custom base.
+     * This provides consistent behavior and avoids confusion when switching between files.
+     *
+     * The restoration logic (via hasCommitDiffEditorsFor checks) ensures that when commit
+     * diffs are closed, only documents without any remaining commit diff editors get their
+     * custom base restored.
+     */
     private void activateHeadBaseForAllCommitDiffs() {
         synchronized (this) {
             for (Map.Entry<Document, Set<Editor>> entry : commitDiffEditors.entrySet()) {
@@ -332,6 +347,11 @@ public class CommitDiffWorkaround implements Disposable {
         }
 
         if (!baseRevisionSwitcher.isShowingHeadBase(doc)) {
+            return;
+        }
+
+        // Fix Hole #2: Don't restore if commit diff editors are still open for this document
+        if (hasCommitDiffEditorsFor(doc)) {
             return;
         }
 

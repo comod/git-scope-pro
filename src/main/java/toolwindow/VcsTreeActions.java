@@ -82,9 +82,19 @@ public class VcsTreeActions {
         }
     }
 
-    public static class SelectOpenedFileAction extends AnAction implements RightAlignedToolbarAction {
+    public static class SelectOpenedFileAction extends AnAction {
         public SelectOpenedFileAction() {
             super("Select Opened File", "Select the file currently open in the editor", AllIcons.General.Locate);
+        }
+
+        @Override
+        public @NotNull ActionUpdateThread getActionUpdateThread() {
+            return ActionUpdateThread.BGT;
+        }
+
+        @Override
+        public void update(@NotNull AnActionEvent e) {
+            // Keep presentation stable - no modifications needed
         }
 
         @Override

@@ -44,6 +44,11 @@ public class VcsTree extends JPanel {
     private final Map<String, Collection<Change>> lastChangesPerTab = new ConcurrentHashMap<>();
     private final Map<String, Integer> lastChangesHashCodePerTab = new ConcurrentHashMap<>();
 
+    // Use a single browser instance for this VcsTree to avoid toolbar recreation issues
+    // When switching tabs, we just update the browser's contents instead of swapping components
+    private MySimpleChangesBrowser singleBrowser = null;
+    private CompletableFuture<MySimpleChangesBrowser> pendingBrowserCreation = null;
+
     public VcsTree(Project project) {
         this.project = project;
         this.positionTracker = new WindowPositionTracker(
@@ -63,12 +68,17 @@ public class VcsTree extends JPanel {
     public void onTabSwitched() {
         SwingUtilities.invokeLater(() -> {
             try {
+                // Get the current tab ID to restore its scroll position
+                String currentTabId = getCurrentTabId();
+
+                // With single browser approach, the browser is already in place if it exists
+                // We just need to restore the scroll position for this tab
+
                 Component currentComponent = getComponentCount() > 0 ? getComponent(0) : null;
                 if (currentComponent != null) {
                     positionTracker.attachScrollListeners(currentComponent);
 
                     SwingUtilities.invokeLater(() -> {
-                        String currentTabId = getCurrentTabId();
                         ScrollPosition savedPosition = positionTracker.getSavedScrollPosition(currentTabId);
                         if (savedPosition != null) {
                             positionTracker.restoreScrollPosition(currentComponent, savedPosition);
@@ -110,12 +120,13 @@ public class VcsTree extends JPanel {
             ViewService viewService = project.getService(ViewService.class);
             if (viewService != null) {
                 int tabIndex = viewService.getTabIndex();
-                return "tab_" + tabIndex;
+                // Include project name to avoid conflicts when cache is static across projects
+                return project.getName() + "_tab_" + tabIndex;
             }
         } catch (Exception e) {
             LOG.warn("Failed to get current tab ID", e);
         }
-        return "default_tab";
+        return project.getName() + "_default_tab";
     }
 
     public void createElement() {
@@ -186,9 +197,9 @@ public class VcsTree extends JPanel {
             return;
         }
 
-        String currentTabId = getCurrentTabId();
-        lastChangesPerTab.put(currentTabId, changes != null ? new ArrayList<>(changes) : null);
-        lastChangesHashCodePerTab.put(currentTabId, calculateChangesHashCode(changes));
+        final String tabId = getCurrentTabId();
+        lastChangesPerTab.put(tabId, changes != null ? new ArrayList<>(changes) : null);
+        lastChangesHashCodePerTab.put(tabId, calculateChangesHashCode(changes));
         lastChanges = changes;
         lastChangesHashCode = calculateChangesHashCode(changes);
 
@@ -218,14 +229,58 @@ public class VcsTree extends JPanel {
                     if (!isCurrentSequence(sequenceNumber)) {
                         throw new CompletionException(new InterruptedException("Update cancelled - sequence outdated"));
                     }
-                    return MySimpleChangesBrowser.createAsync(project, this, changesCopy);
+
+                    // Reuse single browser instance if it exists
+                    if (singleBrowser != null) {
+                        LOG.debug("VcsTree: Reusing single browser instance");
+                        return CompletableFuture.supplyAsync(() -> {
+                            SwingUtilities.invokeLater(() -> {
+                                if (!project.isDisposed()) {
+                                    singleBrowser.setChangesToDisplay(changesCopy);
+                                }
+                            });
+                            return singleBrowser;
+                        });
+                    }
+
+                    // Check if browser is already being created
+                    if (pendingBrowserCreation != null && !pendingBrowserCreation.isDone()) {
+                        LOG.debug("VcsTree: Waiting for pending browser creation");
+                        // Wait for the pending creation to complete
+                        return pendingBrowserCreation.thenApply(browser -> {
+                            // Update with new changes
+                            SwingUtilities.invokeLater(() -> {
+                                if (!project.isDisposed()) {
+                                    browser.setChangesToDisplay(changesCopy);
+                                }
+                            });
+                            return browser;
+                        });
+                    }
+
+                    // Create single browser instance
+                    LOG.debug("VcsTree: Creating single browser instance");
+                    CompletableFuture<MySimpleChangesBrowser> creationFuture =
+                            MySimpleChangesBrowser.createAsync(project, this, changesCopy)
+                                    .thenApply(newBrowser -> {
+                                        singleBrowser = newBrowser;
+                                        pendingBrowserCreation = null;
+                                        LOG.debug("VcsTree: Single browser created and cached");
+                                        return newBrowser;
+                                    });
+
+                    pendingBrowserCreation = creationFuture;
+                    return creationFuture;
                 })
 
                 .thenAccept(browser -> {
                     SwingUtilities.invokeLater(() -> {
                         if (isCurrentSequence(sequenceNumber) && !project.isDisposed()) {
-                            setComponent(browser);
-                            currentBrowser = browser;
+                            // Set component if it's different from current
+                            if (currentBrowser != browser) {
+                                setComponent(browser);
+                                currentBrowser = browser;
+                            }
                         }
                     });
                 })
@@ -237,6 +292,8 @@ public class VcsTree extends JPanel {
                                 JLabel errorLabel = createErrorLabel(throwable);
                                 setComponent(errorLabel);
                                 currentBrowser = null;
+                                // Clear the single browser since we're showing an error
+                                singleBrowser = null;
                             }
                         });
                     }
@@ -311,10 +368,14 @@ public class VcsTree extends JPanel {
 
             positionTracker.setScrollPositionRestored(false);
 
-            this.removeAll();
-            this.add(component, BorderLayout.CENTER);
-            this.revalidate();
-            this.repaint();
+            // Only remove/add if the component actually changed to avoid triggering toolbar updates
+            Component currentComponent = getComponentCount() > 0 ? getComponent(0) : null;
+            if (currentComponent != component) {
+                this.removeAll();
+                this.add(component, BorderLayout.CENTER);
+                this.revalidate();
+                this.repaint();
+            }
 
             SwingUtilities.invokeLater(() -> {
                 positionTracker.attachScrollListeners(component);
@@ -354,5 +415,9 @@ public class VcsTree extends JPanel {
         }
         lastChangesPerTab.clear();
         lastChangesHashCodePerTab.clear();
+
+        // Clear the single browser instance for this VcsTree
+        singleBrowser = null;
+        pendingBrowserCreation = null;
     }
 }

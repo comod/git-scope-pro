@@ -21,6 +21,7 @@
         <listener class="listener.MyToolWindowListener" topic="com.intellij.openapi.wm.ex.ToolWindowManagerListener"/>
         <listener class="listener.VcsStartup" topic="com.intellij.openapi.vcs.VcsMappingListener"/>
         <listener class="listener.MyChangeListListener" topic="com.intellij.openapi.vcs.changes.ChangeListListener"/>
+        <listener class="listener.MyGitRepositoryChangeListener" topic="git4idea.repo.GitRepository$GIT_REPO_CHANGE"/>
         <listener class="listener.MyFileEditorManagerListener"
                   topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"/>
     </projectListeners>

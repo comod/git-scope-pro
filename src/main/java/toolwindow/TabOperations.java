@@ -19,16 +19,24 @@ import java.awt.*;
 import java.lang.reflect.Field;
 import java.util.Map;
 
-public class TabRename {
+public class TabOperations {
     private final Project project;
 
-    public TabRename(Project project) {
-        this.project = project;
-    }
+    // Reuse action instances to avoid creating new instances on every registration (IntelliJ 2025.3+ requirement)
+    private final AnAction moveLeftAction;
+    private final AnAction moveRightAction;
+    private final AnAction renameAction;
+    private final AnAction resetTabNameAction;
 
-    public void registerRenameTabAction() {
+    public TabOperations(Project project) {
+        this.project = project;
+
+        // Initialize actions once - they must be instance fields, not local variables
+        this.moveLeftAction = new TabMoveActions.MoveTabLeft();
+        this.moveRightAction = new TabMoveActions.MoveTabRight();
+
         // Create a rename action that will be added to the tab context menu
-        AnAction renameAction = new AnAction("Rename Tab") {
+        this.renameAction = new AnAction("Rename Tab") {
             @Override
             public @NotNull ActionUpdateThread getActionUpdateThread() {
                 return ActionUpdateThread.EDT;
@@ -75,7 +83,7 @@ public class TabRename {
         };
 
         // Create a reset tab name action
-        AnAction resetTabNameAction = new AnAction("Reset Tab Name") {
+        this.resetTabNameAction = new AnAction("Reset Tab Name") {
             @Override
             public @NotNull ActionUpdateThread getActionUpdateThread() {
                 return ActionUpdateThread.EDT;
@@ -129,9 +137,29 @@ public class TabRename {
                 }
             }
         };
+    }
 
+    public void registerTabActions() {
         // Get the action manager and register our actions
         ActionManager actionManager = ActionManager.getInstance();
+
+        // Register the move left action
+        String moveLeftActionId = "GitScope.MoveTabLeft";
+        if (actionManager.getAction(moveLeftActionId) == null) {
+            actionManager.registerAction(moveLeftActionId, moveLeftAction);
+        } else {
+            actionManager.unregisterAction(moveLeftActionId);
+            actionManager.registerAction(moveLeftActionId, moveLeftAction);
+        }
+
+        // Register the move right action
+        String moveRightActionId = "GitScope.MoveTabRight";
+        if (actionManager.getAction(moveRightActionId) == null) {
+            actionManager.registerAction(moveRightActionId, moveRightAction);
+        } else {
+            actionManager.unregisterAction(moveRightActionId);
+            actionManager.registerAction(moveRightActionId, moveRightAction);
+        }
 
         // Register the rename action
         String renameActionId = "GitScope.RenameTab";
@@ -158,16 +186,32 @@ public class TabRename {
             AnAction[] actions = contextMenuGroup.getChildActionsOrStubs();
             for (AnAction action : actions) {
                 if (action.getTemplateText() != null &&
-                        (action.getTemplateText().equals("Rename Tab") || action.getTemplateText().equals("Reset Tab Name"))) {
+                        (action.getTemplateText().equals("Rename Tab") ||
+                         action.getTemplateText().equals("Reset Tab Name") ||
+                         action.getTemplateText().equals("Move Tab Left") ||
+                         action.getTemplateText().equals("Move Tab Right"))) {
                     contextMenuGroup.remove(action);
                 }
             }
 
             // Add our actions to the group in the desired order:
-            // 1. Rename Tab
-            // 2. Reset Tab Name
-            contextMenuGroup.add(resetTabNameAction, Constraints.FIRST);  // Added second, appears first from bottom
-            contextMenuGroup.add(renameAction, Constraints.FIRST);        // Added first, appears first from top
+            // 1. Move Tab Left
+            // 2. Move Tab Right
+            // 3. Rename Tab
+            // 4. Reset Tab Name
+            // Note: Add null checks to prevent IllegalArgumentException in IntelliJ 2025.3+
+            if (resetTabNameAction != null) {
+                contextMenuGroup.add(resetTabNameAction, Constraints.FIRST);
+            }
+            if (renameAction != null) {
+                contextMenuGroup.add(renameAction, Constraints.FIRST);
+            }
+            if (moveRightAction != null) {
+                contextMenuGroup.add(moveRightAction, Constraints.FIRST);
+            }
+            if (moveLeftAction != null) {
+                contextMenuGroup.add(moveLeftAction, Constraints.FIRST);
+            }
         }
     }
 

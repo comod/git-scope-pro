@@ -33,7 +33,9 @@ public class VcsContextMenuAction extends CopyRevisionNumberAction {
     public void actionPerformed(@NotNull AnActionEvent e) {
         List<VcsRevisionNumber> revisions = getRevisionNumbersFromContext(e);
         revisions = ContainerUtil.reverse(revisions);
-        String rev = getHashesAsString(revisions);
+
+        // Use only the first commit hash as the tab name
+        String rev = revisions.isEmpty() ? "" : revisions.getFirst().asString();
 
         Project project = e.getProject();
         ViewService viewService = Objects.requireNonNull(project).getService(ViewService.class);

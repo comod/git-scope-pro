@@ -13,7 +13,7 @@ import model.MyModel;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import system.Defs;
-import toolwindow.TabRename;
+import toolwindow.TabOperations;
 import toolwindow.ToolWindowView;
 import toolwindow.elements.VcsTree;
 
@@ -24,11 +24,11 @@ import java.util.Map;
 public final class ToolWindowService implements ToolWindowServiceInterface {
     private final Project project;
     private final Map<Content, ToolWindowView> contentToViewMap = new HashMap<>();
-    private final TabRename tabRename;
+    private final TabOperations tabOperations;
 
     public ToolWindowService(Project project) {
         this.project = project;
-        this.tabRename = new TabRename(project);
+        this.tabOperations = new TabOperations(project);
     }
 
     @Override
@@ -86,18 +86,18 @@ public final class ToolWindowService implements ToolWindowServiceInterface {
         ContentManager contentManager = getContentManager();
         contentManager.addContentManagerListener(new MyTabContentListener(project));
 
-        // Register the rename action in the tab context menu
-        tabRename.registerRenameTabAction();
+        // Register all tab actions (rename, reset, move) in the tab context menu
+        tabOperations.registerTabActions();
     }
 
     @Override
     public void setupTabTooltip(MyModel model) {
-        tabRename.setupTabTooltip(model, contentToViewMap);
+        tabOperations.setupTabTooltip(model, contentToViewMap);
     }
 
     @Override
     public void changeTabName(String title) {
-        tabRename.changeTabName(title, getContentManager());
+        tabOperations.changeTabName(title, getContentManager());
     }
 
     public void removeTab(int index) {
@@ -140,5 +140,14 @@ public final class ToolWindowService implements ToolWindowServiceInterface {
         if (vcsTree != null) {
             vcsTree.selectFile(file);
         }
+    }
+
+    @Override
+    public MyModel getModelForContent(Content content) {
+        ToolWindowView toolWindowView = contentToViewMap.get(content);
+        if (toolWindowView != null) {
+            return toolWindowView.getModel();
+        }
+        return null;
     }
 }
