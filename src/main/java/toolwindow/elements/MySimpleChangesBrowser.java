@@ -37,6 +37,14 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
     private static final AnAction SHOW_IN_PROJECT_ACTION = new VcsTreeActions.ShowInProjectAction();
     private static final AnAction ROLLBACK_ACTION = new VcsTreeActions.RollbackAction();
 
+    // Pre-create static immutable lists to ensure the SAME list instance is returned every time
+    private static final List<AnAction> STATIC_TOOLBAR_ACTIONS = java.util.Collections.unmodifiableList(
+            java.util.Collections.singletonList(SELECT_OPENED_FILE_ACTION)
+    );
+    private static final List<AnAction> STATIC_POPUP_ACTIONS = java.util.Collections.unmodifiableList(
+            java.util.Arrays.asList(SHOW_IN_PROJECT_ACTION, ROLLBACK_ACTION)
+    );
+
     /**
      * Constructor for MySimpleChangesBrowser.
      * This MUST be called from the EDT, but only AFTER all slow operations
@@ -53,17 +61,14 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
 
     @Override
     protected @NotNull List<AnAction> createPopupMenuActions() {
-        List<AnAction> actions = new ArrayList<>(super.createPopupMenuActions());
-        actions.add(SHOW_IN_PROJECT_ACTION);
-        actions.add(ROLLBACK_ACTION);
-        return actions;
+        // Return the SAME static list instance every time to prevent toolbar recreation
+        return STATIC_POPUP_ACTIONS;
     }
 
     @Override
     protected @NotNull List<AnAction> createToolbarActions() {
-        List<AnAction> actions = new ArrayList<>(super.createToolbarActions());
-        actions.add(SELECT_OPENED_FILE_ACTION);
-        return actions;
+        // Return the SAME static list instance every time to prevent toolbar recreation
+        return STATIC_TOOLBAR_ACTIONS;
     }
 
     /**

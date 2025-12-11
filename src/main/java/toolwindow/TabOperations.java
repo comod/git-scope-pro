@@ -22,19 +22,21 @@ import java.util.Map;
 public class TabOperations {
     private final Project project;
 
+    // Reuse action instances to avoid creating new instances on every registration (IntelliJ 2025.3+ requirement)
+    private final AnAction moveLeftAction;
+    private final AnAction moveRightAction;
+    private final AnAction renameAction;
+    private final AnAction resetTabNameAction;
+
     public TabOperations(Project project) {
         this.project = project;
-    }
 
-    public void registerTabActions() {
-        // Create move left action
-        AnAction moveLeftAction = new TabMoveActions.MoveTabLeft();
-
-        // Create move right action
-        AnAction moveRightAction = new TabMoveActions.MoveTabRight();
+        // Initialize actions once - they must be instance fields, not local variables
+        this.moveLeftAction = new TabMoveActions.MoveTabLeft();
+        this.moveRightAction = new TabMoveActions.MoveTabRight();
 
         // Create a rename action that will be added to the tab context menu
-        AnAction renameAction = new AnAction("Rename Tab") {
+        this.renameAction = new AnAction("Rename Tab") {
             @Override
             public @NotNull ActionUpdateThread getActionUpdateThread() {
                 return ActionUpdateThread.EDT;
@@ -81,7 +83,7 @@ public class TabOperations {
         };
 
         // Create a reset tab name action
-        AnAction resetTabNameAction = new AnAction("Reset Tab Name") {
+        this.resetTabNameAction = new AnAction("Reset Tab Name") {
             @Override
             public @NotNull ActionUpdateThread getActionUpdateThread() {
                 return ActionUpdateThread.EDT;
@@ -135,7 +137,9 @@ public class TabOperations {
                 }
             }
         };
+    }
 
+    public void registerTabActions() {
         // Get the action manager and register our actions
         ActionManager actionManager = ActionManager.getInstance();
 
