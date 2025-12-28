@@ -1,6 +1,7 @@
 package implementation.compare;
 
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
@@ -28,6 +29,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 public class ChangesService extends GitCompareWithRefAction {
+    private static final Logger LOG = Defs.getLogger(ChangesService.class);
     public interface ErrorStateMarker {}
     public static class ErrorStateList extends AbstractList<Change> implements ErrorStateMarker {
         @Override public Change get(int index) { throw new IndexOutOfBoundsException(); }
@@ -79,41 +81,48 @@ public class ChangesService extends GitCompareWithRefAction {
                 Collection<GitRepository> repositories = currentGitService.getRepositories();
 
                 repositories.forEach(repo -> {
-                    String branchToCompare = getBranchToCompare(targetBranchByRepo, repo);
+                    try {
+                        String branchToCompare = getBranchToCompare(targetBranchByRepo, repo);
 
-                    // Use only repo path as cache key
-                    String cacheKey = repo.getRoot().getPath();
+                        // Use only repo path as cache key
+                        String cacheKey = repo.getRoot().getPath();
 
-                    Collection<Change> changesPerRepo = null;
+                        Collection<Change> changesPerRepo = null;
 
-                    if (!checkFs && changesCache.containsKey(cacheKey)) {
-                        // Use cached changes if checkFs is false and cache exists
-                        changesPerRepo = changesCache.get(cacheKey);
-                    } else {
-                        // Fetch fresh changes
-                        changesPerRepo = doCollectChanges(currentProject, repo, branchToCompare);
+                        if (!checkFs && changesCache.containsKey(cacheKey)) {
+                            // Use cached changes if checkFs is false and cache exists
+                            changesPerRepo = changesCache.get(cacheKey);
+                        } else {
+                            // Fetch fresh changes
+                            changesPerRepo = doCollectChanges(currentProject, repo, branchToCompare);
 
-                        // Cache the results (but don't cache error states)
-                        if (!(changesPerRepo instanceof ErrorStateList)) {
-                            changesCache.put(cacheKey, new ArrayList<>(changesPerRepo)); // Store a copy to avoid modification issues
+                            // Cache the results (but don't cache error states)
+                            if (!(changesPerRepo instanceof ErrorStateList)) {
+                                changesCache.put(cacheKey, new ArrayList<>(changesPerRepo)); // Store a copy to avoid modification issues
+                            }
                         }
-                    }
 
-                    if (changesPerRepo instanceof ErrorStateList) {
+                        if (changesPerRepo instanceof ErrorStateList) {
+                            errorRepos.add(repo.getRoot().getPath());
+                            return; // Skip this repo but continue with others
+                        }
+
+                        // Handle null case
+                        if (changesPerRepo == null) {
+                            changesPerRepo = new ArrayList<>();
+                        }
+
+                        // Simple "merge" logic
+                        for (Change change : changesPerRepo) {
+                            if (!_changes.contains(change)) {
+                                _changes.add(change);
+                            }
+                        }
+                    } catch (Exception e) {
+                        // Catch any unexpected errors from individual repo processing
+                        // This ensures one bad repo doesn't crash the entire operation
+                        LOG.warn("Unexpected error processing repository " + repo.getRoot().getPath(), e);
                         errorRepos.add(repo.getRoot().getPath());
-                        return; // Skip this repo but continue with others
-                    }
-
-                    // Handle null case
-                    if (changesPerRepo == null) {
-                        changesPerRepo = new ArrayList<>();
-                    }
-
-                    // Simple "merge" logic
-                    for (Change change : changesPerRepo) {
-                        if (!_changes.contains(change)) {
-                            _changes.add(change);
-                        }
                     }
                 });
 
@@ -283,7 +292,12 @@ public class ChangesService extends GitCompareWithRefAction {
             Collection<Change> additionalLocalChanges = filterLocalChanges(localChanges, repoPath, _changes);
             _changes.addAll(additionalLocalChanges);
 
-        } catch (VcsException ignored) {
+        } catch (VcsException e) {
+            // Log VCS errors (e.g., locked files, git command failures) but don't fail entirely
+            LOG.warn("Error collecting changes for repository " + repo.getRoot().getPath() + ": " + e.getMessage());
+        } catch (Exception e) {
+            // Catch any other unexpected errors (e.g., file system issues)
+            LOG.warn("Unexpected error collecting changes for repository " + repo.getRoot().getPath(), e);
         }
         return _changes;
     }

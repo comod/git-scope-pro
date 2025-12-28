@@ -1,6 +1,7 @@
 package utils;
 
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.Messages;
@@ -25,6 +26,7 @@ import com.intellij.openapi.progress.ProgressIndicator;
 import org.jetbrains.annotations.NotNull;
 import com.intellij.history.LocalHistory;
 import com.intellij.openapi.util.io.FileUtil;
+import system.Defs;
 
 import javax.swing.*;
 import java.awt.*;
@@ -33,6 +35,7 @@ import java.util.List;
 import java.util.function.Consumer;
 
 public class CustomRollback {
+    private static final Logger LOG = Defs.getLogger(CustomRollback.class);
 
     public void rollbackChanges(@NotNull Project project, @NotNull Change[] changes, String revisionString) {
         AsyncChangesTreeImpl.Changes changesTree = new AsyncChangesTreeImpl.Changes(
@@ -271,6 +274,7 @@ public class CustomRollback {
                     pathsToRefresh.addAll(newRelPaths);
                 } catch (VcsException e) {
                     // Fall back to per-file rm if batch fails
+                    LOG.debug("Batch rm failed, falling back to per-file: " + e.getMessage());
                     for (String p : newRelPaths) {
                         try {
                             GitLineHandler rm = new GitLineHandler(project, root, GitCommand.RM);
@@ -278,6 +282,11 @@ public class CustomRollback {
                             Git.getInstance().runCommand(rm).throwOnError();
                             pathsToRefresh.add(p);
                         } catch (VcsException ex) {
+                            // Check if this is a file locking issue
+                            String msg = ex.getMessage();
+                            if (msg.contains("lock") || msg.contains("unable to open") || msg.contains("permission denied") || msg.contains("access is denied")) {
+                                LOG.warn("File locked or access denied during rollback for: " + p);
+                            }
                             failedFiles.add(root.getName() + ": " + p);
                         }
                     }
@@ -335,7 +344,12 @@ public class CustomRollback {
                                     Git.getInstance().runCommand(rm).throwOnError();
                                     pathsToRefresh.add(relAfter);
                                 } catch (VcsException e) {
-                                    rmFailed = true; // might be untracked; we won’t fail if checkout succeeds
+                                    // Check if this is a file locking issue
+                                    String msg = e.getMessage();
+                                    if (msg.contains("lock") || msg.contains("unable to open") || msg.contains("permission denied") || msg.contains("access is denied")) {
+                                        LOG.warn("File locked or access denied during rollback (MOVED) for: " + relAfter);
+                                    }
+                                    rmFailed = true; // might be untracked; we won't fail if checkout succeeds
                                 }
                             }
                             if (rev == null || relBefore == null) {
@@ -348,6 +362,11 @@ public class CustomRollback {
                                 Git.getInstance().runCommand(co).throwOnError();
                                 pathsToRefresh.add(relBefore);
                             } catch (VcsException e) {
+                                // Check if this is a file locking issue
+                                String msg = e.getMessage();
+                                if (msg.contains("lock") || msg.contains("unable to open") || msg.contains("permission denied") || msg.contains("access is denied")) {
+                                    LOG.warn("File locked or access denied during rollback checkout for: " + relBefore);
+                                }
                                 checkoutFailed = true;
                             }
                             if (checkoutFailed) {
@@ -370,7 +389,10 @@ public class CustomRollback {
                         }
                     }
                 } catch (Throwable t) {
-                    fail.accept(relAfter != null ? relAfter : relBefore);
+                    // Log unexpected errors during rollback
+                    String fileName = relAfter != null ? relAfter : relBefore;
+                    LOG.warn("Unexpected error during rollback for file: " + fileName, t);
+                    fail.accept(fileName);
                 }
             }
 
@@ -435,6 +457,13 @@ public class CustomRollback {
             Git.getInstance().runCommand(handler).throwOnError();
             pathsToRefresh.add(targetRelPath);
         } catch (VcsException e) {
+            // Check if this is a file locking issue
+            String msg = e.getMessage();
+            if (msg.contains("lock") || msg.contains("unable to open") || msg.contains("permission denied") || msg.contains("access is denied")) {
+                LOG.warn("File locked or access denied during git checkout for: " + targetRelPath);
+            } else {
+                LOG.debug("Git checkout failed for: " + targetRelPath + " - " + e.getMessage());
+            }
             fail.accept(targetRelPath);
         }
     }
