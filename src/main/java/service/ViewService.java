@@ -26,7 +26,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -38,7 +37,6 @@ public class ViewService implements Disposable {
 
     public static final String PLUS_TAB_LABEL = "+";
     public static final int DEBOUNCE_MS = 50;
-    public static final int HEAD_TAB_INIT_TIMEOUT = 5;  // sec
     public List<MyModel> collection = new ArrayList<>();
     public Integer currentTabIndex = 0;
     private final Project project;
@@ -242,29 +240,7 @@ public class ViewService implements Disposable {
     private void initHeadTab() {
         this.myHeadModel = new MyModel(true);
         toolWindowService.addTab(myHeadModel, GitService.BRANCH_HEAD, false);
-
-        // Wait for repositories to be loaded before proceeding
-        CountDownLatch latch = new CountDownLatch(1);
-
-        gitService.getRepositoriesAsync(repositories -> {
-            repositories.forEach(repo -> {
-                myHeadModel.addTargetBranch(repo, null);
-            });
-
-            subscribeToObservable(myHeadModel);
-
-            // TODO: collectChanges: head tab initialized
-            incrementUpdate();
-            collectChanges(myHeadModel, true);
-            latch.countDown();
-        });
-
-        try {
-            // Wait for the head tab initialization to complete with a timeout
-            latch.await(HEAD_TAB_INIT_TIMEOUT, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            // Handle interruption if necessary
-        }
+        subscribeToObservable(myHeadModel);
     }
 
     public void addRevisionTab(String revision) {
@@ -440,24 +416,61 @@ public class ViewService implements Disposable {
         return collectChanges(getCurrent(), checkFs);
     }
 
+    /**
+     * Ensures HEAD tab model has a targetBranchMap initialized with all repositories.
+     * This is a lazy initialization that runs when HEAD tab is accessed, after repositories are loaded.
+     * Uses async callback to avoid slow operations on EDT.
+     */
+    private void ensureHeadTabInitializedAsync(MyModel model, Runnable onComplete) {
+        if (model.isHeadTab() && model.getTargetBranchMap() == null) {
+            // Use async method to avoid slow operations on EDT
+            gitService.getRepositoriesAsync(repositories -> {
+                repositories.forEach(repo -> {
+                    model.addTargetBranch(repo, null);
+                });
+                if (onComplete != null) {
+                    onComplete.run();
+                }
+            });
+        } else {
+            // Already initialized or not HEAD tab
+            if (onComplete != null) {
+                onComplete.run();
+            }
+        }
+    }
+
     public CompletableFuture<Void> collectChanges(MyModel model, boolean checkFs) {
         CompletableFuture<Void> done = new CompletableFuture<>();
         if (model == null) {
             done.complete(null);
             return done;
         }
-        TargetBranchMap targetBranchMap = model.getTargetBranchMap();
-        if (targetBranchMap == null) {
-            done.complete(null);
-            return done;
-        }
 
+        // Ensure HEAD tab is initialized before proceeding
+        ensureHeadTabInitializedAsync(model, () -> {
+            TargetBranchMap targetBranchMap = model.getTargetBranchMap();
+            if (targetBranchMap == null) {
+                done.complete(null);
+                return;
+            }
+
+            collectChangesInternal(model, targetBranchMap, checkFs, done);
+        });
+
+        return done;
+    }
+
+    private void collectChangesInternal(MyModel model, TargetBranchMap targetBranchMap, boolean checkFs, CompletableFuture<Void> done) {
+
+        // Make targetBranchMap effectively final for lambda
+        final TargetBranchMap finalTargetBranchMap = targetBranchMap;
         final long gen = applyGeneration.get();
         LOG.debug("collectChanges() scheduled with generation = " + gen);
 
         // serialize collection behind a single-threaded executor
         changesExecutor.execute(() -> {
-            changesService.collectChangesWithCallback(targetBranchMap, changes -> {
+            changesService.collectChangesWithCallback(finalTargetBranchMap, changes -> {
                 ApplicationManager.getApplication().invokeLater(() -> {
                     try {
                         long currentGen = applyGeneration.get();
@@ -473,8 +486,6 @@ public class ViewService implements Disposable {
                 });
             }, checkFs);
         });
-
-        return done;
     }
 
     // helper to enqueue UI work strictly after the currently queued collections
@@ -495,6 +506,11 @@ public class ViewService implements Disposable {
     }
 
     public MyModel getCurrent() {
+        // Check if toolWindowService is initialized
+        if (toolWindowService == null) {
+            return myHeadModel; // Safe fallback when not yet initialized
+        }
+
         // Get the currently selected tab's model directly from ContentManager
         ContentManager contentManager = toolWindowService.getToolWindow().getContentManager();
         Content selectedContent = contentManager.getSelectedContent();
@@ -529,6 +545,25 @@ public class ViewService implements Disposable {
 
     public void setCollection(List<MyModel> collection) {
         this.collection = collection;
+    }
+
+    /**
+     * Gets the changes from the currently active scope/tab.
+     * Used by FileStatusProvider to color files based on active scope.
+     *
+     * @return Collection of changes in current scope, or null if no active scope or not initialized
+     */
+    public Collection<Change> getCurrentScopeChanges() {
+        // Early return if ViewService is not fully initialized yet
+        if (toolWindowService == null) {
+            return null;
+        }
+
+        MyModel current = getCurrent();
+        if (current == null) {
+            return null;
+        }
+        return current.getChanges();
     }
 
     public void removeTab(int tabIndex) {

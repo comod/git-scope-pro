@@ -80,10 +80,10 @@ public class ChangesService extends GitCompareWithRefAction {
 
                 repositories.forEach(repo -> {
                     String branchToCompare = getBranchToCompare(targetBranchByRepo, repo);
-                    
+
                     // Use only repo path as cache key
                     String cacheKey = repo.getRoot().getPath();
-                    
+
                     Collection<Change> changesPerRepo = null;
 
                     if (!checkFs && changesCache.containsKey(cacheKey)) {
@@ -92,7 +92,7 @@ public class ChangesService extends GitCompareWithRefAction {
                     } else {
                         // Fetch fresh changes
                         changesPerRepo = doCollectChanges(currentProject, repo, branchToCompare);
-                        
+
                         // Cache the results (but don't cache error states)
                         if (!(changesPerRepo instanceof ErrorStateList)) {
                             changesCache.put(cacheKey, new ArrayList<>(changesPerRepo)); // Store a copy to avoid modification issues
@@ -159,25 +159,50 @@ public class ChangesService extends GitCompareWithRefAction {
         changesCache.remove(cacheKey);
     }
 
-    private Boolean isLocalChangeOnly(String localChangePath, Collection<Change> changes) {
+    /**
+     * Filters local changes to include only those within the specified repository path.
+     * Also optionally excludes changes that are already present in an existing collection.
+     *
+     * @param localChanges All local changes from the project
+     * @param repoPath Repository root path to filter by
+     * @param existingChanges Optional collection of existing changes to exclude duplicates (null to include all)
+     * @return Filtered collection of changes
+     */
+    private Collection<Change> filterLocalChanges(Collection<Change> localChanges, String repoPath, Collection<Change> existingChanges) {
+        Collection<Change> filtered = new ArrayList<>();
 
-        if (changes == null || changes.isEmpty()) {
-            return false;
+        for (Change change : localChanges) {
+            VirtualFile changeFile = change.getVirtualFile();
+            if (changeFile == null) {
+                continue;
+            }
+
+            String changePath = changeFile.getPath();
+
+            // Check if change belongs to this repository
+            if (!changePath.startsWith(repoPath)) {
+                continue;
+            }
+
+            // If existingChanges provided, skip duplicates
+            if (existingChanges != null && !existingChanges.isEmpty()) {
+                boolean isDuplicate = false;
+                for (Change existing : existingChanges) {
+                    VirtualFile existingFile = existing.getVirtualFile();
+                    if (existingFile != null && changePath.equals(existingFile.getPath())) {
+                        isDuplicate = true;
+                        break;
+                    }
+                }
+                if (isDuplicate) {
+                    continue;
+                }
+            }
+
+            filtered.add(change);
         }
 
-        for (Change change : changes) {
-            VirtualFile vFile = change.getVirtualFile();
-            if (vFile == null) {
-                return false;
-            }
-            String changePath = change.getVirtualFile().getPath();
-
-            if (localChangePath.equals(changePath)) {
-                // we have already this file in our changes-list
-                return false;
-            }
-        }
-        return true;
+        return filtered;
     }
 
     @NotNull
@@ -194,6 +219,19 @@ public class ChangesService extends GitCompareWithRefAction {
         return new ArrayList<>(changeMap.values());
     }
 
+    /**
+     * Collects local changes for HEAD (uncommitted changes) filtered by repository.
+     *
+     * @param localChanges All local changes from the project
+     * @param repo Repository to filter changes for
+     * @return Collection of local changes within this repository
+     */
+    private Collection<Change> collectHeadChanges(Collection<Change> localChanges, GitRepository repo) {
+        String repoPath = repo.getRoot().getPath();
+        // For HEAD, we only want local changes within this repository (no existing changes to exclude)
+        return filterLocalChanges(localChanges, repoPath, null);
+    }
+
     public Collection<Change> doCollectChanges(Project project, GitRepository repo, String scopeRef) {
         VirtualFile file = repo.getRoot();
         Collection<Change> _changes = new ArrayList<>();
@@ -202,10 +240,9 @@ public class ChangesService extends GitCompareWithRefAction {
             ChangeListManager changeListManager = ChangeListManager.getInstance(project);
             Collection<Change> localChanges = changeListManager.getAllChanges();
 
-            // Special handling for HEAD - just return local changes
+            // Special handling for HEAD - return local changes filtered by this repository
             if (scopeRef.equals(GitService.BRANCH_HEAD)) {
-                _changes.addAll(localChanges);
-                return _changes;
+                return collectHeadChanges(localChanges, repo);
             }
 
             // Diff Changes
@@ -241,18 +278,10 @@ public class ChangesService extends GitCompareWithRefAction {
                 }
             }
 
-            for (Change localChange : localChanges) {
-                VirtualFile localChangeVirtualFile = localChange.getVirtualFile();
-                if (localChangeVirtualFile == null) {
-                    continue;
-                }
-                String localChangePath = localChangeVirtualFile.getPath();
-
-                // Add Local Change if not part of Diff Changes anyway
-                if (isLocalChangeOnly(localChangePath, _changes)) {
-                    _changes.add(localChange);
-                }
-            }
+            // Add local changes that aren't already in the diff (filtered by repository and excluding duplicates)
+            String repoPath = repo.getRoot().getPath();
+            Collection<Change> additionalLocalChanges = filterLocalChanges(localChanges, repoPath, _changes);
+            _changes.addAll(additionalLocalChanges);
 
         } catch (VcsException ignored) {
         }
