@@ -48,6 +48,9 @@
         <projectService
                 serviceInterface="service.ToolWindowServiceInterface"
                 serviceImplementation="service.ToolWindowService"/>
+
+        <!-- File Status Provider for custom Git Scope coloring -->
+        <vcs.fileStatusProvider implementation="implementation.fileStatus.GitScopeFileStatusProvider"/>
     </extensions>
 
     <actions>

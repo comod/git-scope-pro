@@ -30,14 +30,30 @@ import java.util.function.Consumer;
 
 public class ChangesService extends GitCompareWithRefAction {
     private static final Logger LOG = Defs.getLogger(ChangesService.class);
+
     public interface ErrorStateMarker {}
+
     public static class ErrorStateList extends AbstractList<Change> implements ErrorStateMarker {
         @Override public Change get(int index) { throw new IndexOutOfBoundsException(); }
         @Override public int size() { return 0; }
         @Override public String toString() { return "ERROR_STATE_SENTINEL"; }
         @Override public boolean equals(Object o) { return o instanceof ErrorStateList; }
     }
+
     public static final Collection<Change> ERROR_STATE = new ErrorStateList();
+
+    /**
+     * Container for both merged changes and local changes towards HEAD.
+     */
+    public static class ChangesResult {
+        public final Collection<Change> mergedChanges; // Scope changes + local changes
+        public final Collection<Change> localChanges;  // Local changes towards HEAD only
+
+        public ChangesResult(Collection<Change> mergedChanges, Collection<Change> localChanges) {
+            this.mergedChanges = mergedChanges;
+            this.localChanges = localChanges;
+        }
+    }
     private final Project project;
     private final GitService git;
     private Task.Backgroundable task;
@@ -64,21 +80,26 @@ public class ChangesService extends GitCompareWithRefAction {
     // Cache for storing changes per repository
     private final Map<String, Collection<Change>> changesCache = new ConcurrentHashMap<>();
 
-    public void collectChangesWithCallback(TargetBranchMap targetBranchByRepo, Consumer<Collection<Change>> callBack, boolean checkFs) {
+    public void collectChangesWithCallback(TargetBranchMap targetBranchByRepo, Consumer<ChangesResult> callBack, boolean checkFs) {
         // Capture the current project reference to ensure consistency
         final Project currentProject = this.project;
         final GitService currentGitService = this.git;
 
         task = new Task.Backgroundable(currentProject, "Collecting " + Defs.APPLICATION_NAME, true) {
 
-            private Collection<Change> changes;
+            private ChangesResult result;
 
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
                 Collection<Change> _changes = new ArrayList<>();
+                Collection<Change> _localChanges = new ArrayList<>();
                 List<String> errorRepos = new ArrayList<>();
 
                 Collection<GitRepository> repositories = currentGitService.getRepositories();
+
+                // Get all local changes from ChangeListManager once
+                ChangeListManager changeListManager = ChangeListManager.getInstance(currentProject);
+                Collection<Change> allLocalChanges = changeListManager.getAllChanges();
 
                 repositories.forEach(repo -> {
                     try {
@@ -112,10 +133,19 @@ public class ChangesService extends GitCompareWithRefAction {
                             changesPerRepo = new ArrayList<>();
                         }
 
-                        // Simple "merge" logic
+                        // Merge changes into the collection
                         for (Change change : changesPerRepo) {
                             if (!_changes.contains(change)) {
                                 _changes.add(change);
+                            }
+                        }
+
+                        // Also collect local changes for this repository
+                        String repoPath = repo.getRoot().getPath();
+                        Collection<Change> repoLocalChanges = filterLocalChanges(allLocalChanges, repoPath, null);
+                        for (Change change : repoLocalChanges) {
+                            if (!_localChanges.contains(change)) {
+                                _localChanges.add(change);
                             }
                         }
                     } catch (Exception e) {
@@ -128,19 +158,19 @@ public class ChangesService extends GitCompareWithRefAction {
 
                 // Only return ERROR_STATE if ALL repositories failed
                 if (!errorRepos.isEmpty() && _changes.isEmpty()) {
-                    changes = ERROR_STATE;
+                    result = new ChangesResult(ERROR_STATE, new ArrayList<>());
                 } else {
-                    changes = _changes;
+                    result = new ChangesResult(_changes, _localChanges);
                 }
             }
 
             @Override
             public void onSuccess() {
-                // Ensure `changes` is accessed only on the UI thread to update the UI component
+                // Ensure result is accessed only on the UI thread to update the UI component
                 ApplicationManager.getApplication().invokeLater(() -> {
                     // Double-check the project is still valid
                     if (!currentProject.isDisposed() && callBack != null) {
-                        callBack.accept(this.changes);
+                        callBack.accept(this.result);
                     }
                 });
             }
@@ -149,7 +179,7 @@ public class ChangesService extends GitCompareWithRefAction {
             public void onThrowable(@NotNull Throwable error) {
                 ApplicationManager.getApplication().invokeLater(() -> {
                     if (!currentProject.isDisposed() && callBack != null) {
-                        callBack.accept(ERROR_STATE);
+                        callBack.accept(new ChangesResult(ERROR_STATE, new ArrayList<>()));
                     }
                 });
             }

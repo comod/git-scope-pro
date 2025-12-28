@@ -4,6 +4,7 @@ import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.changes.Change;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.content.Content;
 import com.intellij.ui.content.ContentManager;
 import com.intellij.util.concurrency.SequentialTaskExecutor;
@@ -86,6 +87,41 @@ public class ViewService implements Disposable {
 
     private void doUpdateDebounced(Collection<Change> changes) {
         debouncer.debounce(Void.class, () -> onUpdate(changes), DEBOUNCE_MS, TimeUnit.MILLISECONDS);
+    }
+
+    /**
+     * Refreshes file status colors for files in the current scope and previous scope.
+     * Call this when the active scope changes to update colors based on new scope.
+     *
+     * This method refreshes files from BOTH the new active model and the previous active model to ensure:
+     * - Files in the new scope get the new colors
+     * - Files that were in the old scope but not in the new scope revert to default colors
+     *
+     */
+    public void refreshFileColors() {
+        if (project.isDisposed()) {
+            return;
+        }
+
+        // Execute file status refresh on background thread to avoid EDT slow operations
+        ApplicationManager.getApplication().executeOnPooledThread(() -> {
+            if (project.isDisposed()) {
+                return;
+            }
+            
+            // Then update on EDT with bulk refresh
+            ApplicationManager.getApplication().invokeLater(() -> {
+                if (project.isDisposed()) {
+                    return;
+                }
+                
+                com.intellij.openapi.vcs.FileStatusManager fileStatusManager =
+                    com.intellij.openapi.vcs.FileStatusManager.getInstance(project);
+                
+                // Bulk update all file statuses
+                fileStatusManager.fileStatusesChanged();
+            });
+        });
     }
 
     public void load() {
@@ -345,12 +381,18 @@ public class ViewService implements Disposable {
                     if (model.isActive()) {
                         Collection<Change> changes = model.getChanges();
                         doUpdateDebounced(changes);
+                        // Note: We don't manually refresh file colors here because:
+                        // 1. It interferes with gutter change bars being set up
+                        // 2. FileStatusProvider is automatically queried by IntelliJ when needed
+                        // 3. Manual refresh causes race conditions with the line status tracker
                     }
                 }
                 // TODO: collectChanges: tab switched
                 case active -> {
                     incrementUpdate(); // Increment generation to cancel any stale updates for previous tab
                     collectChanges(model, true);
+                    // Refresh file colors when switching tabs
+                    refreshFileColors();
                 }
                 case tabName -> {
                     if (!isProcessingTabRename) {
@@ -470,13 +512,14 @@ public class ViewService implements Disposable {
 
         // serialize collection behind a single-threaded executor
         changesExecutor.execute(() -> {
-            changesService.collectChangesWithCallback(finalTargetBranchMap, changes -> {
+            changesService.collectChangesWithCallback(finalTargetBranchMap, result -> {
                 ApplicationManager.getApplication().invokeLater(() -> {
                     try {
                         long currentGen = applyGeneration.get();
                         if (!project.isDisposed() && currentGen == gen) {
                             LOG.debug("Applying changes for generation " + gen);
-                            model.setChanges(changes);
+                            model.setChanges(result.mergedChanges);
+                            model.setLocalChanges(result.localChanges);
                         } else {
                             LOG.debug("Discarding changes for generation " + gen + " (current generation is " + currentGen + ")");
                         }
@@ -564,6 +607,30 @@ public class ViewService implements Disposable {
             return null;
         }
         return current.getChanges();
+    }
+
+    /**
+     * Gets the local changes (modifications towards HEAD) for all repositories.
+     * These are files that are currently being modified and should use IntelliJ's default file coloring
+     * (including gutter change bars).
+     *
+     * Returns cached local changes from the current scope to avoid querying ChangeListManager repeatedly.
+     *
+     * @return Collection of local changes towards HEAD, or null if not initialized
+     */
+    public Collection<Change> getLocalChangesTowardsHead() {
+        // Early return if ViewService is not fully initialized yet
+        if (toolWindowService == null) {
+            return null;
+        }
+
+        MyModel current = getCurrent();
+        if (current == null) {
+            return null;
+        }
+
+        // Return the cached local changes
+        return current.getLocalChanges();
     }
 
     public void removeTab(int tabIndex) {

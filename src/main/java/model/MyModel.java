@@ -13,7 +13,8 @@ import java.util.Map;
 public class MyModel extends MyModelBase {
     private final PublishSubject<MyModel.field> changeObservable = PublishSubject.create();
     private final boolean isHeadTab;
-    private Collection<Change> changes;
+    private Collection<Change> changes; // Merged changes (scope + local)
+    private Collection<Change> localChanges; // Local changes towards HEAD only
     private boolean isActive;
     private String customTabName; // Added field for custom tab name
 
@@ -99,6 +100,14 @@ public class MyModel extends MyModelBase {
     public void setChanges(Collection<Change> changes) {
         this.changes = changes;
         changeObservable.onNext(field.changes);
+    }
+
+    public Collection<Change> getLocalChanges() {
+        return localChanges;
+    }
+
+    public void setLocalChanges(Collection<Change> localChanges) {
+        this.localChanges = localChanges;
     }
 
     public Observable<field> getObservable() {
