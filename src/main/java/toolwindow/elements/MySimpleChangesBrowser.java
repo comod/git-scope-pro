@@ -61,8 +61,11 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
 
     @Override
     protected @NotNull List<AnAction> createPopupMenuActions() {
-        // Return the SAME static list instance every time to prevent toolbar recreation
-        return STATIC_POPUP_ACTIONS;
+        // Include parent actions (which provide diff functionality) plus our custom actions
+        List<AnAction> actions = new ArrayList<>(super.createPopupMenuActions());
+        actions.add(SHOW_IN_PROJECT_ACTION);
+        actions.add(ROLLBACK_ACTION);
+        return actions;
     }
 
     @Override
