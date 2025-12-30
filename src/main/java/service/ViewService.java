@@ -2,8 +2,11 @@ package service;
 
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.vcs.FileStatusManager;
 import com.intellij.openapi.vcs.changes.Change;
+import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.ui.content.Content;
 import com.intellij.ui.content.ContentManager;
 import com.intellij.util.concurrency.SequentialTaskExecutor;
@@ -42,6 +45,14 @@ public class ViewService implements Disposable {
     public List<MyModel> collection = new ArrayList<>();
     public Integer currentTabIndex = 0;
     private final Project project;
+    private volatile boolean isDisposed = false;
+
+    // Lightweight disposal token to avoid capturing 'this' in lambdas
+    private static class DisposalToken {
+        volatile boolean disposed = false;
+    }
+    private final DisposalToken disposalToken = new DisposalToken();
+
     private boolean isProcessingTabRename = false;
     private boolean isProcessingTabReorder = false;
     private ToolWindowServiceInterface toolWindowService;
@@ -61,6 +72,7 @@ public class ViewService implements Disposable {
     private Integer savedTabIndex;
     private final AtomicBoolean tabInitializationInProgress = new AtomicBoolean(false);
     private final AtomicBoolean initialFileColorsRefreshed = new AtomicBoolean(false);
+    private final List<io.reactivex.rxjava3.disposables.Disposable> rxSubscriptions = new ArrayList<>();
 
     public ViewService(Project project) {
         this.project = project;
@@ -73,8 +85,25 @@ public class ViewService implements Disposable {
 
     @Override
     public void dispose() {
+        // Set disposed flag FIRST to prevent any further operations
+        isDisposed = true;
+        disposalToken.disposed = true;
+
+        // Dispose all RxJava subscriptions to break references to MyModel.field enum
+        for (io.reactivex.rxjava3.disposables.Disposable subscription : rxSubscriptions) {
+            if (subscription != null && !subscription.isDisposed()) {
+                subscription.dispose();
+            }
+        }
+        rxSubscriptions.clear();
+
+        // Shutdown the debouncer scheduler FIRST to cancel pending tasks
+        if (debouncer != null) {
+            debouncer.shutdown();
+        }
+
         // Shutdown the executor service to prevent memory leaks
-        if (changesExecutor != null && !changesExecutor.isShutdown()) {
+        if (!changesExecutor.isShutdown()) {
             changesExecutor.shutdown();
             try {
                 if (!changesExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
@@ -89,13 +118,35 @@ public class ViewService implements Disposable {
         // Clear all collections to release memory
         if (collection != null) {
             collection.clear();
+            collection = null;
+        }
+
+        // Null out all service references to break potential circular references
+        toolWindowService = null;
+        changesService = null;
+        statusBarService = null;
+        gitService = null;
+        targetBranchService = null;
+        state = null;
+
+        // Dispose MyScope to unregister NamedScope from NamedScopeManager
+        if (myScope != null) {
+            myScope.dispose();
+            myScope = null;
         }
 
         // Dispose of the line status tracker if it has dispose logic
         myLineStatusTrackerImpl = null;
-        myScope = null;
         debouncer = null;
         myHeadModel = null;
+    }
+
+    /**
+     * Check if this service has been disposed.
+     * Used by FileStatusProvider to avoid accessing disposed service.
+     */
+    public boolean isDisposed() {
+        return isDisposed;
     }
 
     public void initDependencies() {
@@ -124,28 +175,29 @@ public class ViewService implements Disposable {
      *
      */
     public void refreshFileColors() {
-        if (project.isDisposed()) {
+        if (project.isDisposed() || isDisposed) {
             return;
         }
 
+        final DisposalToken token = this.disposalToken;
         // Execute file status refresh on background thread to avoid EDT slow operations
         ApplicationManager.getApplication().executeOnPooledThread(() -> {
-            if (project.isDisposed()) {
+            if (token.disposed) {
                 return;
             }
-            
+
             // Then update on EDT with bulk refresh
             ApplicationManager.getApplication().invokeLater(() -> {
-                if (project.isDisposed()) {
+                if (project.isDisposed() || token.disposed) {
                     return;
                 }
-                
-                com.intellij.openapi.vcs.FileStatusManager fileStatusManager =
-                    com.intellij.openapi.vcs.FileStatusManager.getInstance(project);
-                
+
+                FileStatusManager fileStatusManager =
+                    FileStatusManager.getInstance(project);
+
                 // Bulk update all file statuses
                 fileStatusManager.fileStatusesChanged();
-            });
+            }, ModalityState.any(), __ -> token.disposed);
         });
     }
 
@@ -323,9 +375,12 @@ public class ViewService implements Disposable {
 
             // Set up tooltip after target branches are added
             if (myModel.getCustomTabName() != null && !myModel.getCustomTabName().isEmpty()) {
+                final DisposalToken token = disposalToken;
                 ApplicationManager.getApplication().invokeLater(() -> {
-                    toolWindowService.setupTabTooltip(myModel);
-                });
+                    if (!token.disposed && toolWindowService != null) {
+                        toolWindowService.setupTabTooltip(myModel);
+                    }
+                }, ModalityState.any(), __ -> token.disposed);
             }
         });
     }
@@ -391,7 +446,7 @@ public class ViewService implements Disposable {
 
     private void subscribeToObservable(MyModel model) {
         Observable<MyModel.field> observable = model.getObservable();
-        observable.subscribe(field -> {
+        io.reactivex.rxjava3.disposables.Disposable subscription = observable.subscribe(field -> {
             switch (field) {
                 case targetBranch -> {
                     getTargetBranchDisplayAsync(model, tabName -> {
@@ -437,6 +492,9 @@ public class ViewService implements Disposable {
 
         }, (e -> {
         }));
+
+        // Track the subscription so it can be disposed when ViewService is disposed
+        rxSubscriptions.add(subscription);
     }
 
     private void getTargetBranchDisplayCurrent(Consumer<String> callback) {
@@ -540,12 +598,13 @@ public class ViewService implements Disposable {
         LOG.debug("collectChanges() scheduled with generation = " + gen);
 
         // serialize collection behind a single-threaded executor
+        final DisposalToken token = this.disposalToken;
         changesExecutor.execute(() -> {
             changesService.collectChangesWithCallback(finalTargetBranchMap, result -> {
                 ApplicationManager.getApplication().invokeLater(() -> {
                     try {
                         long currentGen = applyGeneration.get();
-                        if (!project.isDisposed() && currentGen == gen) {
+                        if (!project.isDisposed() && !token.disposed && currentGen == gen) {
                             LOG.debug("Applying changes for generation " + gen);
                             model.setChanges(result.mergedChanges());
                             model.setLocalChanges(result.localChanges());
@@ -555,18 +614,21 @@ public class ViewService implements Disposable {
                     } finally {
                         done.complete(null);
                     }
-                });
+                }, ModalityState.any(), __ -> token.disposed);
             }, checkFs);
         });
     }
 
     // helper to enqueue UI work strictly after the currently queued collections
     public void runAfterCurrentChangeCollection(Runnable uiTask) {
-        changesExecutor.execute(() ->
-                ApplicationManager.getApplication().invokeLater(() -> {
-                    if (!project.isDisposed()) uiTask.run();
-                })
-        );
+        if (isDisposed) return;
+        final DisposalToken token = this.disposalToken;
+        changesExecutor.execute(() -> {
+            if (token.disposed) return;
+            ApplicationManager.getApplication().invokeLater(() -> {
+                if (!project.isDisposed() && !token.disposed) uiTask.run();
+            }, ModalityState.any(), __ -> token.disposed);
+        });
     }
 
 
@@ -578,13 +640,19 @@ public class ViewService implements Disposable {
     }
 
     public MyModel getCurrent() {
-        // Check if toolWindowService is initialized
-        if (toolWindowService == null) {
-            return myHeadModel; // Safe fallback when not yet initialized
+        // Check if disposed or not initialized
+        if (isDisposed || toolWindowService == null) {
+            return myHeadModel; // Safe fallback
+        }
+
+        // Get tool window safely
+        ToolWindow toolWindow = toolWindowService.getToolWindow();
+        if (toolWindow == null) {
+            return myHeadModel; // Tool window not available
         }
 
         // Get the currently selected tab's model directly from ContentManager
-        ContentManager contentManager = toolWindowService.getToolWindow().getContentManager();
+        ContentManager contentManager = toolWindow.getContentManager();
         Content selectedContent = contentManager.getSelectedContent();
 
         if (selectedContent == null) {
@@ -809,12 +877,15 @@ public class ViewService implements Disposable {
     }
 
     public void onUpdate(Collection<Change> changes) {
-        if (changes == null) {
+        if (changes == null || isDisposed) {
             return;
         }
 
         // Run UI updates on EDT
+        final DisposalToken token = this.disposalToken;
         ApplicationManager.getApplication().invokeLater(() -> {
+            if (token.disposed) return;
+
             updateStatusBarWidget();
             myLineStatusTrackerImpl.update(changes, null);
             myScope.update(changes);
@@ -822,12 +893,14 @@ public class ViewService implements Disposable {
             // Perform scroll restoration after all UI updates are complete
             // Use another invokeLater to ensure everything is fully rendered
             SwingUtilities.invokeLater(() -> {
+                if (token.disposed || toolWindowService == null) return;
+
                 VcsTree vcsTree = toolWindowService.getVcsTree();
                 if (vcsTree != null) {
                     vcsTree.performScrollRestoration();
                 }
             });
-        });
+        }, ModalityState.any(), __ -> token.disposed);
     }
 
     private void updateStatusBarWidget() {

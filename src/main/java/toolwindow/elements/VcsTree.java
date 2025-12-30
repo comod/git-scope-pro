@@ -172,7 +172,7 @@ public class VcsTree extends JPanel {
             return 0;
         }
 
-        java.util.List<String> filePaths = changes.stream()
+        List<String> filePaths = changes.stream()
                 .filter(Objects::nonNull)
                 .map(this::getChangePath)
                 .filter(path -> !path.isEmpty())
@@ -213,7 +213,6 @@ public class VcsTree extends JPanel {
         if (changes == null || changes.isEmpty() || changes instanceof ChangesService.ErrorStateMarker) {
             JLabel statusLabel = createStatusLabel(changes);
             SwingUtilities.invokeLater(() -> setComponentIfCurrent(statusLabel, sequenceNumber));
-            //currentBrowser = null;
             return;
         }
 
@@ -403,21 +402,39 @@ public class VcsTree extends JPanel {
         }
     }
 
-    @Override
-    public void removeNotify() {
-        super.removeNotify();
-
-        positionTracker.cleanup();
-
+    public void cleanup() {
+        // Cancel any pending updates
         CompletableFuture<Void> current = currentUpdate.get();
         if (current != null && !current.isDone()) {
             current.cancel(true);
         }
+
+        // Clean up position tracker
+        positionTracker.cleanup();
+
+        // Clear all maps
         lastChangesPerTab.clear();
         lastChangesHashCodePerTab.clear();
 
-        // Clear the single browser instance for this VcsTree
-        singleBrowser = null;
+        // Clear browser instances (parent will dispose SimpleAsyncChangesBrowser)
+        if (singleBrowser != null) {
+            singleBrowser = null;
+        }
+
+        if (currentBrowser != null) {
+            currentBrowser = null;
+        }
+
         pendingBrowserCreation = null;
+
+        // Remove all components to break JNI references
+        removeAll();
+    }
+
+    @Override
+    public void removeNotify() {
+        super.removeNotify();
+        // DO NOT call cleanup() here - removeNotify() is called when switching tabs
+        // cleanup() should only be called from ToolWindowView.dispose() when the tab is actually closed
     }
 }

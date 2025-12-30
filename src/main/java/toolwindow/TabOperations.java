@@ -139,6 +139,59 @@ public class TabOperations {
         };
     }
 
+    /**
+     * Removes our tab actions from the ToolWindowContextMenu group by matching template text.
+     * This is necessary because action instances may change but template text remains constant.
+     */
+    private void removeTabActionsFromContextMenu(DefaultActionGroup contextMenuGroup) {
+        if (contextMenuGroup == null) {
+            return;
+        }
+
+        AnAction[] actions = contextMenuGroup.getChildActionsOrStubs();
+        for (AnAction action : actions) {
+            if (action.getTemplateText() != null &&
+                    (action.getTemplateText().equals("Rename Tab") ||
+                     action.getTemplateText().equals("Reset Tab Name") ||
+                     action.getTemplateText().equals("Move Tab Left") ||
+                     action.getTemplateText().equals("Move Tab Right"))) {
+                contextMenuGroup.remove(action);
+            }
+        }
+    }
+
+    /**
+     * Unregisters all tab actions from the action manager and removes them from context menu.
+     * Should be called when the plugin is being unloaded or the service is disposed.
+     */
+    public void unregisterTabActions() {
+        ActionManager actionManager = ActionManager.getInstance();
+
+        // Unregister all our dynamically registered actions
+        // Note: These action IDs are not in plugin.xml as they are registered at runtime
+        String[] actionIds = {
+            "GitScope.MoveTabLeft",
+            "GitScope.MoveTabRight",
+            "GitScope.RenameTab",
+            "GitScope.ResetTabName"
+        };
+
+        for (String actionId : actionIds) {
+            try {
+                // Only unregister if action exists (getAction returns null for non-existent actions)
+                if (actionManager.getAction(actionId) != null) {
+                    actionManager.unregisterAction(actionId);
+                }
+            } catch (Exception e) {
+                // Ignore - action may not be registered
+            }
+        }
+
+        // Remove actions from the context menu group by template text
+        DefaultActionGroup contextMenuGroup = (DefaultActionGroup) actionManager.getAction("ToolWindowContextMenu");
+        removeTabActionsFromContextMenu(contextMenuGroup);
+    }
+
     public void registerTabActions() {
         // Get the action manager and register our actions
         ActionManager actionManager = ActionManager.getInstance();
@@ -183,16 +236,7 @@ public class TabOperations {
         DefaultActionGroup contextMenuGroup = (DefaultActionGroup) actionManager.getAction("ToolWindowContextMenu");
         if (contextMenuGroup != null) {
             // Remove any existing instances of our actions first to avoid duplicates
-            AnAction[] actions = contextMenuGroup.getChildActionsOrStubs();
-            for (AnAction action : actions) {
-                if (action.getTemplateText() != null &&
-                        (action.getTemplateText().equals("Rename Tab") ||
-                         action.getTemplateText().equals("Reset Tab Name") ||
-                         action.getTemplateText().equals("Move Tab Left") ||
-                         action.getTemplateText().equals("Move Tab Right"))) {
-                    contextMenuGroup.remove(action);
-                }
-            }
+            removeTabActionsFromContextMenu(contextMenuGroup);
 
             // Add our actions to the group in the desired order:
             // 1. Move Tab Left
@@ -200,18 +244,10 @@ public class TabOperations {
             // 3. Rename Tab
             // 4. Reset Tab Name
             // Note: Add null checks to prevent IllegalArgumentException in IntelliJ 2025.3+
-            if (resetTabNameAction != null) {
-                contextMenuGroup.add(resetTabNameAction, Constraints.FIRST);
-            }
-            if (renameAction != null) {
-                contextMenuGroup.add(renameAction, Constraints.FIRST);
-            }
-            if (moveRightAction != null) {
-                contextMenuGroup.add(moveRightAction, Constraints.FIRST);
-            }
-            if (moveLeftAction != null) {
-                contextMenuGroup.add(moveLeftAction, Constraints.FIRST);
-            }
+            contextMenuGroup.add(resetTabNameAction, Constraints.FIRST);
+            contextMenuGroup.add(renameAction, Constraints.FIRST);
+            contextMenuGroup.add(moveRightAction, Constraints.FIRST);
+            contextMenuGroup.add(moveLeftAction, Constraints.FIRST);
         }
     }
 

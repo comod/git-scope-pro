@@ -72,4 +72,22 @@ public class MyScope {
             ApplicationManager.getApplication().invokeLater(this::updateProjectFilter);
         }
     }
+
+    /**
+     * Remove the named scope from the scope manager to prevent memory leaks.
+     * Must be called when the plugin is being unloaded.
+     */
+    public void dispose() {
+        // Remove our scope from the NamedScopeManager to break the reference to MyPackageSet
+        List<NamedScope> scopes = new ArrayList<>(Arrays.asList(scopeManager.getEditableScopes()));
+        scopes.removeIf(scope -> SCOPE_ID.equals(scope.getScopeId()));
+        scopes.removeIf(scope -> OLD_SCOPE_ID.equals(scope.getScopeId()));
+        scopeManager.setScopes(scopes.toArray(new NamedScope[0]));
+
+        // Clear the package set reference
+        if (myPackageSet != null) {
+            myPackageSet.setChanges(Collections.emptyList());
+            myPackageSet = null;
+        }
+    }
 }

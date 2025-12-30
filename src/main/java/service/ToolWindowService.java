@@ -34,6 +34,16 @@ public final class ToolWindowService implements ToolWindowServiceInterface, Disp
 
     @Override
     public void dispose() {
+        // Unregister tab actions from action manager to prevent memory leaks
+        tabOperations.unregisterTabActions();
+
+        // Dispose all ToolWindowView instances to clean up UI components
+        for (ToolWindowView view : contentToViewMap.values()) {
+            if (view != null) {
+                view.dispose();
+            }
+        }
+
         // Clear the content to view map to release memory
         contentToViewMap.clear();
     }
@@ -45,15 +55,20 @@ public final class ToolWindowService implements ToolWindowServiceInterface, Disp
     }
 
     public ToolWindow getToolWindow() {
+        if (project.isDisposed()) {
+            return null;
+        }
         ToolWindowManager toolWindowManager = ToolWindowManager.getInstance(project);
-        ToolWindow toolWindow = toolWindowManager.getToolWindow(Defs.TOOL_WINDOW_NAME);
-        assert toolWindow != null;
-        return toolWindow;
+        return toolWindowManager.getToolWindow(Defs.TOOL_WINDOW_NAME);
     }
 
     @NotNull
     private ContentManager getContentManager() {
-        return getToolWindow().getContentManager();
+        ToolWindow toolWindow = getToolWindow();
+        if (toolWindow == null) {
+            throw new IllegalStateException("Tool window is not available");
+        }
+        return toolWindow.getContentManager();
     }
 
     public void addTab(MyModel myModel, String tabName, boolean closeable) {
@@ -112,7 +127,13 @@ public final class ToolWindowService implements ToolWindowServiceInterface, Disp
         if (content == null) {
             return;
         }
-        contentToViewMap.remove(content);
+
+        // Dispose the view associated with this content before removing
+        ToolWindowView view = contentToViewMap.remove(content);
+        if (view != null) {
+            view.dispose();
+        }
+
         getContentManager().removeContent(content, false);
     }
 
@@ -121,7 +142,13 @@ public final class ToolWindowService implements ToolWindowServiceInterface, Disp
         if (content == null) {
             return;
         }
-        contentToViewMap.remove(content);
+
+        // Dispose the view associated with this content before removing
+        ToolWindowView view = contentToViewMap.remove(content);
+        if (view != null) {
+            view.dispose();
+        }
+
         getContentManager().removeContent(content, true);
     }
 

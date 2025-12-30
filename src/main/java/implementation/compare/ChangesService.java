@@ -2,6 +2,7 @@ package implementation.compare;
 
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.Task;
@@ -27,6 +28,7 @@ import utils.GitUtil;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 public class ChangesService extends GitCompareWithRefAction implements Disposable {
@@ -54,6 +56,7 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
     private final Project project;
     private final GitService git;
     private Task.Backgroundable task;
+    private final AtomicBoolean disposing = new AtomicBoolean(false);
 
     public ChangesService(Project project) {
         this.project = project;
@@ -88,6 +91,11 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
 
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
+                // Early exit if disposing
+                if (disposing.get() || indicator.isCanceled()) {
+                    return;
+                }
+
                 Collection<Change> _changes = new ArrayList<>();
                 Collection<Change> _localChanges = new ArrayList<>();
                 List<String> errorRepos = new ArrayList<>();
@@ -98,12 +106,17 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
                 ChangeListManager changeListManager = ChangeListManager.getInstance(currentProject);
                 Collection<Change> allLocalChanges = changeListManager.getAllChanges();
 
+                // Clear cache if checkFs is true (force fresh fetch)
+                if (checkFs) {
+                    changesCache.clear();
+                }
+
                 repositories.forEach(repo -> {
                     try {
                         String branchToCompare = getBranchToCompare(targetBranchByRepo, repo);
 
-                        // Use only repo path as cache key
-                        String cacheKey = repo.getRoot().getPath();
+                        // Use repo path + target branch as cache key to ensure different branches don't share cache
+                        String cacheKey = repo.getRoot().getPath() + "|" + branchToCompare;
 
                         Collection<Change> changesPerRepo = null;
 
@@ -153,8 +166,9 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
                     }
                 });
 
-                // Only return ERROR_STATE if ALL repositories failed
-                if (!errorRepos.isEmpty() && _changes.isEmpty()) {
+                // Return ERROR_STATE if ANY repository had an invalid reference
+                // Since target branch is per-repo, if the specified repo fails, the entire scope is invalid
+                if (!errorRepos.isEmpty()) {
                     result = new ChangesResult(ERROR_STATE, new ArrayList<>());
                 } else {
                     result = new ChangesResult(_changes, _localChanges);
@@ -169,7 +183,7 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
                     if (!currentProject.isDisposed() && callBack != null) {
                         callBack.accept(this.result);
                     }
-                });
+                }, ModalityState.defaultModalityState(), __ -> disposing.get());
             }
 
             @Override
@@ -178,7 +192,7 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
                     if (!currentProject.isDisposed() && callBack != null) {
                         callBack.accept(new ChangesResult(ERROR_STATE, new ArrayList<>()));
                     }
-                });
+                }, ModalityState.defaultModalityState(), __ -> disposing.get());
             }
         };
         task.queue();
@@ -186,6 +200,9 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
     
     @Override
     public void dispose() {
+        // Set disposing flag to prevent queued callbacks from executing
+        disposing.set(true);
+
         // Clear cache to release memory
         clearCache();
     }
@@ -195,10 +212,11 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
         changesCache.clear();
     }
 
-    // Method to clear cache for specific repo
+    // Method to clear cache for specific repo (clears all entries for this repo across all branches)
     public void clearCache(GitRepository repo) {
-        String cacheKey = repo.getRoot().getPath();
-        changesCache.remove(cacheKey);
+        String repoPath = repo.getRoot().getPath();
+        // Remove all cache entries that start with this repo path
+        changesCache.keySet().removeIf(key -> key.startsWith(repoPath + "|"));
     }
 
     /**

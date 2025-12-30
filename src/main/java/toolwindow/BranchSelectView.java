@@ -33,6 +33,7 @@ public class BranchSelectView {
     private final GitService gitService;
     private final State state;
     private final SearchTextField search;
+    private final java.util.List<BranchTree> branchTrees = new java.util.ArrayList<>();
 
 private JPanel createManualInputPanel(GitRepository repository, BranchTree branchTree) {
     JPanel manualInputPanel = new JPanel(new BorderLayout());
@@ -145,6 +146,7 @@ private JPanel createManualInputPanel(GitRepository repository, BranchTree branc
                 }
 
                 BranchTree branchTree = createBranchTree(project, node);
+                branchTrees.add(branchTree);  // Track for cleanup
                 main.add(createManualInputPanel(gitRepository, branchTree));
                 main.add(branchTree);
             });
@@ -215,6 +217,19 @@ private JPanel createManualInputPanel(GitRepository repository, BranchTree branc
 
     public JPanel getRootPanel() {
         return rootPanel;
+    }
+
+    public void dispose() {
+        // Clean up all branch trees (removes listeners)
+        for (BranchTree branchTree : branchTrees) {
+            if (branchTree != null) {
+                branchTree.removeAll();
+            }
+        }
+        branchTrees.clear();
+
+        // Clean up root panel
+        rootPanel.removeAll();
     }
 
 }

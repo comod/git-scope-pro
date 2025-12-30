@@ -1,5 +1,4 @@
-<!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
-<idea-plugin>
+<idea-plugin require-restart="true">
     <id>Git Scope</id>
     <name>Git Scope</name>
     <vendor>WOELKIT, M.Wållberg</vendor>

@@ -14,6 +14,7 @@ import com.intellij.openapi.vcs.changes.Change;
 import com.intellij.openapi.vcs.changes.ui.SimpleAsyncChangesBrowser;
 import com.intellij.openapi.vfs.VirtualFile;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import system.Defs;
 import toolwindow.VcsTreeActions;
 
@@ -21,9 +22,7 @@ import javax.swing.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.*;
 
 public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
@@ -31,19 +30,21 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
     private final Project myProject;
     UISettings uiSettings = UISettings.getInstance();
 
-    // Reuse action instances to avoid creating new instances on every toolbar update (IntelliJ 2025.3+ requirement)
-    // These must be static to be shared across all browser instances
-    private static final AnAction SELECT_OPENED_FILE_ACTION = new VcsTreeActions.SelectOpenedFileAction();
-    private static final AnAction SHOW_IN_PROJECT_ACTION = new VcsTreeActions.ShowInProjectAction();
-    private static final AnAction ROLLBACK_ACTION = new VcsTreeActions.RollbackAction();
+    // Instance-level actions to avoid static references that prevent plugin unloading
+    // Use lazy initialization since super() constructor may call createToolbarActions() before field initialization
+    private AnAction selectOpenedFileAction;
+    private AnAction showInProjectAction;
+    private AnAction rollbackAction;
+    private List<AnAction> toolbarActions;
 
-    // Pre-create static immutable lists to ensure the SAME list instance is returned every time
-    private static final List<AnAction> STATIC_TOOLBAR_ACTIONS = java.util.Collections.unmodifiableList(
-            java.util.Collections.singletonList(SELECT_OPENED_FILE_ACTION)
-    );
-    private static final List<AnAction> STATIC_POPUP_ACTIONS = java.util.Collections.unmodifiableList(
-            java.util.Arrays.asList(SHOW_IN_PROJECT_ACTION, ROLLBACK_ACTION)
-    );
+    private void initializeActions() {
+        if (selectOpenedFileAction == null) {
+            selectOpenedFileAction = new VcsTreeActions.SelectOpenedFileAction();
+            showInProjectAction = new VcsTreeActions.ShowInProjectAction();
+            rollbackAction = new VcsTreeActions.RollbackAction();
+            toolbarActions = Collections.singletonList(selectOpenedFileAction);
+        }
+    }
 
     /**
      * Constructor for MySimpleChangesBrowser.
@@ -61,17 +62,19 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
 
     @Override
     protected @NotNull List<AnAction> createPopupMenuActions() {
+        initializeActions();
         // Include parent actions (which provide diff functionality) plus our custom actions
         List<AnAction> actions = new ArrayList<>(super.createPopupMenuActions());
-        actions.add(SHOW_IN_PROJECT_ACTION);
-        actions.add(ROLLBACK_ACTION);
+        actions.add(showInProjectAction);
+        actions.add(rollbackAction);
         return actions;
     }
 
     @Override
     protected @NotNull List<AnAction> createToolbarActions() {
-        // Return the SAME static list instance every time to prevent toolbar recreation
-        return STATIC_TOOLBAR_ACTIONS;
+        initializeActions();
+        // Return the SAME instance-level list every time to prevent toolbar recreation
+        return toolbarActions;
     }
 
     /**
@@ -136,28 +139,11 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
             options = withReuseOpen.invoke(options, true);
 
             // Look for the openFile method with FileEditorOpenOptions
-            Method openFileMethod = null;
-            Class<?> currentClass = editorManager.getClass();
-
-            while (currentClass != null && openFileMethod == null) {
-                for (Method method : currentClass.getDeclaredMethods()) {
-                    if ("openFile".equals(method.getName())) {
-                        Class<?>[] paramTypes = method.getParameterTypes();
-                        if (paramTypes.length == 3 &&
-                                VirtualFile.class.isAssignableFrom(paramTypes[0]) &&
-                                optionsClass.isAssignableFrom(paramTypes[2])) {
-                            openFileMethod = method;
-                            break;
-                        }
-                    }
-                }
-                currentClass = currentClass.getSuperclass();
-            }
+            Method openFileMethod = getMethod(editorManager, optionsClass);
 
             if (openFileMethod != null) {
                 openFileMethod.setAccessible(true);
                 openFileMethod.invoke(editorManager, file, null, options);
-                LOG.debug("Successfully opened file in preview tab: " + file.getName());
             } else {
                 LOG.debug("Preview tab method not found, doing nothing for single click");
             }
@@ -165,6 +151,27 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
         } catch (Exception e) {
             LOG.debug("Preview tab opening failed, doing nothing for single click", e);
         }
+    }
+
+    private static @Nullable Method getMethod(FileEditorManager editorManager, Class<?> optionsClass) {
+        Method openFileMethod = null;
+        Class<?> currentClass = editorManager.getClass();
+
+        while (currentClass != null && openFileMethod == null) {
+            for (Method method : currentClass.getDeclaredMethods()) {
+                if ("openFile".equals(method.getName())) {
+                    Class<?>[] paramTypes = method.getParameterTypes();
+                    if (paramTypes.length == 3 &&
+                            VirtualFile.class.isAssignableFrom(paramTypes[0]) &&
+                            optionsClass.isAssignableFrom(paramTypes[2])) {
+                        openFileMethod = method;
+                        break;
+                    }
+                }
+            }
+            currentClass = currentClass.getSuperclass();
+        }
+        return openFileMethod;
     }
 
     /**

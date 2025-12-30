@@ -24,7 +24,7 @@ public class MyDynamicPluginListener implements DynamicPluginListener {
     @Override
     public void beforePluginUnload(@NotNull IdeaPluginDescriptor pluginDescriptor, boolean isUpdate) {
         // Only handle our own plugin
-        if (!isOurPlugin(pluginDescriptor)) {
+        if (isAlienPlugin(pluginDescriptor)) {
             return;
         }
 
@@ -56,7 +56,7 @@ public class MyDynamicPluginListener implements DynamicPluginListener {
     @Override
     public void pluginLoaded(@NotNull IdeaPluginDescriptor pluginDescriptor) {
         // Only handle our own plugin
-        if (!isOurPlugin(pluginDescriptor)) {
+        if (isAlienPlugin(pluginDescriptor)) {
             return;
         }
 
@@ -81,11 +81,11 @@ public class MyDynamicPluginListener implements DynamicPluginListener {
     }
 
     /**
-     * Checks if the plugin descriptor refers to our plugin
+     * Checks if the plugin descriptor refers to some other plugin
      */
-    private boolean isOurPlugin(@NotNull IdeaPluginDescriptor pluginDescriptor) {
+    private boolean isAlienPlugin(@NotNull IdeaPluginDescriptor pluginDescriptor) {
         String pluginId = pluginDescriptor.getPluginId().getIdString();
         // Match the plugin ID from plugin.xml
-        return "Git Scope".equals(pluginId);
+        return !"Git Scope".equals(pluginId);
     }
 }

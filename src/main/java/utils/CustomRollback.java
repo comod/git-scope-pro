@@ -23,6 +23,7 @@ import git4idea.commands.GitLineHandler;
 import git4idea.commands.Git;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProgressManager;
 import org.jetbrains.annotations.NotNull;
 import com.intellij.history.LocalHistory;
 import com.intellij.openapi.util.io.FileUtil;
@@ -193,7 +194,7 @@ public class CustomRollback {
         List<GitRepository> allRepos = git4idea.GitUtil.getRepositoryManager(project).getRepositories();
 
         for (Change change : changes) {
-            com.intellij.openapi.progress.ProgressManager.checkCanceled();
+            ProgressManager.checkCanceled();
             indicator.checkCanceled();
 
             FilePath afterPath = ChangesUtil.getAfterPath(change);
@@ -224,7 +225,7 @@ public class CustomRollback {
         int processed = 0;
 
         for (Map.Entry<VirtualFile, List<Change>> entry : rootToChanges.entrySet()) {
-            com.intellij.openapi.progress.ProgressManager.checkCanceled();
+            ProgressManager.checkCanceled();
             indicator.checkCanceled();
 
             VirtualFile root = entry.getKey();

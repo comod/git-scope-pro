@@ -1,6 +1,7 @@
 package implementation.fileStatus;
 
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.vcs.FileStatus;
 import com.intellij.openapi.vcs.changes.Change;
 import com.intellij.openapi.vcs.impl.FileStatusProvider;
@@ -35,7 +36,7 @@ public class GitScopeFileStatusProvider implements FileStatusProvider {
 
         // Get the ViewService to access current scope's changes
         ViewService viewService = project.getService(ViewService.class);
-        if (viewService == null) {
+        if (viewService == null || viewService.isDisposed()) {
             return null;
         }
 
@@ -76,8 +77,8 @@ public class GitScopeFileStatusProvider implements FileStatusProvider {
      */
     private @Nullable Project getProjectFromFile(@NotNull VirtualFile virtualFile) {
         // FileStatusProvider is project-specific, so we can use ProjectManager
-        com.intellij.openapi.project.ProjectManager projectManager =
-            com.intellij.openapi.project.ProjectManager.getInstance();
+        ProjectManager projectManager =
+            ProjectManager.getInstance();
 
         for (com.intellij.openapi.project.Project project : projectManager.getOpenProjects()) {
             if (project.isDisposed()) {
