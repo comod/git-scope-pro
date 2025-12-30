@@ -25,13 +25,16 @@ import javax.swing.*;
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 public class ViewService implements Disposable {
     private static final com.intellij.openapi.diagnostic.Logger LOG = Defs.getLogger(ViewService.class);
@@ -591,12 +594,13 @@ public class ViewService implements Disposable {
     }
 
     /**
-     * Gets the changes from the currently active scope/tab.
-     * Used by FileStatusProvider to color files based on active scope.
+     * Core private method to retrieve a cached HashMap from the current MyModel.
+     * Handles initialization checks and returns the pre-built map.
      *
-     * @return Collection of changes in current scope, or null if no active scope or not initialized
+     * @param mapGetter Function to retrieve the cached map from MyModel
+     * @return Map of file path to Change, or null if not initialized
      */
-    public Collection<Change> getCurrentScopeChanges() {
+    private Map<String, Change> getChangesMapInternal(Function<MyModel, Map<String, Change>> mapGetter) {
         // Early return if ViewService is not fully initialized yet
         if (toolWindowService == null) {
             return null;
@@ -606,31 +610,28 @@ public class ViewService implements Disposable {
         if (current == null) {
             return null;
         }
-        return current.getChanges();
+
+        return mapGetter.apply(current);
     }
 
     /**
-     * Gets the local changes (modifications towards HEAD) for all repositories.
-     * These are files that are currently being modified and should use IntelliJ's default file coloring
-     * (including gutter change bars).
+     * Gets a HashMap of local changes indexed by file path for O(1) lookup.
+     * Returns the cached map that was built when changes were set.
      *
-     * Returns cached local changes from the current scope to avoid querying ChangeListManager repeatedly.
-     *
-     * @return Collection of local changes towards HEAD, or null if not initialized
+     * @return Map of file path to Change, or null if not initialized
      */
-    public Collection<Change> getLocalChangesTowardsHead() {
-        // Early return if ViewService is not fully initialized yet
-        if (toolWindowService == null) {
-            return null;
-        }
+    public Map<String, Change> getLocalChangesTowardsHeadMap() {
+        return getChangesMapInternal(MyModel::getLocalChangesMap);
+    }
 
-        MyModel current = getCurrent();
-        if (current == null) {
-            return null;
-        }
-
-        // Return the cached local changes
-        return current.getLocalChanges();
+    /**
+     * Gets a HashMap of scope changes indexed by file path for O(1) lookup.
+     * Returns the cached map that was built when changes were set.
+     *
+     * @return Map of file path to Change, or null if not initialized
+     */
+    public Map<String, Change> getCurrentScopeChangesMap() {
+        return getChangesMapInternal(MyModel::getChangesMap);
     }
 
     public void removeTab(int tabIndex) {

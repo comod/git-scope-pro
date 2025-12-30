@@ -9,7 +9,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import service.ViewService;
 
-import java.util.Collection;
+import java.util.Map;
 
 /**
  * Provides custom file status colors based on the active Git Scope tab
@@ -43,32 +43,27 @@ public class GitScopeFileStatusProvider implements FileStatusProvider {
 
         // STRATEGY: If file is in local changes towards HEAD, let IntelliJ handle it
         // This ensures gutter change bars work correctly for actively modified files
-        Collection<Change> localChanges = viewService.getLocalChangesTowardsHead();
-        if (localChanges != null) {
-            for (Change change : localChanges) {
-                VirtualFile changeFile = change.getVirtualFile();
-                if (changeFile != null && changeFile.getPath().equals(filePath)) {
-                    // File is actively being modified - let IntelliJ's default provider handle it
-                    return null;
-                }
-            }
+        // Use HashMap lookup for O(1) performance instead of iterating through all changes
+        Map<String, Change> localChangesMap = viewService.getLocalChangesTowardsHeadMap();
+        if (localChangesMap != null && localChangesMap.containsKey(filePath)) {
+            // File is actively being modified - let IntelliJ's default provider handle it
+            return null;
         }
 
         // File is NOT in local changes - check if it's in the Git Scope
-        Collection<Change> scopeChanges = viewService.getCurrentScopeChanges();
-        if (scopeChanges == null || scopeChanges.isEmpty()) {
+        // Use HashMap lookup for O(1) performance instead of iterating through all changes
+        Map<String, Change> scopeChangesMap = viewService.getCurrentScopeChangesMap();
+        if (scopeChangesMap == null || scopeChangesMap.isEmpty()) {
             // No changes in scope - return null to fall back to default behavior
             return null;
         }
 
-        // Check if this file has changes in the current scope
-        for (Change change : scopeChanges) {
-            VirtualFile changeFile = change.getVirtualFile();
-            if (changeFile != null && changeFile.getPath().equals(filePath)) {
-                // File is in Git Scope but NOT in local changes - we control the color
-                // Use the FileStatus directly from the Change object
-                return change.getFileStatus();
-            }
+        // Check if this file has changes in the current scope using O(1) lookup
+        Change change = scopeChangesMap.get(filePath);
+        if (change != null) {
+            // File is in Git Scope but NOT in local changes - we control the color
+            // Use the FileStatus directly from the Change object
+            return change.getFileStatus();
         }
 
         // File not in scope changes - return null to let default provider handle it

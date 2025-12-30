@@ -1,6 +1,7 @@
 package model;
 
 import com.intellij.openapi.vcs.changes.Change;
+import com.intellij.openapi.vfs.VirtualFile;
 import git4idea.repo.GitRepository;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.subjects.PublishSubject;
@@ -8,6 +9,7 @@ import org.jetbrains.annotations.Nullable;
 import service.GitService;
 
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Map;
 
 public class MyModel extends MyModelBase {
@@ -15,6 +17,8 @@ public class MyModel extends MyModelBase {
     private final boolean isHeadTab;
     private Collection<Change> changes; // Merged changes (scope + local)
     private Collection<Change> localChanges; // Local changes towards HEAD only
+    private Map<String, Change> changesMap; // Cached map of changes by file path
+    private Map<String, Change> localChangesMap; // Cached map of local changes by file path
     private boolean isActive;
     private String customTabName; // Added field for custom tab name
 
@@ -99,6 +103,7 @@ public class MyModel extends MyModelBase {
 
     public void setChanges(Collection<Change> changes) {
         this.changes = changes;
+        this.changesMap = buildChangesByPathMap(changes);
         changeObservable.onNext(field.changes);
     }
 
@@ -108,6 +113,37 @@ public class MyModel extends MyModelBase {
 
     public void setLocalChanges(Collection<Change> localChanges) {
         this.localChanges = localChanges;
+        this.localChangesMap = buildChangesByPathMap(localChanges);
+    }
+
+    public Map<String, Change> getChangesMap() {
+        return changesMap;
+    }
+
+    public Map<String, Change> getLocalChangesMap() {
+        return localChangesMap;
+    }
+
+    /**
+     * Helper method to build a HashMap from a collection of changes indexed by file path.
+     * This provides O(1) lookup performance for file status checks.
+     *
+     * @param changes Collection of changes to convert to a map
+     * @return Map of file path to Change, or null if changes is null
+     */
+    private Map<String, Change> buildChangesByPathMap(Collection<Change> changes) {
+        if (changes == null) {
+            return null;
+        }
+
+        Map<String, Change> changeMap = new HashMap<>();
+        for (Change change : changes) {
+            VirtualFile file = change.getVirtualFile();
+            if (file != null) {
+                changeMap.put(file.getPath(), change);
+            }
+        }
+        return changeMap;
     }
 
     public Observable<field> getObservable() {
