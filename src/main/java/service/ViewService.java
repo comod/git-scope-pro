@@ -60,6 +60,7 @@ public class ViewService implements Disposable {
     private int lastTabIndex;
     private Integer savedTabIndex;
     private final AtomicBoolean tabInitializationInProgress = new AtomicBoolean(false);
+    private final AtomicBoolean initialFileColorsRefreshed = new AtomicBoolean(false);
 
     public ViewService(Project project) {
         this.project = project;
@@ -92,7 +93,7 @@ public class ViewService implements Disposable {
 
     /**
      * Refreshes file status colors for files in the current scope and previous scope.
-     * Call this when the active scope changes to update colors based on new scope.
+     * Call this when the active scope changes to update colors.
      *
      * This method refreshes files from BOTH the new active model and the previous active model to ensure:
      * - Files in the new scope get the new colors
@@ -382,10 +383,14 @@ public class ViewService implements Disposable {
                     if (model.isActive()) {
                         Collection<Change> changes = model.getChanges();
                         doUpdateDebounced(changes);
-                        // Note: We don't manually refresh file colors here because:
-                        // 1. It interferes with gutter change bars being set up
-                        // 2. FileStatusProvider is automatically queried by IntelliJ when needed
-                        // 3. Manual refresh causes race conditions with the line status tracker
+
+                        // Refresh file colors once on initial startup after changes are loaded
+                        // This ensures proper file coloring is applied when IDE starts
+                        if (!initialFileColorsRefreshed.get() && changes != null && !changes.isEmpty()) {
+                            if (initialFileColorsRefreshed.compareAndSet(false, true)) {
+                                refreshFileColors();
+                            }
+                        }
                     }
                 }
                 // TODO: collectChanges: tab switched
