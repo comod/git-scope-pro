@@ -44,15 +44,11 @@ public class ChangesService extends GitCompareWithRefAction {
 
     /**
      * Container for both merged changes and local changes towards HEAD.
+     *
+     * @param mergedChanges Scope changes + local changes
+     * @param localChanges  Local changes towards HEAD only
      */
-    public static class ChangesResult {
-        public final Collection<Change> mergedChanges; // Scope changes + local changes
-        public final Collection<Change> localChanges;  // Local changes towards HEAD only
-
-        public ChangesResult(Collection<Change> mergedChanges, Collection<Change> localChanges) {
-            this.mergedChanges = mergedChanges;
-            this.localChanges = localChanges;
-        }
+        public record ChangesResult(Collection<Change> mergedChanges, Collection<Change> localChanges) {
     }
     private final Project project;
     private final GitService git;
@@ -69,7 +65,7 @@ public class ChangesService extends GitCompareWithRefAction {
         if (targetBranchByRepo == null) {
             branchToCompare = GitService.BRANCH_HEAD;
         } else {
-            branchToCompare = targetBranchByRepo.getValue().get(repo.toString());
+            branchToCompare = targetBranchByRepo.value().get(repo.toString());
         }
         if (branchToCompare == null) {
             branchToCompare = GitService.BRANCH_HEAD;

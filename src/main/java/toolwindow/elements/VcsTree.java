@@ -361,7 +361,7 @@ public class VcsTree extends JPanel {
 
             if (positionTracker.isScrollPositionRestored()) {
                 ScrollPosition currentPosition = positionTracker.saveScrollPosition();
-                if (currentPosition.isValid) {
+                if (currentPosition.isValid()) {
                     positionTracker.setSavedScrollPosition(currentTabId, currentPosition);
                 }
             }

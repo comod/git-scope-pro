@@ -4,7 +4,6 @@ import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.changes.Change;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.content.Content;
 import com.intellij.ui.content.ContentManager;
 import com.intellij.util.concurrency.SequentialTaskExecutor;
@@ -25,7 +24,6 @@ import javax.swing.*;
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -521,8 +519,8 @@ public class ViewService implements Disposable {
                         long currentGen = applyGeneration.get();
                         if (!project.isDisposed() && currentGen == gen) {
                             LOG.debug("Applying changes for generation " + gen);
-                            model.setChanges(result.mergedChanges);
-                            model.setLocalChanges(result.localChanges);
+                            model.setChanges(result.mergedChanges());
+                            model.setLocalChanges(result.localChanges());
                         } else {
                             LOG.debug("Discarding changes for generation " + gen + " (current generation is " + currentGen + ")");
                         }

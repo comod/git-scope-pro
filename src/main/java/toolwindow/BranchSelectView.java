@@ -32,7 +32,7 @@ public class BranchSelectView {
     private final Project project;
     private final GitService gitService;
     private final State state;
-    private SearchTextField search;
+    private final SearchTextField search;
 
 private JPanel createManualInputPanel(GitRepository repository, BranchTree branchTree) {
     JPanel manualInputPanel = new JPanel(new BorderLayout());

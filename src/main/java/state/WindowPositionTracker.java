@@ -694,19 +694,10 @@ public class WindowPositionTracker {
     }
 
     // Simple data class to hold scroll position
-    public static class ScrollPosition {
-        public final int verticalValue;
-        public final int horizontalValue;
-        public final boolean isValid;
-
-        public ScrollPosition(int vertical, int horizontal, boolean valid) {
-            this.verticalValue = vertical;
-            this.horizontalValue = horizontal;
-            this.isValid = valid;
-        }
+        public record ScrollPosition(int verticalValue, int horizontalValue, boolean isValid) {
 
         public static ScrollPosition invalid() {
-            return new ScrollPosition(0, 0, false);
+                return new ScrollPosition(0, 0, false);
+            }
         }
-    }
 }

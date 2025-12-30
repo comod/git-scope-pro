@@ -155,7 +155,7 @@ public class MyModel extends MyModelBase {
         if (targetBranchMap == null) {
             return true;
         }
-        return targetBranchMap.getValue().isEmpty();
+        return targetBranchMap.value().isEmpty();
     }
 
     public boolean isActive() {
@@ -181,7 +181,7 @@ public class MyModel extends MyModelBase {
     private String getFirstBranchValue() {
         TargetBranchMap branchMap = getTargetBranchMap();
         if (branchMap == null) return null;
-        Map<String, String> values = branchMap.getValue();
+        Map<String, String> values = branchMap.value();
         if (values == null || values.isEmpty()) return null;
         for (String v : values.values()) {
             if (v != null && !v.trim().isEmpty()) {
