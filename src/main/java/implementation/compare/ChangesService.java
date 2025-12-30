@@ -1,5 +1,6 @@
 package implementation.compare;
 
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.progress.ProgressIndicator;
@@ -28,7 +29,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
-public class ChangesService extends GitCompareWithRefAction {
+public class ChangesService extends GitCompareWithRefAction implements Disposable {
     private static final Logger LOG = Defs.getLogger(ChangesService.class);
 
     public interface ErrorStateMarker {}
@@ -183,11 +184,17 @@ public class ChangesService extends GitCompareWithRefAction {
         task.queue();
     }
     
+    @Override
+    public void dispose() {
+        // Clear cache to release memory
+        clearCache();
+    }
+
     // Method to clear cache when needed
     public void clearCache() {
         changesCache.clear();
     }
-    
+
     // Method to clear cache for specific repo
     public void clearCache(GitRepository repo) {
         String cacheKey = repo.getRoot().getPath();

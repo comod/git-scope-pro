@@ -1,5 +1,6 @@
 package service;
 
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -21,7 +22,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Service(Service.Level.PROJECT)
-public final class ToolWindowService implements ToolWindowServiceInterface {
+public final class ToolWindowService implements ToolWindowServiceInterface, Disposable {
     private final Project project;
     private final Map<Content, ToolWindowView> contentToViewMap = new HashMap<>();
     private final TabOperations tabOperations;
@@ -29,6 +30,12 @@ public final class ToolWindowService implements ToolWindowServiceInterface {
     public ToolWindowService(Project project) {
         this.project = project;
         this.tabOperations = new TabOperations(project);
+    }
+
+    @Override
+    public void dispose() {
+        // Clear the content to view map to release memory
+        contentToViewMap.clear();
     }
 
     @Override

@@ -73,6 +73,29 @@ public class ViewService implements Disposable {
 
     @Override
     public void dispose() {
+        // Shutdown the executor service to prevent memory leaks
+        if (changesExecutor != null && !changesExecutor.isShutdown()) {
+            changesExecutor.shutdown();
+            try {
+                if (!changesExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+                    changesExecutor.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                changesExecutor.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        // Clear all collections to release memory
+        if (collection != null) {
+            collection.clear();
+        }
+
+        // Dispose of the line status tracker if it has dispose logic
+        myLineStatusTrackerImpl = null;
+        myScope = null;
+        debouncer = null;
+        myHeadModel = null;
     }
 
     public void initDependencies() {
