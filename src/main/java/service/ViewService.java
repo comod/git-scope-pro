@@ -3,9 +3,14 @@ package service;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
+import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.editor.EditorFactory;
+import com.intellij.openapi.editor.EditorKind;
+import com.intellij.openapi.editor.ex.EditorEx;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.FileStatusManager;
 import com.intellij.openapi.vcs.changes.Change;
+import com.intellij.openapi.vcs.impl.LineStatusTrackerManagerI;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.ui.content.Content;
 import com.intellij.ui.content.ContentManager;
@@ -166,13 +171,40 @@ public class ViewService implements Disposable {
     }
 
     /**
+     * Schedules the initial file colors refresh with a 5-second delay.
+     * This is called once on startup after changes are first loaded to ensure proper
+     * initialization of gutter markers and file colors after all IDE components have
+     * fully initialized.
+     */
+    private void scheduleInitialFileColorsRefresh() {
+        final DisposalToken token = this.disposalToken;
+
+        // Schedule refresh 5 seconds from now
+        ApplicationManager.getApplication().executeOnPooledThread(() -> {
+            try {
+                Thread.sleep(5000); // 5 seconds
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+
+            // Check if still valid
+            if (token.disposed || project.isDisposed() || isDisposed) {
+                return;
+            }
+
+            // Perform the refresh
+            LOG.debug("Executing initial file colors refresh (5 seconds after first changes loaded)");
+            refreshFileColors();
+        });
+    }
+
+    /**
      * Refreshes file status colors for files in the current scope and previous scope.
      * Call this when the active scope changes to update colors.
-     *
-     * This method refreshes files from BOTH the new active model and the previous active model to ensure:
-     * - Files in the new scope get the new colors
-     * - Files that were in the old scope but not in the new scope revert to default colors
-     *
+     * IMPORTANT: Calling FileStatusManager.fileStatusesChanged() can trigger VCS machinery that
+     * invalidates LineStatusTrackers, causing gutter markers to disappear. We protect against this
+     * by ensuring trackers are maintained and repainted after the status update.
      */
     public void refreshFileColors() {
         if (project.isDisposed() || isDisposed) {
@@ -180,25 +212,83 @@ public class ViewService implements Disposable {
         }
 
         final DisposalToken token = this.disposalToken;
-        // Execute file status refresh on background thread to avoid EDT slow operations
+        // Execute on background thread first, then switch to EDT for the actual work
         ApplicationManager.getApplication().executeOnPooledThread(() -> {
-            if (token.disposed) {
+            if (!token.disposed) {
+                ApplicationManager.getApplication().invokeLater(
+                    () -> doRefreshFileColorsOnEdt(token),
+                    ModalityState.any(),
+                    __ -> token.disposed
+                );
+            }
+        });
+    }
+
+    /**
+     * Performs the actual file colors refresh on EDT.
+     * Collects open editors, triggers file status update, and schedules gutter repaint.
+     */
+    private void doRefreshFileColorsOnEdt(DisposalToken token) {
+        if (project.isDisposed() || token.disposed) {
+            return;
+        }
+
+        // Collect editors that need gutter repaint after the status change
+        List<Editor> editorsToRepaint = collectMainEditors();
+
+        // Trigger the file status update (may invalidate trackers)
+        FileStatusManager.getInstance(project).fileStatusesChanged();
+
+        // Schedule gutter repaint after trackers are updated
+        scheduleGutterRepaint(editorsToRepaint, token);
+    }
+
+    /**
+     * Collects all main editors for the current project.
+     */
+    private List<Editor> collectMainEditors() {
+        List<Editor> result = new ArrayList<>();
+        Editor[] allEditors = EditorFactory.getInstance().getAllEditors();
+
+        for (Editor editor : allEditors) {
+            if (editor.getProject() == project && editor.getEditorKind() == EditorKind.MAIN_EDITOR) {
+                result.add(editor);
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * Schedules gutter repaint after LineStatusTracker updates complete.
+     */
+    private void scheduleGutterRepaint(List<Editor> editorsToRepaint, DisposalToken token) {
+        LineStatusTrackerManagerI trackerManager = project.getService(LineStatusTrackerManagerI.class);
+
+        if (trackerManager != null) {
+            trackerManager.invokeAfterUpdate(() -> {
+                if (!token.disposed && !project.isDisposed()) {
+                    repaintEditorGutters(editorsToRepaint, token);
+                }
+            });
+        }
+    }
+
+    /**
+     * Repaints gutters for all specified editors on EDT.
+     */
+    private void repaintEditorGutters(List<Editor> editors, DisposalToken token) {
+        ApplicationManager.getApplication().invokeLater(() -> {
+            if (token.disposed || project.isDisposed()) {
                 return;
             }
 
-            // Then update on EDT with bulk refresh
-            ApplicationManager.getApplication().invokeLater(() -> {
-                if (project.isDisposed() || token.disposed) {
-                    return;
+            for (Editor editor : editors) {
+                if (!editor.isDisposed() && editor instanceof EditorEx) {
+                        ((EditorEx) editor).getGutterComponentEx().repaint();
                 }
-
-                FileStatusManager fileStatusManager =
-                    FileStatusManager.getInstance(project);
-
-                // Bulk update all file statuses
-                fileStatusManager.fileStatusesChanged();
-            }, ModalityState.any(), __ -> token.disposed);
-        });
+            }
+        }, ModalityState.any(), __ -> token.disposed);
     }
 
     public void load() {
@@ -464,9 +554,10 @@ public class ViewService implements Disposable {
 
                         // Refresh file colors once on initial startup after changes are loaded
                         // This ensures proper file coloring is applied when IDE starts
+                        // We use a 5-second delay to allow all IDE components to fully initialize
                         if (!initialFileColorsRefreshed.get() && changes != null && !changes.isEmpty()) {
                             if (initialFileColorsRefreshed.compareAndSet(false, true)) {
-                                refreshFileColors();
+                                scheduleInitialFileColorsRefresh();
                             }
                         }
                     }
