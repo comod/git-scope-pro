@@ -1,3 +1,14 @@
+## [2025.3.2]
+
+### Fixes
+
+- Fixed [Diff popup selection missing](https://github.com/comod/git-scope-pro/issues/76)
+- Fixed [HEAD diff logic does not handle root directories outside git repo](https://github.com/comod/git-scope-pro/issues/75)
+
+### Added
+
+- Added [filnames in project explorer and tabs colored based on GitScope](https://github.com/comod/git-scope-pro/issues/74)
+
 ## [2025.3.1]
 
 ### Fixes
