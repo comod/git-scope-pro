@@ -194,6 +194,8 @@ public class VcsTree extends JPanel {
         }
 
         if (shouldSkipUpdate(changes)) {
+            LOG.debug("VcsTree.update() SKIPPED - changes match last update (size: " +
+                     (changes != null ? changes.size() : "null") + ")");
             return;
         }
 
@@ -231,20 +233,19 @@ public class VcsTree extends JPanel {
 
                     // Reuse single browser instance if it exists
                     if (singleBrowser != null) {
-                        LOG.debug("VcsTree: Reusing single browser instance");
-                        return CompletableFuture.supplyAsync(() -> {
-                            SwingUtilities.invokeLater(() -> {
-                                if (!project.isDisposed()) {
-                                    singleBrowser.setChangesToDisplay(changesCopy);
-                                }
-                            });
-                            return singleBrowser;
-                        });
+                        return CompletableFuture.completedFuture(singleBrowser)
+                                .thenApply(browser -> {
+                                    SwingUtilities.invokeLater(() -> {
+                                        if (!project.isDisposed()) {
+                                            browser.setChangesToDisplay(changesCopy);
+                                        }
+                                    });
+                                    return browser;
+                                });
                     }
 
                     // Check if browser is already being created
                     if (pendingBrowserCreation != null && !pendingBrowserCreation.isDone()) {
-                        LOG.debug("VcsTree: Waiting for pending browser creation");
                         // Wait for the pending creation to complete
                         return pendingBrowserCreation.thenApply(browser -> {
                             // Update with new changes
@@ -275,11 +276,9 @@ public class VcsTree extends JPanel {
                 .thenAccept(browser -> {
                     SwingUtilities.invokeLater(() -> {
                         if (isCurrentSequence(sequenceNumber) && !project.isDisposed()) {
-                            // Set component if it's different from current
-                            if (currentBrowser != browser) {
-                                setComponent(browser);
-                                currentBrowser = browser;
-                            }
+                            // Always set component to ensure we update the UI with the new browser
+                            setComponent(browser);
+                            currentBrowser = browser;
                         }
                     });
                 })

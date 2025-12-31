@@ -10,6 +10,8 @@ public interface ToolWindowServiceInterface {
 
     void changeTabName(String title);
 
+    void changeTabNameForModel(MyModel model, String title);
+
     void setupTabTooltip(MyModel model);
 
     void addListener();

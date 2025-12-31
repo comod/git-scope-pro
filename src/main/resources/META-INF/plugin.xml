@@ -47,8 +47,6 @@
         <projectService
                 serviceInterface="service.ToolWindowServiceInterface"
                 serviceImplementation="service.ToolWindowService"/>
-
-        <!-- File Status Provider for custom Git Scope coloring -->
         <vcs.fileStatusProvider implementation="implementation.fileStatus.GitScopeFileStatusProvider"/>
     </extensions>
 
@@ -60,6 +58,20 @@
         <action id="listener.VcsContextMenuAction" class="listener.VcsContextMenuAction" text="Use Commit as Git Scope">
             <add-to-group group-id="Vcs.Log.ContextMenu" anchor="after"
                           relative-to-action="Vcs.CopyRevisionNumberAction"/>
+        </action>
+
+        <!-- Tab context menu actions for Git Scope tool window -->
+        <action id="GitScope.MoveTabLeft" class="toolwindow.actions.TabMoveActions$MoveTabLeft" text="Move Tab Left">
+            <add-to-group group-id="ToolWindowContextMenu" anchor="first"/>
+        </action>
+        <action id="GitScope.MoveTabRight" class="toolwindow.actions.TabMoveActions$MoveTabRight" text="Move Tab Right">
+            <add-to-group group-id="ToolWindowContextMenu" anchor="after" relative-to-action="GitScope.MoveTabLeft"/>
+        </action>
+        <action id="GitScope.RenameTab" class="toolwindow.actions.RenameTabAction" text="Rename Tab">
+            <add-to-group group-id="ToolWindowContextMenu" anchor="after" relative-to-action="GitScope.MoveTabRight"/>
+        </action>
+        <action id="GitScope.ResetTabName" class="toolwindow.actions.ResetTabNameAction" text="Reset Tab Name">
+            <add-to-group group-id="ToolWindowContextMenu" anchor="after" relative-to-action="GitScope.RenameTab"/>
         </action>
     </actions>
 

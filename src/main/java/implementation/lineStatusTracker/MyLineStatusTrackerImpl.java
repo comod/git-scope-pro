@@ -215,70 +215,25 @@ public class MyLineStatusTrackerImpl implements Disposable {
         return editor.getEditorKind() == EditorKind.DIFF;
     }
 
-    public void update(Collection<Change> changes, @Nullable VirtualFile targetFile) {
-        if (changes == null || disposing.get()) {
+    public void update(Map<String, Change> scopeChangesMap) {
+        if (scopeChangesMap == null || disposing.get()) {
             return;
         }
 
         final DisposalToken token = this.disposalToken;
-        ApplicationManager.getApplication().executeOnPooledThread(() -> {
+        ApplicationManager.getApplication().invokeLater(() -> {
             if (token.disposed) return;
 
-            // Extract content from ContentRevision objects on background thread
-            Map<String, String> fileToContentMap = collectFileContentMap(changes);
-
-            ApplicationManager.getApplication().invokeLater(() -> {
-                if (token.disposed) return;
-
-                Editor[] editors = EditorFactory.getInstance().getAllEditors();
-                for (Editor editor : editors) {
-                    if (isDiffView(editor)) continue;
-                    // Platform handles gutter repainting automatically - no need to force it
-                    updateLineStatusByChangesForEditorSafe(editor, fileToContentMap);
-                }
-            }, ModalityState.defaultModalityState(), __ -> token.disposed);
-        });
+            Editor[] editors = EditorFactory.getInstance().getAllEditors();
+            for (Editor editor : editors) {
+                if (isDiffView(editor)) continue;
+                // Platform handles gutter repainting automatically - no need to force it
+                updateLineStatusByChangesForEditorSafe(editor, scopeChangesMap);
+            }
+        }, ModalityState.defaultModalityState(), __ -> token.disposed);
     }
 
-    private Map<String, String> collectFileContentMap(Collection<Change> changes) {
-        // First collect file paths and revisions in ReadAction
-        Map<String, ContentRevision> fileToRevisionMap = ApplicationManager.getApplication().runReadAction((Computable<Map<String, ContentRevision>>) () -> {
-            Map<String, ContentRevision> map = new HashMap<>();
-            for (Change change : changes) {
-                if (change == null) continue;
-
-                VirtualFile vcsFile = change.getVirtualFile();
-                if (vcsFile == null) continue;
-
-                String filePath = vcsFile.getPath();
-                ContentRevision beforeRevision = change.getBeforeRevision();
-                if (beforeRevision != null) {
-                    map.put(filePath, beforeRevision);
-                }
-            }
-            return map;
-        });
-
-        // Then extract content OUTSIDE ReadAction (git commands not allowed in ReadAction)
-        Map<String, String> contentMap = new HashMap<>();
-        for (Map.Entry<String, ContentRevision> entry : fileToRevisionMap.entrySet()) {
-            if (disposing.get()) break;
-
-            String filePath = entry.getKey();
-            ContentRevision revision = entry.getValue();
-            try {
-                String revisionContent = revision.getContent();
-                if (revisionContent != null) {
-                    contentMap.put(filePath, revisionContent);
-                }
-            } catch (VcsException e) {
-                LOG.warn("Error getting content for revision: " + filePath, e);
-            }
-        }
-        return contentMap;
-    }
-
-    private void updateLineStatusByChangesForEditorSafe(Editor editor, Map<String, String> fileToContentMap) {
+    private void updateLineStatusByChangesForEditorSafe(Editor editor, Map<String, Change> scopeChangesMap) {
         if (editor == null || disposing.get()) return;
 
         Document doc = editor.getDocument();
@@ -286,9 +241,24 @@ public class MyLineStatusTrackerImpl implements Disposable {
         if (file == null) return;
 
         String filePath = file.getPath();
-        String content = fileToContentMap.get(filePath);
 
-        if (content == null) {
+        // Look up the change for this editor's file using the map
+        Change changeForFile = scopeChangesMap.get(filePath);
+
+        String content;
+        if (changeForFile != null && changeForFile.getBeforeRevision() != null) {
+            // Extract content for this specific file only
+            try {
+                content = changeForFile.getBeforeRevision().getContent();
+            } catch (VcsException e) {
+                LOG.warn("Error getting content for revision: " + filePath, e);
+                content = null;
+            }
+
+            if (content == null) {
+                content = doc.getCharsSequence().toString();
+            }
+        } else {
             // No revision content available, use current document content
             content = doc.getCharsSequence().toString();
         }

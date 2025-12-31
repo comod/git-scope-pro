@@ -1,8 +1,10 @@
 # Plugin Classes to Check in HPROF Analysis
 
-This document lists all plugin classes to search for when analyzing heap dumps to identify memory leaks after plugin unload. All classes should have **count = 0** after successful plugin unload.
+This document lists all plugin classes to search for when analyzing heap dumps to identify memory leaks after plugin
+unload. All classes should have **count = 0** after successful plugin unload.
 
 ## Services
+
 *Expected: 1 instance per project, or 0 after unload*
 
 - `service.ViewService`
@@ -20,6 +22,7 @@ This document lists all plugin classes to search for when analyzing heap dumps t
 - `state.WindowPositionTracker`
 
 ## Listeners
+
 *Expected: 0 after unload*
 
 - `listener.MyBulkFileListener`
@@ -37,16 +40,22 @@ This document lists all plugin classes to search for when analyzing heap dumps t
 ## UI Components
 
 ### Main Components
+
 - `toolwindow.ToolWindowView`
 - `toolwindow.ToolWindowUIFactory`
 - `toolwindow.BranchSelectView`
 - `toolwindow.TabOperations`
-- `toolwindow.TabMoveActions`
-- `toolwindow.TabMoveActions$MoveTabLeft`
-- `toolwindow.TabMoveActions$MoveTabRight`
 - `toolwindow.VcsTreeActions`
 
+#### Actions
+- `toolwindow.actions.TabMoveActions`
+- `toolwindow.actions.TabMoveActions$MoveTabLeft`
+- `toolwindow.actions.TabMoveActions$MoveTabRight`
+- `toolwindow.actions.RenameTabAction`
+- `toolwindow.actions.ResetTabNameAction`
+
 ### UI Elements
+
 - `toolwindow.elements.VcsTree`
 - `toolwindow.elements.BranchTree`
 - `toolwindow.elements.BranchTreeEntry`
@@ -71,16 +80,19 @@ This document lists all plugin classes to search for when analyzing heap dumps t
 ## Implementation Classes
 
 ### Line Status Tracker
+
 - `implementation.lineStatusTracker.MyLineStatusTrackerImpl`
 - `implementation.lineStatusTracker.CommitDiffWorkaround`
 
 ### Scope
+
 - `implementation.scope.MyScope`
 - `implementation.scope.MyPackageSet` *(registered with NamedScopeManager - critical leak if not unregistered)*
 - `implementation.scope.MyScopeInTarget`
 - `implementation.scope.MyScopeNameSupplier`
 
 ### File Status
+
 - `implementation.fileStatus.GitScopeFileStatusProvider`
 
 ## Utility Classes
@@ -111,7 +123,9 @@ This document lists all plugin classes to search for when analyzing heap dumps t
 ## How to Search Efficiently
 
 ### 1. Search by Package Prefix
+
 Filter the HPROF classes view using these prefixes:
+
 - `service.`
 - `listener.`
 - `toolwindow.`
@@ -122,11 +136,13 @@ Filter the HPROF classes view using these prefixes:
 - `utils.`
 
 ### 2. Filter the Classes View
+
 1. Sort by "Count" column
 2. Look for `count != 0`
 3. Focus on YOUR packages (ignore `com.intellij.*`, `java.*`, `kotlin.*`)
 
 ### 3. Priority Classes to Check
+
 *Most likely to leak:*
 
 1. **All listeners** - Must be unregistered

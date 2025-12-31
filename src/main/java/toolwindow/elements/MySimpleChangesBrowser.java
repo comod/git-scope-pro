@@ -73,8 +73,10 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
     @Override
     protected @NotNull List<AnAction> createToolbarActions() {
         initializeActions();
-        // Return the SAME instance-level list every time to prevent toolbar recreation
-        return toolbarActions;
+        // Include parent actions first (on the left), then add our custom action (on the right)
+        List<AnAction> actions = new ArrayList<>(super.createToolbarActions());
+        actions.add(selectOpenedFileAction);
+        return actions;
     }
 
     /**

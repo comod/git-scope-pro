@@ -4,6 +4,7 @@
 
 - Fixed [Diff popup selection missing](https://github.com/comod/git-scope-pro/issues/76)
 - Fixed [HEAD diff logic does not handle root directories outside git repo](https://github.com/comod/git-scope-pro/issues/75)
+- Fixed several minor refresh issues
 
 ### Added
 

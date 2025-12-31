@@ -34,9 +34,6 @@ public final class ToolWindowService implements ToolWindowServiceInterface, Disp
 
     @Override
     public void dispose() {
-        // Unregister tab actions from action manager to prevent memory leaks
-        tabOperations.unregisterTabActions();
-
         // Dispose all ToolWindowView instances to clean up UI components
         for (ToolWindowView view : contentToViewMap.values()) {
             if (view != null) {
@@ -107,9 +104,6 @@ public final class ToolWindowService implements ToolWindowServiceInterface, Disp
     public void addListener() {
         ContentManager contentManager = getContentManager();
         contentManager.addContentManagerListener(new MyTabContentListener(project));
-
-        // Register all tab actions (rename, reset, move) in the tab context menu
-        tabOperations.registerTabActions();
     }
 
     @Override
@@ -120,6 +114,27 @@ public final class ToolWindowService implements ToolWindowServiceInterface, Disp
     @Override
     public void changeTabName(String title) {
         tabOperations.changeTabName(title, getContentManager());
+    }
+
+    @Override
+    public void changeTabNameForModel(MyModel model, String title) {
+        // Find the Content for this model
+        Content targetContent = null;
+        for (Map.Entry<Content, ToolWindowView> entry : contentToViewMap.entrySet()) {
+            ToolWindowView view = entry.getValue();
+            if (view != null && view.getModel() == model) {
+                targetContent = entry.getKey();
+                break;
+            }
+        }
+
+        // Update the tab name for the specific content
+        if (targetContent != null) {
+            String currentName = targetContent.getDisplayName();
+            if (!currentName.equals(title)) {
+                targetContent.setDisplayName(title);
+            }
+        }
     }
 
     public void removeTab(int index) {

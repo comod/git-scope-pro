@@ -4,19 +4,18 @@
 
 ### Story
 
-I think every developer loves to check their changes with **version control** before committing.
-But there is a big problem with the current IntelliJ-based IDEs after committing the code: All changes in **version
-control** and also the line status disappear completely. Usually a branch contains more than one commit. This plugin
-helps you to make these commits visible again in an intuitive way!
+Developers rely on version control to review changes before committing. However, IntelliJ-based IDEs have a significant
+limitation: after committing code, all change indicators in version control and line status annotations disappear
+completely. Since feature branches typically contain multiple commits, this makes it difficult to track accumulated
+changes over time. This plugin addresses that problem by making committed changes visible again.
 
-To make changes visible you can create custom "scopes" for any target branch, tag or any valid git reference. Each of
-the defined scopes will be selectable as a tab in the **GIT SCOPE** tool window. The current selected "scope" is
-displayed as a:
+Create custom "scopes" for any Git reference—branch, tag, or commit hash. Each defined scope appears as a selectable tab
+in the **GIT SCOPE** tool window. The currently selected scope visualizes changes through:
 
-- Overall project tree diff in the **GIT SCOPE** tool window
-- Editor "line status" in the "line gutter" for each opened file (if file gutter is enabled)
-- Custom "scope" that can be used for example when searching and finally as a
-- Status bar widget
+- **Project tree diff** — Shows all modified files in the GIT SCOPE tool window
+- **Editor line status** — Displays change markers in the editor gutter for open files
+- **Custom scope** — Enables filtered search, replace, and inspection operations
+- **Status bar widget** — Displays the current scope selection
 
 ### Plugin Basics
 

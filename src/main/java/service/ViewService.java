@@ -170,34 +170,6 @@ public class ViewService implements Disposable {
         debouncer.debounce(Void.class, () -> onUpdate(changes), DEBOUNCE_MS, TimeUnit.MILLISECONDS);
     }
 
-    /**
-     * Schedules the initial file colors refresh with a 5-second delay.
-     * This is called once on startup after changes are first loaded to ensure proper
-     * initialization of gutter markers and file colors after all IDE components have
-     * fully initialized.
-     */
-    private void scheduleInitialFileColorsRefresh() {
-        final DisposalToken token = this.disposalToken;
-
-        // Schedule refresh 5 seconds from now
-        ApplicationManager.getApplication().executeOnPooledThread(() -> {
-            try {
-                Thread.sleep(5000); // 5 seconds
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return;
-            }
-
-            // Check if still valid
-            if (token.disposed || project.isDisposed() || isDisposed) {
-                return;
-            }
-
-            // Perform the refresh
-            LOG.debug("Executing initial file colors refresh (5 seconds after first changes loaded)");
-            refreshFileColors();
-        });
-    }
 
     /**
      * Refreshes file status colors for files in the current scope and previous scope.
@@ -234,13 +206,14 @@ public class ViewService implements Disposable {
         }
 
         // Collect editors that need gutter repaint after the status change
-        List<Editor> editorsToRepaint = collectMainEditors();
+        //List<Editor> editorsToRepaint = collectMainEditors();
 
         // Trigger the file status update (may invalidate trackers)
         FileStatusManager.getInstance(project).fileStatusesChanged();
 
         // Schedule gutter repaint after trackers are updated
-        scheduleGutterRepaint(editorsToRepaint, token);
+        // TODO: Currently removed since this still seem to cause gutter refresh issues
+        //scheduleGutterRepaint(editorsToRepaint, token);
     }
 
     /**
@@ -331,14 +304,14 @@ public class ViewService implements Disposable {
 
         List<MyModelBase> modelData = new ArrayList<>();
         collection.forEach(myModel -> {
-            MyModelBase myModelBase = new MyModelBase();
-
             // Save the target branch map
             TargetBranchMap targetBranchMap = myModel.getTargetBranchMap();
             if (targetBranchMap == null) {
-                LOG.debug("Skipping model with null targetBranchMap during save");
+                LOG.warn("Model has null targetBranchMap during save - this should not happen in steady state. Skipping.");
                 return;
             }
+
+            MyModelBase myModelBase = new MyModelBase();
             myModelBase.setTargetBranchMap(targetBranchMap);
 
             // Save the custom tab name
@@ -539,25 +512,35 @@ public class ViewService implements Disposable {
         io.reactivex.rxjava3.disposables.Disposable subscription = observable.subscribe(field -> {
             switch (field) {
                 case targetBranch -> {
-                    getTargetBranchDisplayAsync(model, tabName -> {
-                        toolWindowService.changeTabName(tabName);
-                    });
+                    // Don't update tab names during initialization - tabs are named correctly during creation
+                    if (!tabInitializationInProgress.get()) {
+                        getTargetBranchDisplayAsync(model, tabName -> {
+                            // Use model-specific tab name change to avoid changing wrong tab
+                            toolWindowService.changeTabNameForModel(model, tabName);
+                        });
+                        // Set up tooltip when target branch changes (for tabs with custom names)
+                        if (model.getCustomTabName() != null && !model.getCustomTabName().isEmpty()) {
+                            toolWindowService.setupTabTooltip(model);
+                        }
+                    }
                     // TODO: collectChanges: target branch selected (Git Scope selected)
                     incrementUpdate();
                     collectChanges(model, true);
-                    save();
+                    // Don't save during initialization
+                    if (!tabInitializationInProgress.get()) {
+                        save();
+                    }
                 }
                 case changes -> {
                     if (model.isActive()) {
                         Collection<Change> changes = model.getChanges();
                         doUpdateDebounced(changes);
 
-                        // Refresh file colors once on initial startup after changes are loaded
-                        // This ensures proper file coloring is applied when IDE starts
-                        // We use a 5-second delay to allow all IDE components to fully initialize
+                        // Refresh file colors once on initial startup after changes are loaded for the active model
+                        // This handles the boot case where setActiveModel() is called before changes are collected
                         if (!initialFileColorsRefreshed.get() && changes != null && !changes.isEmpty()) {
                             if (initialFileColorsRefreshed.compareAndSet(false, true)) {
-                                scheduleInitialFileColorsRefresh();
+                                refreshFileColors();
                             }
                         }
                     }
@@ -565,15 +548,16 @@ public class ViewService implements Disposable {
                 // TODO: collectChanges: tab switched
                 case active -> {
                     incrementUpdate(); // Increment generation to cancel any stale updates for previous tab
-                    collectChanges(model, true);
-                    // Refresh file colors when switching tabs
-                    refreshFileColors();
+                    // Refresh file colors AFTER scopeChangesMap is updated
+                    // This ensures GitScopeFileStatusProvider sees the correct scope
+                    collectChanges(model, true).thenRun(this::refreshFileColors);
                 }
                 case tabName -> {
                     if (!isProcessingTabRename) {
                         String customName = model.getCustomTabName();
                         if (customName != null && !customName.isEmpty()) {
-                            toolWindowService.changeTabName(customName);
+                            // Use model-specific tab name change to avoid changing wrong tab
+                            toolWindowService.changeTabNameForModel(model, customName);
                             toolWindowService.setupTabTooltip(model);
                         }
                     }
@@ -916,6 +900,10 @@ public class ViewService implements Disposable {
         try {
             isProcessingTabRename = true;
 
+            // Rebuild collection from tab order to ensure consistency
+            // This is critical because the collection might be out of sync with actual tabs
+            rebuildCollectionFromTabOrder();
+
             // Update the model with custom name if needed
             int modelIndex = getModelIndex(tabIndex);
             if (modelIndex >= 0 && modelIndex < collection.size()) {
@@ -978,17 +966,25 @@ public class ViewService implements Disposable {
             if (token.disposed) return;
 
             updateStatusBarWidget();
-            myLineStatusTrackerImpl.update(changes, null);
+            // Get the current scope changes map to pass to line status tracker
+            Map<String, Change> scopeChangesMap = getCurrentScopeChangesMap();
+            myLineStatusTrackerImpl.update(scopeChangesMap);
             myScope.update(changes);
 
             // Perform scroll restoration after all UI updates are complete
             // Use another invokeLater to ensure everything is fully rendered
+            // Update VcsTree with changes
+            VcsTree vcsTree = toolWindowService.getVcsTree();
+            if (vcsTree != null) {
+                vcsTree.update(changes);
+            }
+
             SwingUtilities.invokeLater(() -> {
                 if (token.disposed || toolWindowService == null) return;
 
-                VcsTree vcsTree = toolWindowService.getVcsTree();
-                if (vcsTree != null) {
-                    vcsTree.performScrollRestoration();
+                VcsTree tree = toolWindowService.getVcsTree();
+                if (tree != null) {
+                    tree.performScrollRestoration();
                 }
             });
         }, ModalityState.any(), __ -> token.disposed);

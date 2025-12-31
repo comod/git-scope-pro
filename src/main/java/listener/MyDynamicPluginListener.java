@@ -28,8 +28,6 @@ public class MyDynamicPluginListener implements DynamicPluginListener {
             return;
         }
 
-        LOG.info("Git Scope plugin unloading" + (isUpdate ? " (update)" : ""));
-
         for (Project project : ProjectManager.getInstance().getOpenProjects()) {
             if (project.isDisposed()) continue;
 
@@ -45,37 +43,8 @@ public class MyDynamicPluginListener implements DynamicPluginListener {
                 if (changesService != null) {
                     changesService.clearCache();
                 }
-
-                LOG.debug("Successfully prepared project '" + project.getName() + "' for plugin unload");
             } catch (Exception e) {
                 LOG.error("Error preparing project for plugin unload: " + project.getName(), e);
-            }
-        }
-    }
-
-    @Override
-    public void pluginLoaded(@NotNull IdeaPluginDescriptor pluginDescriptor) {
-        // Only handle our own plugin
-        if (isAlienPlugin(pluginDescriptor)) {
-            return;
-        }
-
-        LOG.info("Git Scope plugin loaded");
-
-        for (Project project : ProjectManager.getInstance().getOpenProjects()) {
-            if (project.isDisposed()) continue;
-
-            try {
-                // Reinitialize services if needed
-                ViewService viewService = project.getService(ViewService.class);
-                if (viewService != null) {
-                    // Services are automatically initialized by the platform
-                    // No explicit reinitialization needed
-                }
-
-                LOG.debug("Successfully initialized plugin for project: " + project.getName());
-            } catch (Exception e) {
-                LOG.error("Error initializing plugin for project: " + project.getName(), e);
             }
         }
     }
