@@ -12,7 +12,9 @@ changes over time. This plugin addresses that problem by making committed change
 Create custom "scopes" for any Git reference—branch, tag, or commit hash. Each defined scope appears as a selectable tab
 in the **GIT SCOPE** tool window. The currently selected scope visualizes changes through:
 
-- **Project tree diff** — Shows all modified files in the GIT SCOPE tool window
+- **Scope tree diff** — Shows all modified files in the GIT SCOPE tool window
+- **File colors** - Files highlighted in editor tabs and project window according to the GIT SCOPE status (added;
+  modified; deleted; ...)
 - **Editor line status** — Displays change markers in the editor gutter for open files
 - **Custom scope** — Enables filtered search, replace, and inspection operations
 - **Status bar widget** — Displays the current scope selection

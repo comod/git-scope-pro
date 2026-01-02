@@ -3,7 +3,29 @@
     <name>Git Scope</name>
     <vendor>WOELKIT, M.Wållberg</vendor>
     <version>auto</version>
-    <description>Create custom Git "scopes" for any target branch.</description>
+    <description><![CDATA[
+    <p><b>See all your feature branch changes at a glance—even after committing.</b></p>
+
+    <p>IntelliJ's built-in version control only shows uncommitted changes. Once you commit, all change indicators disappear.
+    Git Scope solves this by letting you compare your current work against any Git reference—branches, tags, or commits—making
+    it perfect for tracking feature branch progress across multiple commits.</p>
+
+    <p><b>Key Features:</b></p>
+    <ul>
+        <li><b>Visual change tracking</b> — See exactly what changed between HEAD and your target branch</li>
+        <li><b>Editor gutter indicators</b> — Line-by-line change markers (added/modified/deleted) right in your editor</li>
+        <li><b>File tree diff browser</b> — Browse all modified files in a dedicated tool window</li>
+        <li><b>Project file colors</b> — Instantly spot changed files with color-coded highlighting</li>
+        <li><b>Smart scopes</b> — Use Git Scope with IntelliJ's search, replace, and inspection features</li>
+    </ul>
+    <p><b>Perfect for:</b></p>
+    <ul>
+        <li>Reviewing all changes in a feature branch before creating a pull request</li>
+        <li>Tracking progress against your target branch (e.g., main, develop, release)</li>
+        <li>Performing code inspections or refactoring only on files you've changed</li>
+        <li>Understanding what's different between your work and any historical reference</li>
+    </ul>
+    ]]></description>
     <change-notes>auto</change-notes>
 
     <depends>com.intellij.modules.platform</depends>
