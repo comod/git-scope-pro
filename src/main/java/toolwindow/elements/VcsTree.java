@@ -172,7 +172,7 @@ public class VcsTree extends JPanel {
             return 0;
         }
 
-        java.util.List<String> filePaths = changes.stream()
+        List<String> filePaths = changes.stream()
                 .filter(Objects::nonNull)
                 .map(this::getChangePath)
                 .filter(path -> !path.isEmpty())
@@ -194,6 +194,8 @@ public class VcsTree extends JPanel {
         }
 
         if (shouldSkipUpdate(changes)) {
+            LOG.debug("VcsTree.update() SKIPPED - changes match last update (size: " +
+                     (changes != null ? changes.size() : "null") + ")");
             return;
         }
 
@@ -213,7 +215,6 @@ public class VcsTree extends JPanel {
         if (changes == null || changes.isEmpty() || changes instanceof ChangesService.ErrorStateMarker) {
             JLabel statusLabel = createStatusLabel(changes);
             SwingUtilities.invokeLater(() -> setComponentIfCurrent(statusLabel, sequenceNumber));
-            //currentBrowser = null;
             return;
         }
 
@@ -232,20 +233,19 @@ public class VcsTree extends JPanel {
 
                     // Reuse single browser instance if it exists
                     if (singleBrowser != null) {
-                        LOG.debug("VcsTree: Reusing single browser instance");
-                        return CompletableFuture.supplyAsync(() -> {
-                            SwingUtilities.invokeLater(() -> {
-                                if (!project.isDisposed()) {
-                                    singleBrowser.setChangesToDisplay(changesCopy);
-                                }
-                            });
-                            return singleBrowser;
-                        });
+                        return CompletableFuture.completedFuture(singleBrowser)
+                                .thenApply(browser -> {
+                                    SwingUtilities.invokeLater(() -> {
+                                        if (!project.isDisposed()) {
+                                            browser.setChangesToDisplay(changesCopy);
+                                        }
+                                    });
+                                    return browser;
+                                });
                     }
 
                     // Check if browser is already being created
                     if (pendingBrowserCreation != null && !pendingBrowserCreation.isDone()) {
-                        LOG.debug("VcsTree: Waiting for pending browser creation");
                         // Wait for the pending creation to complete
                         return pendingBrowserCreation.thenApply(browser -> {
                             // Update with new changes
@@ -276,11 +276,9 @@ public class VcsTree extends JPanel {
                 .thenAccept(browser -> {
                     SwingUtilities.invokeLater(() -> {
                         if (isCurrentSequence(sequenceNumber) && !project.isDisposed()) {
-                            // Set component if it's different from current
-                            if (currentBrowser != browser) {
-                                setComponent(browser);
-                                currentBrowser = browser;
-                            }
+                            // Always set component to ensure we update the UI with the new browser
+                            setComponent(browser);
+                            currentBrowser = browser;
                         }
                     });
                 })
@@ -361,7 +359,7 @@ public class VcsTree extends JPanel {
 
             if (positionTracker.isScrollPositionRestored()) {
                 ScrollPosition currentPosition = positionTracker.saveScrollPosition();
-                if (currentPosition.isValid) {
+                if (currentPosition.isValid()) {
                     positionTracker.setSavedScrollPosition(currentTabId, currentPosition);
                 }
             }
@@ -403,21 +401,39 @@ public class VcsTree extends JPanel {
         }
     }
 
-    @Override
-    public void removeNotify() {
-        super.removeNotify();
-
-        positionTracker.cleanup();
-
+    public void cleanup() {
+        // Cancel any pending updates
         CompletableFuture<Void> current = currentUpdate.get();
         if (current != null && !current.isDone()) {
             current.cancel(true);
         }
+
+        // Clean up position tracker
+        positionTracker.cleanup();
+
+        // Clear all maps
         lastChangesPerTab.clear();
         lastChangesHashCodePerTab.clear();
 
-        // Clear the single browser instance for this VcsTree
-        singleBrowser = null;
+        // Clear browser instances (parent will dispose SimpleAsyncChangesBrowser)
+        if (singleBrowser != null) {
+            singleBrowser = null;
+        }
+
+        if (currentBrowser != null) {
+            currentBrowser = null;
+        }
+
         pendingBrowserCreation = null;
+
+        // Remove all components to break JNI references
+        removeAll();
+    }
+
+    @Override
+    public void removeNotify() {
+        super.removeNotify();
+        // DO NOT call cleanup() here - removeNotify() is called when switching tabs
+        // cleanup() should only be called from ToolWindowView.dispose() when the tab is actually closed
     }
 }

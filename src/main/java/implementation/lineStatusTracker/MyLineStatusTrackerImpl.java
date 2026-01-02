@@ -2,27 +2,23 @@ package implementation.lineStatusTracker;
 
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.EditorFactory;
 import com.intellij.openapi.editor.EditorKind;
 import com.intellij.openapi.editor.event.EditorFactoryEvent;
 import com.intellij.openapi.editor.event.EditorFactoryListener;
-import com.intellij.openapi.editor.ex.DocumentEx;
-import com.intellij.util.DocumentUtil;
-import com.intellij.openapi.editor.ex.EditorGutterComponentEx;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditor;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vcs.VcsException;
 import com.intellij.openapi.vcs.changes.Change;
-import com.intellij.openapi.vcs.changes.ContentRevision;
 import com.intellij.openapi.vcs.ex.LineStatusTracker;
 import com.intellij.openapi.vcs.impl.LineStatusTrackerManagerI;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -40,13 +36,19 @@ public class MyLineStatusTrackerImpl implements Disposable {
     private static final com.intellij.openapi.diagnostic.Logger LOG = Defs.getLogger(MyLineStatusTrackerImpl.class);
 
     private final Project project;
-    private final MessageBusConnection messageBusConnection;
-    private final LineStatusTrackerManagerI trackerManager;
-    private final CommitDiffWorkaround commitDiffWorkaround;
+    private MessageBusConnection messageBusConnection;
+    private LineStatusTrackerManagerI trackerManager;
+    private CommitDiffWorkaround commitDiffWorkaround;
 
     // Single, consistent requester for this component's lifetime
     private final Object requester = new Object();
     private final AtomicBoolean disposing = new AtomicBoolean(false);
+
+    // Lightweight disposable token to check disposal state without capturing 'this'
+    private static class DisposalToken {
+        volatile boolean disposed = false;
+    }
+    private final DisposalToken disposalToken = new DisposalToken();
 
     // Track per-document holds and base content
     private final Map<Document, TrackerInfo> trackers = new HashMap<>();
@@ -67,6 +69,7 @@ public class MyLineStatusTrackerImpl implements Disposable {
 
     @Override
     public void dispose() {
+        disposalToken.disposed = true;
         releaseAll();
     }
 
@@ -154,7 +157,7 @@ public class MyLineStatusTrackerImpl implements Disposable {
                         if (doc != null) {
                             // Workaround: Don't release if commit diff editors still need this document
                             if (!commitDiffWorkaround.hasCommitDiffEditorsFor(doc)) {
-                                safeRelease(doc);
+                                release(doc);
                             }
                         }
 
@@ -174,31 +177,32 @@ public class MyLineStatusTrackerImpl implements Disposable {
         );
 
         // Listen to editor lifecycle to detect commit panel diff editors
-        EditorFactory.getInstance().addEditorFactoryListener(
-                new EditorFactoryListener() {
-                    @Override
-                    public void editorCreated(@NotNull EditorFactoryEvent event) {
-                        Editor editor = event.getEditor();
-                        if (editor.getEditorKind() == EditorKind.DIFF) {
-                            // Check if it's a commit panel diff - hierarchy might not be ready yet
-                            ApplicationManager.getApplication().invokeLater(() -> {
-                                if (commitDiffWorkaround.isCommitPanelDiff(editor)) {
-                                    commitDiffWorkaround.handleCommitDiffEditorCreated(editor);
-                                }
-                            });
-                        }
-                    }
-
-                    @Override
-                    public void editorReleased(@NotNull EditorFactoryEvent event) {
-                        Editor editor = event.getEditor();
+        // Use disposalToken to avoid capturing 'this' in lambdas
+        final DisposalToken token = this.disposalToken;
+        EditorFactory.getInstance().addEditorFactoryListener(new EditorFactoryListener() {
+            @Override
+            public void editorCreated(@NotNull EditorFactoryEvent event) {
+                Editor editor = event.getEditor();
+                if (editor.getEditorKind() == EditorKind.DIFF) {
+                    // Check if it's a commit panel diff - hierarchy might not be ready yet
+                    ApplicationManager.getApplication().invokeLater(() -> {
+                        if (token.disposed) return;
                         if (commitDiffWorkaround.isCommitPanelDiff(editor)) {
-                            commitDiffWorkaround.handleCommitDiffEditorReleased(editor);
+                            commitDiffWorkaround.handleCommitDiffEditorCreated(editor);
                         }
-                    }
-                },
-                parentDisposable
-        );
+                    }, ModalityState.defaultModalityState(), __ -> token.disposed);
+                }
+            }
+
+            @Override
+            public void editorReleased(@NotNull EditorFactoryEvent event) {
+                Editor editor = event.getEditor();
+                if (token.disposed) return;
+                if (commitDiffWorkaround.isCommitPanelDiff(editor)) {
+                    commitDiffWorkaround.handleCommitDiffEditorReleased(editor);
+                }
+            }
+        }, parentDisposable);
 
         Disposer.register(parentDisposable, this);
         Disposer.register(parentDisposable, commitDiffWorkaround);
@@ -208,73 +212,55 @@ public class MyLineStatusTrackerImpl implements Disposable {
         return editor.getEditorKind() == EditorKind.DIFF;
     }
 
-    public void update(Collection<Change> changes, @Nullable VirtualFile targetFile) {
-        if (changes == null || disposing.get()) {
+    public void update(Map<String, Change> scopeChangesMap) {
+        if (scopeChangesMap == null || disposing.get()) {
             return;
         }
 
-        ApplicationManager.getApplication().executeOnPooledThread(() -> {
-            if (disposing.get()) return;
+        final DisposalToken token = this.disposalToken;
+        ApplicationManager.getApplication().invokeLater(() -> {
+            if (token.disposed) return;
 
-            Map<String, ContentRevision> fileToRevisionMap = collectFileRevisionMap(changes);
-
-            ApplicationManager.getApplication().invokeLater(() -> {
-                if (disposing.get()) return;
-
-                Editor[] editors = EditorFactory.getInstance().getAllEditors();
-                for (Editor editor : editors) {
-                    if (isDiffView(editor)) continue;
-                    // Platform handles gutter repainting automatically - no need to force it
-                    updateLineStatusByChangesForEditorSafe(editor, fileToRevisionMap);
-                }
-            });
-        });
-    }
-
-    private Map<String, ContentRevision> collectFileRevisionMap(Collection<Change> changes) {
-        return ApplicationManager.getApplication().runReadAction((Computable<Map<String, ContentRevision>>) () -> {
-            Map<String, ContentRevision> map = new HashMap<>();
-            for (Change change : changes) {
-                if (change == null) continue;
-
-                VirtualFile vcsFile = change.getVirtualFile(); // background thread
-                if (vcsFile == null) continue;
-
-                String filePath = vcsFile.getPath();
-                ContentRevision beforeRevision = change.getBeforeRevision();
-                if (beforeRevision != null) {
-                    map.put(filePath, beforeRevision);
-                }
+            Editor[] editors = EditorFactory.getInstance().getAllEditors();
+            for (Editor editor : editors) {
+                if (isDiffView(editor)) continue;
+                // Platform handles gutter repainting automatically - no need to force it
+                updateLineStatusByChangesForEditor(editor, scopeChangesMap);
             }
-            return map;
-        });
+        }, ModalityState.defaultModalityState(), __ -> token.disposed);
     }
 
-    private boolean updateLineStatusByChangesForEditorSafe(Editor editor, Map<String, ContentRevision> fileToRevisionMap) {
-        if (editor == null || disposing.get()) return false;
+    private void updateLineStatusByChangesForEditor(Editor editor, Map<String, Change> scopeChangesMap) {
+        if (editor == null || disposing.get()) return;
 
         Document doc = editor.getDocument();
         VirtualFile file = FileDocumentManager.getInstance().getFile(doc);
-        if (file == null) return false;
+        if (file == null) return;
 
         String filePath = file.getPath();
-        ContentRevision contentRevision = fileToRevisionMap.get(filePath);
+
+        // Look up the change for this editor's file using the map
+        Change changeForFile = scopeChangesMap.get(filePath);
 
         String content;
-        if (contentRevision == null) {
-            content = doc.getCharsSequence().toString();
-        } else {
+        if (changeForFile != null && changeForFile.getBeforeRevision() != null) {
+            // Extract content for this specific file only
             try {
-                String revisionContent = contentRevision.getContent();
-                content = revisionContent != null ? revisionContent : "";
+                content = changeForFile.getBeforeRevision().getContent();
             } catch (VcsException e) {
-                LOG.warn("Error getting content for revision", e);
-                return false;
+                LOG.warn("Error getting content for revision: " + filePath, e);
+                content = null;
             }
+
+            if (content == null) {
+                content = doc.getCharsSequence().toString();
+            }
+        } else {
+            // No revision content available, use current document content
+            content = doc.getCharsSequence().toString();
         }
 
         updateTrackerBaseContent(doc, content);
-        return true;
     }
 
     /**
@@ -302,9 +288,10 @@ public class MyLineStatusTrackerImpl implements Disposable {
         if (content == null || disposing.get()) return;
 
         final String finalContent = StringUtil.convertLineSeparators(content);
+        final DisposalToken token = this.disposalToken;
 
         ApplicationManager.getApplication().invokeLater(() -> {
-            if (disposing.get()) return;
+            if (token.disposed) return;
 
             try {
                 ensureRequested(document);
@@ -326,7 +313,7 @@ public class MyLineStatusTrackerImpl implements Disposable {
             } catch (Exception e) {
                 LOG.error("Error updating line status tracker with new base content", e);
             }
-        });
+        }, ModalityState.defaultModalityState(), __ -> token.disposed);
     }
 
     /**
@@ -365,22 +352,10 @@ public class MyLineStatusTrackerImpl implements Disposable {
                         if (disposing.get()) {
                             return;
                         }
-                        
-                        // Use bulk update mode to batch changes and prevent flickering
-                        Document document = tracker.getDocument();
-                        if (document == null) {
-                            return;
-                        }
-                        
-                        DocumentUtil.executeInBulk(document, () -> {
-                            try {
-                                setBaseRevisionMethod.invoke(tracker, content);
-                            } catch (Exception e) {
-                                LOG.error("Failed to invoke setBaseRevision method", e);
-                            }
-                        });
+
+                        setBaseRevisionMethod.invoke(tracker, content);
                     } catch (Exception e) {
-                        LOG.error("Failed to execute in bulk mode", e);
+                        LOG.error("Failed to invoke setBaseRevision method", e);
                     }
                 });
             } else {
@@ -410,7 +385,7 @@ public class MyLineStatusTrackerImpl implements Disposable {
     /**
      * Release for a specific document if we hold it.
      */
-    private synchronized void safeRelease(@NotNull Document document) {
+    private synchronized void release(@NotNull Document document) {
         TrackerInfo info = trackers.get(document);
         if (info == null || !info.held) return;
 
@@ -432,6 +407,12 @@ public class MyLineStatusTrackerImpl implements Disposable {
     public void releaseAll() {
         if (!disposing.compareAndSet(false, true)) {
             return; // already disposing
+        }
+
+        // Dispose the commit diff workaround to break circular reference
+        // (commitDiffWorkaround holds BaseRevisionSwitcher anonymous inner class that captures this)
+        if (commitDiffWorkaround != null) {
+            commitDiffWorkaround.dispose();
         }
 
         if (messageBusConnection != null) {
@@ -462,6 +443,11 @@ public class MyLineStatusTrackerImpl implements Disposable {
         } else {
             ApplicationManager.getApplication().invokeAndWait(release);
         }
+
+        // Null out references to platform services to prevent retention
+        trackerManager = null;
+        messageBusConnection = null;
+        commitDiffWorkaround = null;
     }
 
     /**

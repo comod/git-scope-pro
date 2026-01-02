@@ -2,7 +2,9 @@ package implementation.lineStatusTracker;
 
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.util.Alarm;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.EditorKind;
@@ -11,7 +13,6 @@ import com.intellij.openapi.fileEditor.FileEditor;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.text.StringUtil;
-import com.intellij.openapi.vcs.VcsException;
 import com.intellij.openapi.vcs.changes.Change;
 import com.intellij.openapi.vcs.changes.ChangeListManager;
 import com.intellij.openapi.vcs.changes.ContentRevision;
@@ -196,7 +197,7 @@ public class CommitDiffWorkaround implements Disposable {
      */
     public void handleSwitchedToCommitDiff() {
         // Delay activation to allow diff window to fully render before switching base
-        com.intellij.util.Alarm alarm = new com.intellij.util.Alarm(this);
+        Alarm alarm = new Alarm(this);
         alarm.addRequest(() -> {
             if (disposing.get()) return;
             activateHeadBaseForAllCommitDiffs();
@@ -265,13 +266,13 @@ public class CommitDiffWorkaround implements Disposable {
             if (selectedEditor != null &&
                 selectedEditor.getClass().getSimpleName().equals("BackendDiffRequestProcessorEditor")) {
                 // Delay activation to allow diff window to fully render
-                com.intellij.util.Alarm alarm = new com.intellij.util.Alarm(this);
+                Alarm alarm = new Alarm(this);
                 alarm.addRequest(() -> {
                     if (disposing.get()) return;
                     activateHeadBaseForAllCommitDiffs();
                 }, ACTIVATION_DELAY_MS);
             }
-        });
+        }, ModalityState.defaultModalityState(), __ -> disposing.get());
     }
 
     /**
@@ -326,7 +327,7 @@ public class CommitDiffWorkaround implements Disposable {
                     ApplicationManager.getApplication().invokeLater(() -> {
                         if (disposing.get()) return;
                         baseRevisionSwitcher.switchToHeadBase(doc, finalHeadContent);
-                    });
+                    }, ModalityState.defaultModalityState(), __ -> disposing.get());
                 }
             }
         }
@@ -363,13 +364,13 @@ public class CommitDiffWorkaround implements Disposable {
             ApplicationManager.getApplication().invokeLater(() -> {
                 if (disposing.get()) return;
                 baseRevisionSwitcher.switchToCustomBase(doc, customContent);
-            });
+            }, ModalityState.defaultModalityState(), __ -> disposing.get());
         }
     }
 
     private String fetchHeadRevisionContent(@NotNull VirtualFile file) {
         try {
-            if (project == null || project.isDisposed()) {
+            if (project.isDisposed()) {
                 return null;
             }
 

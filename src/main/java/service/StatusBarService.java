@@ -1,9 +1,10 @@
 package service;
 
+import com.intellij.openapi.Disposable;
 import statusBar.MyStatusBarPanel;
 
-public class StatusBarService {
-    private final MyStatusBarPanel panel;
+public class StatusBarService implements Disposable {
+    private MyStatusBarPanel panel;
 
     public StatusBarService() {
         this.panel = new MyStatusBarPanel();
@@ -14,6 +15,13 @@ public class StatusBarService {
     }
 
     public void updateText(String text) {
-        panel.updateText(text);
+        if (panel != null) {
+            panel.updateText(text);
+        }
+    }
+
+    @Override
+    public void dispose() {
+        panel = null;
     }
 }

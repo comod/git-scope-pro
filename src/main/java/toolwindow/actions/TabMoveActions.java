@@ -1,4 +1,4 @@
-package toolwindow;
+package toolwindow.actions;
 
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
@@ -47,39 +47,113 @@ public class TabMoveActions {
     }
 
     /**
-     * Action to move the current tab to the left
+     * Helper class to hold validation result for update() and actionPerformed() methods
      */
-    public static class MoveTabLeft extends AnAction {
-        public MoveTabLeft() {
-            super("Move Tab Left");
+    private static class UpdateContext {
+        final ContentManager contentManager;
+        final Content targetContent;
+        final int currentIndex;
+        final String tabName;
+
+        UpdateContext(ContentManager contentManager, Content targetContent, int currentIndex, String tabName) {
+            this.contentManager = contentManager;
+            this.targetContent = targetContent;
+            this.currentIndex = currentIndex;
+            this.tabName = tabName;
+        }
+    }
+
+    /**
+     * Helper class to hold action context including project and validated context
+     */
+    private static class ActionContext {
+        final Project project;
+        final ContentManager contentManager;
+        final Content targetContent;
+        final int currentIndex;
+
+        ActionContext(Project project, ContentManager contentManager, Content targetContent, int currentIndex) {
+            this.project = project;
+            this.contentManager = contentManager;
+            this.targetContent = targetContent;
+            this.currentIndex = currentIndex;
+        }
+    }
+
+    /**
+     * Shared validation logic for actionPerformed() methods.
+     * Returns ActionContext if validation passes, null otherwise.
+     */
+    @Nullable
+    private static ActionContext validateActionContext(AnActionEvent e) {
+        Project project = e.getProject();
+        if (project == null) return null;
+
+        // Get the right-clicked tab content
+        Content targetContent = getContentFromContextMenuEvent(e);
+        if (targetContent == null) return null;
+
+        ToolWindowServiceInterface toolWindowService = project.getService(ToolWindowServiceInterface.class);
+        ContentManager contentManager = toolWindowService.getToolWindow().getContentManager();
+
+        int currentIndex = contentManager.getIndexOfContent(targetContent);
+
+        return new ActionContext(project, contentManager, targetContent, currentIndex);
+    }
+
+    /**
+     * Shared validation logic for update() methods.
+     * Returns UpdateContext if validation passes, null otherwise.
+     */
+    @Nullable
+    private static UpdateContext validateUpdateContext(AnActionEvent e) {
+        Project project = e.getProject();
+        if (project == null) {
+            return null;
         }
 
+        // Check if this is our tool window
+        ToolWindow toolWindow = e.getData(PlatformDataKeys.TOOL_WINDOW);
+        if (toolWindow == null || !Defs.TOOL_WINDOW_NAME.equals(toolWindow.getId())) {
+            return null;
+        }
+
+        // Get the right-clicked tab content
+        Content targetContent = getContentFromContextMenuEvent(e);
+        if (targetContent == null) {
+            return null;
+        }
+
+        ContentManager contentManager = toolWindow.getContentManager();
+        int currentIndex = contentManager.getIndexOfContent(targetContent);
+        String tabName = targetContent.getTabName();
+
+        return new UpdateContext(contentManager, targetContent, currentIndex, tabName);
+    }
+
+    /**
+     * Action to move the current tab to the left.
+     * Registered in plugin.xml and works across all projects.
+     */
+    public static class MoveTabLeft extends AnAction {
         @Override
         public void actionPerformed(@NotNull AnActionEvent e) {
-            Project project = e.getProject();
-            if (project == null) return;
+            ActionContext ctx = validateActionContext(e);
+            if (ctx == null) return;
 
-            // Get the right-clicked tab content
-            Content targetContent = getContentFromContextMenuEvent(e);
-            if (targetContent == null) return;
-
-            ToolWindowServiceInterface toolWindowService = project.getService(ToolWindowServiceInterface.class);
-            ContentManager contentManager = toolWindowService.getToolWindow().getContentManager();
-
-            int currentIndex = contentManager.getIndexOfContent(targetContent);
-            int newIndex = currentIndex - 1;
+            int newIndex = ctx.currentIndex - 1;
 
             // Cannot move HEAD tab (index 0) or move before HEAD tab
-            if (currentIndex <= 1 || newIndex < 1) {
+            if (ctx.currentIndex <= 1 || newIndex < 1) {
                 return;
             }
 
             // Cannot move + tab
-            if (PLUS_TAB_LABEL.equals(targetContent.getTabName())) {
+            if (PLUS_TAB_LABEL.equals(ctx.targetContent.getTabName())) {
                 return;
             }
 
-            moveTab(project, contentManager, targetContent, currentIndex, newIndex);
+            moveTab(ctx.project, ctx.contentManager, ctx.targetContent, ctx.currentIndex, newIndex);
         }
 
         @Override
@@ -87,29 +161,13 @@ public class TabMoveActions {
             // By default, hide the action
             e.getPresentation().setEnabledAndVisible(false);
 
-            Project project = e.getProject();
-            if (project == null) {
+            UpdateContext ctx = validateUpdateContext(e);
+            if (ctx == null) {
                 return;
             }
-
-            // Check if this is our tool window
-            ToolWindow toolWindow = e.getData(PlatformDataKeys.TOOL_WINDOW);
-            if (toolWindow == null || !Defs.TOOL_WINDOW_NAME.equals(toolWindow.getId())) {
-                return;
-            }
-
-            // Get the right-clicked tab content
-            Content targetContent = getContentFromContextMenuEvent(e);
-            if (targetContent == null) {
-                return;
-            }
-
-            ContentManager contentManager = toolWindow.getContentManager();
-            int currentIndex = contentManager.getIndexOfContent(targetContent);
-            String tabName = targetContent.getTabName();
 
             // Enable only if not HEAD tab (index 0), not + tab, and can move left (index > 1)
-            boolean enabled = currentIndex > 1 && !PLUS_TAB_LABEL.equals(tabName);
+            boolean enabled = ctx.currentIndex > 1 && !PLUS_TAB_LABEL.equals(ctx.tabName);
             e.getPresentation().setEnabledAndVisible(enabled);
         }
 
@@ -120,40 +178,29 @@ public class TabMoveActions {
     }
 
     /**
-     * Action to move the current tab to the right
+     * Action to move the current tab to the right.
+     * Registered in plugin.xml and works across all projects.
      */
     public static class MoveTabRight extends AnAction {
-        public MoveTabRight() {
-            super("Move Tab Right");
-        }
-
         @Override
         public void actionPerformed(@NotNull AnActionEvent e) {
-            Project project = e.getProject();
-            if (project == null) return;
+            ActionContext ctx = validateActionContext(e);
+            if (ctx == null) return;
 
-            // Get the right-clicked tab content
-            Content targetContent = getContentFromContextMenuEvent(e);
-            if (targetContent == null) return;
-
-            ToolWindowServiceInterface toolWindowService = project.getService(ToolWindowServiceInterface.class);
-            ContentManager contentManager = toolWindowService.getToolWindow().getContentManager();
-
-            int currentIndex = contentManager.getIndexOfContent(targetContent);
-            int newIndex = currentIndex + 1;
-            int lastIndex = contentManager.getContentCount() - 1;
+            int newIndex = ctx.currentIndex + 1;
+            int lastIndex = ctx.contentManager.getContentCount() - 1;
 
             // Cannot move HEAD tab (index 0) or move past + tab
-            if (currentIndex == 0 || newIndex >= lastIndex) {
+            if (ctx.currentIndex == 0 || newIndex >= lastIndex) {
                 return;
             }
 
             // Cannot move + tab
-            if (PLUS_TAB_LABEL.equals(targetContent.getTabName())) {
+            if (PLUS_TAB_LABEL.equals(ctx.targetContent.getTabName())) {
                 return;
             }
 
-            moveTab(project, contentManager, targetContent, currentIndex, newIndex);
+            moveTab(ctx.project, ctx.contentManager, ctx.targetContent, ctx.currentIndex, newIndex);
         }
 
         @Override
@@ -161,30 +208,15 @@ public class TabMoveActions {
             // By default, hide the action
             e.getPresentation().setEnabledAndVisible(false);
 
-            Project project = e.getProject();
-            if (project == null) {
+            UpdateContext ctx = validateUpdateContext(e);
+            if (ctx == null) {
                 return;
             }
 
-            // Check if this is our tool window
-            ToolWindow toolWindow = e.getData(PlatformDataKeys.TOOL_WINDOW);
-            if (toolWindow == null || !Defs.TOOL_WINDOW_NAME.equals(toolWindow.getId())) {
-                return;
-            }
-
-            // Get the right-clicked tab content
-            Content targetContent = getContentFromContextMenuEvent(e);
-            if (targetContent == null) {
-                return;
-            }
-
-            ContentManager contentManager = toolWindow.getContentManager();
-            int currentIndex = contentManager.getIndexOfContent(targetContent);
-            int lastIndex = contentManager.getContentCount() - 1;
-            String tabName = targetContent.getTabName();
+            int lastIndex = ctx.contentManager.getContentCount() - 1;
 
             // Enable only if not HEAD tab (index 0), not + tab, and can move right (not already at second-to-last position)
-            boolean enabled = currentIndex > 0 && currentIndex < lastIndex - 1 && !PLUS_TAB_LABEL.equals(tabName);
+            boolean enabled = ctx.currentIndex > 0 && ctx.currentIndex < lastIndex - 1 && !PLUS_TAB_LABEL.equals(ctx.tabName);
             e.getPresentation().setEnabledAndVisible(enabled);
         }
 

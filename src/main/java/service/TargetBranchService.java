@@ -77,7 +77,7 @@ public class TargetBranchService {
             return null;
         }
 
-        return repositoryTargetBranchMap.getValue().get(repo.toString());
+        return repositoryTargetBranchMap.value().get(repo.toString());
 
     }
 }

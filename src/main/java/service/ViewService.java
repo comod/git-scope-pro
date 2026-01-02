@@ -2,8 +2,16 @@ package service;
 
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ModalityState;
+import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.editor.EditorFactory;
+import com.intellij.openapi.editor.EditorKind;
+import com.intellij.openapi.editor.ex.EditorEx;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.vcs.FileStatusManager;
 import com.intellij.openapi.vcs.changes.Change;
+import com.intellij.openapi.vcs.impl.LineStatusTrackerManagerI;
+import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.ui.content.Content;
 import com.intellij.ui.content.ContentManager;
 import com.intellij.util.concurrency.SequentialTaskExecutor;
@@ -25,23 +33,31 @@ import java.awt.*;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 public class ViewService implements Disposable {
     private static final com.intellij.openapi.diagnostic.Logger LOG = Defs.getLogger(ViewService.class);
 
     public static final String PLUS_TAB_LABEL = "+";
     public static final int DEBOUNCE_MS = 50;
-    public static final int HEAD_TAB_INIT_TIMEOUT = 5;  // sec
     public List<MyModel> collection = new ArrayList<>();
     public Integer currentTabIndex = 0;
     private final Project project;
+    private volatile boolean isDisposed = false;
+
+    // Lightweight disposal token to avoid capturing 'this' in lambdas
+    private static class DisposalToken {
+        volatile boolean disposed = false;
+    }
+    private final DisposalToken disposalToken = new DisposalToken();
+
     private boolean isProcessingTabRename = false;
     private boolean isProcessingTabReorder = false;
     private ToolWindowServiceInterface toolWindowService;
@@ -60,6 +76,8 @@ public class ViewService implements Disposable {
     private int lastTabIndex;
     private Integer savedTabIndex;
     private final AtomicBoolean tabInitializationInProgress = new AtomicBoolean(false);
+    private final AtomicBoolean initialFileColorsRefreshed = new AtomicBoolean(false);
+    private final List<io.reactivex.rxjava3.disposables.Disposable> rxSubscriptions = new ArrayList<>();
 
     public ViewService(Project project) {
         this.project = project;
@@ -72,6 +90,68 @@ public class ViewService implements Disposable {
 
     @Override
     public void dispose() {
+        // Set disposed flag FIRST to prevent any further operations
+        isDisposed = true;
+        disposalToken.disposed = true;
+
+        // Dispose all RxJava subscriptions to break references to MyModel.field enum
+        for (io.reactivex.rxjava3.disposables.Disposable subscription : rxSubscriptions) {
+            if (subscription != null && !subscription.isDisposed()) {
+                subscription.dispose();
+            }
+        }
+        rxSubscriptions.clear();
+
+        // Shutdown the debouncer scheduler FIRST to cancel pending tasks
+        if (debouncer != null) {
+            debouncer.shutdown();
+        }
+
+        // Shutdown the executor service to prevent memory leaks
+        if (!changesExecutor.isShutdown()) {
+            changesExecutor.shutdown();
+            try {
+                if (!changesExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+                    changesExecutor.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                changesExecutor.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        // Clear all collections to release memory
+        if (collection != null) {
+            collection.clear();
+            collection = null;
+        }
+
+        // Null out all service references to break potential circular references
+        toolWindowService = null;
+        changesService = null;
+        statusBarService = null;
+        gitService = null;
+        targetBranchService = null;
+        state = null;
+
+        // Dispose MyScope to unregister NamedScope from NamedScopeManager
+        if (myScope != null) {
+            myScope.dispose();
+            myScope = null;
+        }
+
+        // Dispose of the line status tracker if it has dispose logic
+        myLineStatusTrackerImpl = null;
+        debouncer = null;
+        myHeadModel = null;
+    }
+
+    /**
+     * Check if this service has been disposed.
+     * Used by FileStatusProvider to avoid accessing disposed service.
+     */
+    public boolean isDisposed() {
+        return isDisposed;
     }
 
     public void initDependencies() {
@@ -88,6 +168,100 @@ public class ViewService implements Disposable {
 
     private void doUpdateDebounced(Collection<Change> changes) {
         debouncer.debounce(Void.class, () -> onUpdate(changes), DEBOUNCE_MS, TimeUnit.MILLISECONDS);
+    }
+
+
+    /**
+     * Refreshes file status colors for files in the current scope and previous scope.
+     * Call this when the active scope changes to update colors.
+     * IMPORTANT: Calling FileStatusManager.fileStatusesChanged() can trigger VCS machinery that
+     * invalidates LineStatusTrackers, causing gutter markers to disappear. We protect against this
+     * by ensuring trackers are maintained and repainted after the status update.
+     */
+    public void refreshFileColors() {
+        if (project.isDisposed() || isDisposed) {
+            return;
+        }
+
+        final DisposalToken token = this.disposalToken;
+        // Execute on background thread first, then switch to EDT for the actual work
+        ApplicationManager.getApplication().executeOnPooledThread(() -> {
+            if (!token.disposed) {
+                ApplicationManager.getApplication().invokeLater(
+                    () -> doRefreshFileColorsOnEdt(token),
+                    ModalityState.any(),
+                    __ -> token.disposed
+                );
+            }
+        });
+    }
+
+    /**
+     * Performs the actual file colors refresh on EDT.
+     * Collects open editors, triggers file status update, and schedules gutter repaint.
+     */
+    private void doRefreshFileColorsOnEdt(DisposalToken token) {
+        if (project.isDisposed() || token.disposed) {
+            return;
+        }
+
+        // Collect editors that need gutter repaint after the status change
+        //List<Editor> editorsToRepaint = collectMainEditors();
+
+        // Trigger the file status update (may invalidate trackers)
+        FileStatusManager.getInstance(project).fileStatusesChanged();
+
+        // Schedule gutter repaint after trackers are updated
+        // TODO: Currently removed since this still seem to cause gutter refresh issues
+        //scheduleGutterRepaint(editorsToRepaint, token);
+    }
+
+    /**
+     * Collects all main editors for the current project.
+     */
+    private List<Editor> collectMainEditors() {
+        List<Editor> result = new ArrayList<>();
+        Editor[] allEditors = EditorFactory.getInstance().getAllEditors();
+
+        for (Editor editor : allEditors) {
+            if (editor.getProject() == project && editor.getEditorKind() == EditorKind.MAIN_EDITOR) {
+                result.add(editor);
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * Schedules gutter repaint after LineStatusTracker updates complete.
+     */
+    private void scheduleGutterRepaint(List<Editor> editorsToRepaint, DisposalToken token) {
+        LineStatusTrackerManagerI trackerManager = project.getService(LineStatusTrackerManagerI.class);
+
+        if (trackerManager != null) {
+            trackerManager.invokeAfterUpdate(() -> {
+                if (!token.disposed && !project.isDisposed()) {
+                    repaintEditorGutters(editorsToRepaint, token);
+                }
+            });
+        }
+    }
+
+    /**
+     * Repaints gutters for all specified editors on EDT.
+     */
+    private void repaintEditorGutters(List<Editor> editors, DisposalToken token) {
+        ApplicationManager.getApplication().invokeLater(() -> {
+            if (token.disposed || project.isDisposed()) {
+                return;
+            }
+
+            for (Editor editor : editors) {
+                if (!editor.isDisposed() && editor instanceof EditorEx) {
+                        ((EditorEx) editor).getGutterComponentEx().repaint();
+                }
+            }
+        }, ModalityState.any(), __ -> token.disposed);
     }
 
     public void load() {
@@ -130,14 +304,14 @@ public class ViewService implements Disposable {
 
         List<MyModelBase> modelData = new ArrayList<>();
         collection.forEach(myModel -> {
-            MyModelBase myModelBase = new MyModelBase();
-
             // Save the target branch map
             TargetBranchMap targetBranchMap = myModel.getTargetBranchMap();
             if (targetBranchMap == null) {
-                LOG.debug("Skipping model with null targetBranchMap during save");
+                LOG.warn("Model has null targetBranchMap during save - this should not happen in steady state. Skipping.");
                 return;
             }
+
+            MyModelBase myModelBase = new MyModelBase();
             myModelBase.setTargetBranchMap(targetBranchMap);
 
             // Save the custom tab name
@@ -242,29 +416,7 @@ public class ViewService implements Disposable {
     private void initHeadTab() {
         this.myHeadModel = new MyModel(true);
         toolWindowService.addTab(myHeadModel, GitService.BRANCH_HEAD, false);
-
-        // Wait for repositories to be loaded before proceeding
-        CountDownLatch latch = new CountDownLatch(1);
-
-        gitService.getRepositoriesAsync(repositories -> {
-            repositories.forEach(repo -> {
-                myHeadModel.addTargetBranch(repo, null);
-            });
-
-            subscribeToObservable(myHeadModel);
-
-            // TODO: collectChanges: head tab initialized
-            incrementUpdate();
-            collectChanges(myHeadModel, true);
-            latch.countDown();
-        });
-
-        try {
-            // Wait for the head tab initialization to complete with a timeout
-            latch.await(HEAD_TAB_INIT_TIMEOUT, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            // Handle interruption if necessary
-        }
+        subscribeToObservable(myHeadModel);
     }
 
     public void addRevisionTab(String revision) {
@@ -286,9 +438,12 @@ public class ViewService implements Disposable {
 
             // Set up tooltip after target branches are added
             if (myModel.getCustomTabName() != null && !myModel.getCustomTabName().isEmpty()) {
+                final DisposalToken token = disposalToken;
                 ApplicationManager.getApplication().invokeLater(() -> {
-                    toolWindowService.setupTabTooltip(myModel);
-                });
+                    if (!token.disposed && toolWindowService != null) {
+                        toolWindowService.setupTabTooltip(myModel);
+                    }
+                }, ModalityState.any(), __ -> token.disposed);
             }
         });
     }
@@ -354,33 +509,55 @@ public class ViewService implements Disposable {
 
     private void subscribeToObservable(MyModel model) {
         Observable<MyModel.field> observable = model.getObservable();
-        observable.subscribe(field -> {
+        io.reactivex.rxjava3.disposables.Disposable subscription = observable.subscribe(field -> {
             switch (field) {
                 case targetBranch -> {
-                    getTargetBranchDisplayAsync(model, tabName -> {
-                        toolWindowService.changeTabName(tabName);
-                    });
+                    // Don't update tab names during initialization - tabs are named correctly during creation
+                    if (!tabInitializationInProgress.get()) {
+                        getTargetBranchDisplayAsync(model, tabName -> {
+                            // Use model-specific tab name change to avoid changing wrong tab
+                            toolWindowService.changeTabNameForModel(model, tabName);
+                        });
+                        // Set up tooltip when target branch changes (for tabs with custom names)
+                        if (model.getCustomTabName() != null && !model.getCustomTabName().isEmpty()) {
+                            toolWindowService.setupTabTooltip(model);
+                        }
+                    }
                     // TODO: collectChanges: target branch selected (Git Scope selected)
                     incrementUpdate();
                     collectChanges(model, true);
-                    save();
+                    // Don't save during initialization
+                    if (!tabInitializationInProgress.get()) {
+                        save();
+                    }
                 }
                 case changes -> {
                     if (model.isActive()) {
                         Collection<Change> changes = model.getChanges();
                         doUpdateDebounced(changes);
+
+                        // Refresh file colors once on initial startup after changes are loaded for the active model
+                        // This handles the boot case where setActiveModel() is called before changes are collected
+                        if (!initialFileColorsRefreshed.get() && changes != null && !changes.isEmpty()) {
+                            if (initialFileColorsRefreshed.compareAndSet(false, true)) {
+                                refreshFileColors();
+                            }
+                        }
                     }
                 }
                 // TODO: collectChanges: tab switched
                 case active -> {
                     incrementUpdate(); // Increment generation to cancel any stale updates for previous tab
-                    collectChanges(model, true);
+                    // Refresh file colors AFTER scopeChangesMap is updated
+                    // This ensures GitScopeFileStatusProvider sees the correct scope
+                    collectChanges(model, true).thenRun(this::refreshFileColors);
                 }
                 case tabName -> {
                     if (!isProcessingTabRename) {
                         String customName = model.getCustomTabName();
                         if (customName != null && !customName.isEmpty()) {
-                            toolWindowService.changeTabName(customName);
+                            // Use model-specific tab name change to avoid changing wrong tab
+                            toolWindowService.changeTabNameForModel(model, customName);
                             toolWindowService.setupTabTooltip(model);
                         }
                     }
@@ -390,6 +567,9 @@ public class ViewService implements Disposable {
 
         }, (e -> {
         }));
+
+        // Track the subscription so it can be disposed when ViewService is disposed
+        rxSubscriptions.add(subscription);
     }
 
     private void getTargetBranchDisplayCurrent(Consumer<String> callback) {
@@ -440,50 +620,90 @@ public class ViewService implements Disposable {
         return collectChanges(getCurrent(), checkFs);
     }
 
+    /**
+     * Ensures HEAD tab model has a targetBranchMap initialized with all repositories.
+     * This is a lazy initialization that runs when HEAD tab is accessed, after repositories are loaded.
+     * Uses async callback to avoid slow operations on EDT.
+     */
+    private void ensureHeadTabInitializedAsync(MyModel model, Runnable onComplete) {
+        if (model.isHeadTab() && model.getTargetBranchMap() == null) {
+            // Use async method to avoid slow operations on EDT
+            gitService.getRepositoriesAsync(repositories -> {
+                repositories.forEach(repo -> {
+                    model.addTargetBranch(repo, null);
+                });
+                if (onComplete != null) {
+                    onComplete.run();
+                }
+            });
+        } else {
+            // Already initialized or not HEAD tab
+            if (onComplete != null) {
+                onComplete.run();
+            }
+        }
+    }
+
     public CompletableFuture<Void> collectChanges(MyModel model, boolean checkFs) {
         CompletableFuture<Void> done = new CompletableFuture<>();
         if (model == null) {
             done.complete(null);
             return done;
         }
-        TargetBranchMap targetBranchMap = model.getTargetBranchMap();
-        if (targetBranchMap == null) {
-            done.complete(null);
-            return done;
-        }
 
+        // Ensure HEAD tab is initialized before proceeding
+        ensureHeadTabInitializedAsync(model, () -> {
+            TargetBranchMap targetBranchMap = model.getTargetBranchMap();
+            if (targetBranchMap == null) {
+                done.complete(null);
+                return;
+            }
+
+            collectChangesInternal(model, targetBranchMap, checkFs, done);
+        });
+
+        return done;
+    }
+
+    private void collectChangesInternal(MyModel model, TargetBranchMap targetBranchMap, boolean checkFs, CompletableFuture<Void> done) {
+
+        // Make targetBranchMap effectively final for lambda
+        final TargetBranchMap finalTargetBranchMap = targetBranchMap;
         final long gen = applyGeneration.get();
         LOG.debug("collectChanges() scheduled with generation = " + gen);
 
         // serialize collection behind a single-threaded executor
+        final DisposalToken token = this.disposalToken;
         changesExecutor.execute(() -> {
-            changesService.collectChangesWithCallback(targetBranchMap, changes -> {
+            changesService.collectChangesWithCallback(finalTargetBranchMap, result -> {
                 ApplicationManager.getApplication().invokeLater(() -> {
                     try {
                         long currentGen = applyGeneration.get();
-                        if (!project.isDisposed() && currentGen == gen) {
+                        if (!project.isDisposed() && !token.disposed && currentGen == gen) {
                             LOG.debug("Applying changes for generation " + gen);
-                            model.setChanges(changes);
+                            model.setChanges(result.mergedChanges());
+                            model.setLocalChanges(result.localChanges());
                         } else {
                             LOG.debug("Discarding changes for generation " + gen + " (current generation is " + currentGen + ")");
                         }
                     } finally {
                         done.complete(null);
                     }
-                });
+                }, ModalityState.any(), __ -> token.disposed);
             }, checkFs);
         });
-
-        return done;
     }
 
     // helper to enqueue UI work strictly after the currently queued collections
     public void runAfterCurrentChangeCollection(Runnable uiTask) {
-        changesExecutor.execute(() ->
-                ApplicationManager.getApplication().invokeLater(() -> {
-                    if (!project.isDisposed()) uiTask.run();
-                })
-        );
+        if (isDisposed) return;
+        final DisposalToken token = this.disposalToken;
+        changesExecutor.execute(() -> {
+            if (token.disposed) return;
+            ApplicationManager.getApplication().invokeLater(() -> {
+                if (!project.isDisposed() && !token.disposed) uiTask.run();
+            }, ModalityState.any(), __ -> token.disposed);
+        });
     }
 
 
@@ -495,8 +715,19 @@ public class ViewService implements Disposable {
     }
 
     public MyModel getCurrent() {
+        // Check if disposed or not initialized
+        if (isDisposed || toolWindowService == null) {
+            return myHeadModel; // Safe fallback
+        }
+
+        // Get tool window safely
+        ToolWindow toolWindow = toolWindowService.getToolWindow();
+        if (toolWindow == null) {
+            return myHeadModel; // Tool window not available
+        }
+
         // Get the currently selected tab's model directly from ContentManager
-        ContentManager contentManager = toolWindowService.getToolWindow().getContentManager();
+        ContentManager contentManager = toolWindow.getContentManager();
         Content selectedContent = contentManager.getSelectedContent();
 
         if (selectedContent == null) {
@@ -529,6 +760,47 @@ public class ViewService implements Disposable {
 
     public void setCollection(List<MyModel> collection) {
         this.collection = collection;
+    }
+
+    /**
+     * Core private method to retrieve a cached HashMap from the current MyModel.
+     * Handles initialization checks and returns the pre-built map.
+     *
+     * @param mapGetter Function to retrieve the cached map from MyModel
+     * @return Map of file path to Change, or null if not initialized
+     */
+    private Map<String, Change> getChangesMapInternal(Function<MyModel, Map<String, Change>> mapGetter) {
+        // Early return if ViewService is not fully initialized yet
+        if (toolWindowService == null) {
+            return null;
+        }
+
+        MyModel current = getCurrent();
+        if (current == null) {
+            return null;
+        }
+
+        return mapGetter.apply(current);
+    }
+
+    /**
+     * Gets a HashMap of local changes indexed by file path for O(1) lookup.
+     * Returns the cached map that was built when changes were set.
+     *
+     * @return Map of file path to Change, or null if not initialized
+     */
+    public Map<String, Change> getLocalChangesTowardsHeadMap() {
+        return getChangesMapInternal(MyModel::getLocalChangesMap);
+    }
+
+    /**
+     * Gets a HashMap of scope changes indexed by file path for O(1) lookup.
+     * Returns the cached map that was built when changes were set.
+     *
+     * @return Map of file path to Change, or null if not initialized
+     */
+    public Map<String, Change> getCurrentScopeChangesMap() {
+        return getChangesMapInternal(MyModel::getChangesMap);
     }
 
     public void removeTab(int tabIndex) {
@@ -628,6 +900,10 @@ public class ViewService implements Disposable {
         try {
             isProcessingTabRename = true;
 
+            // Rebuild collection from tab order to ensure consistency
+            // This is critical because the collection might be out of sync with actual tabs
+            rebuildCollectionFromTabOrder();
+
             // Update the model with custom name if needed
             int modelIndex = getModelIndex(tabIndex);
             if (modelIndex >= 0 && modelIndex < collection.size()) {
@@ -680,25 +956,38 @@ public class ViewService implements Disposable {
     }
 
     public void onUpdate(Collection<Change> changes) {
-        if (changes == null) {
+        if (changes == null || isDisposed) {
             return;
         }
 
         // Run UI updates on EDT
+        final DisposalToken token = this.disposalToken;
         ApplicationManager.getApplication().invokeLater(() -> {
+            if (token.disposed) return;
+
             updateStatusBarWidget();
-            myLineStatusTrackerImpl.update(changes, null);
+            // Get the current scope changes map to pass to line status tracker
+            Map<String, Change> scopeChangesMap = getCurrentScopeChangesMap();
+            myLineStatusTrackerImpl.update(scopeChangesMap);
             myScope.update(changes);
 
             // Perform scroll restoration after all UI updates are complete
             // Use another invokeLater to ensure everything is fully rendered
+            // Update VcsTree with changes
+            VcsTree vcsTree = toolWindowService.getVcsTree();
+            if (vcsTree != null) {
+                vcsTree.update(changes);
+            }
+
             SwingUtilities.invokeLater(() -> {
-                VcsTree vcsTree = toolWindowService.getVcsTree();
-                if (vcsTree != null) {
-                    vcsTree.performScrollRestoration();
+                if (token.disposed || toolWindowService == null) return;
+
+                VcsTree tree = toolWindowService.getVcsTree();
+                if (tree != null) {
+                    tree.performScrollRestoration();
                 }
             });
-        });
+        }, ModalityState.any(), __ -> token.disposed);
     }
 
     private void updateStatusBarWidget() {

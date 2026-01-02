@@ -1,5 +1,6 @@
 package toolwindow;
 
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.changes.Change;
 import model.MyModel;
@@ -10,7 +11,7 @@ import java.util.Collection;
 import javax.swing.*;
 import java.awt.*;
 
-public class ToolWindowView {
+public class ToolWindowView implements Disposable {
 
     private final MyModel myModel;
     private final Project project;
@@ -19,14 +20,48 @@ public class ToolWindowView {
     private VcsTree vcsTree;
     private JPanel sceneA;
     private JPanel sceneB;
+    private BranchSelectView branchSelectView;
+    private io.reactivex.rxjava3.disposables.Disposable subscription;
 
     public ToolWindowView(Project project, MyModel myModel) {
         this.project = project;
         this.myModel = myModel;
 
-        myModel.getObservable().subscribe(model -> render());
+        subscription = myModel.getObservable().subscribe(model -> render());
         draw();
         render();
+    }
+
+    @Override
+    public void dispose() {
+        // Dispose the observable subscription first to prevent further updates
+        if (subscription != null && !subscription.isDisposed()) {
+            subscription.dispose();
+            subscription = null;
+        }
+
+        // Dispose BranchSelectView (removes listeners from trees, checkboxes, etc.)
+        if (branchSelectView != null) {
+            branchSelectView.dispose();
+            branchSelectView = null;
+        }
+
+        // Explicitly cleanup VcsTree first (cancels futures, disposes browsers)
+        if (vcsTree != null) {
+            vcsTree.cleanup();
+            vcsTree = null;
+        }
+
+        // Remove all components from panels to break JNI references
+        if (sceneB != null) {
+            sceneB.removeAll();
+            sceneB = null;
+        }
+        if (sceneA != null) {
+            sceneA.removeAll();
+            sceneA = null;
+        }
+        rootPanel.removeAll();
     }
 
     private void draw() {
@@ -37,8 +72,8 @@ public class ToolWindowView {
     }
 
     private JPanel getBranchSelectPanel() {
-        BranchSelectView branchSelectPanel = new BranchSelectView(project);
-        return branchSelectPanel.getRootPanel();
+        branchSelectView = new BranchSelectView(project);
+        return branchSelectView.getRootPanel();
     }
 
     private JPanel getChangesPanel() {

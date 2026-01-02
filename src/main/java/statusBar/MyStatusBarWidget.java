@@ -40,6 +40,10 @@ public class MyStatusBarWidget implements CustomStatusBarWidget {
 
     @Override
     public void dispose() {
-// keep
+        // Clean up the status bar panel to break JNI references
+        JComponent panel = getComponent();
+        if (panel != null) {
+            panel.removeAll();
+        }
     }
 }
