@@ -9,19 +9,16 @@ import com.intellij.openapi.editor.EditorFactory;
 import com.intellij.openapi.editor.EditorKind;
 import com.intellij.openapi.editor.event.EditorFactoryEvent;
 import com.intellij.openapi.editor.event.EditorFactoryListener;
-import com.intellij.util.DocumentUtil;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditor;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vcs.VcsException;
 import com.intellij.openapi.vcs.changes.Change;
-import com.intellij.openapi.vcs.changes.ContentRevision;
 import com.intellij.openapi.vcs.ex.LineStatusTracker;
 import com.intellij.openapi.vcs.impl.LineStatusTrackerManagerI;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -160,7 +157,7 @@ public class MyLineStatusTrackerImpl implements Disposable {
                         if (doc != null) {
                             // Workaround: Don't release if commit diff editors still need this document
                             if (!commitDiffWorkaround.hasCommitDiffEditorsFor(doc)) {
-                                safeRelease(doc);
+                                release(doc);
                             }
                         }
 
@@ -228,12 +225,12 @@ public class MyLineStatusTrackerImpl implements Disposable {
             for (Editor editor : editors) {
                 if (isDiffView(editor)) continue;
                 // Platform handles gutter repainting automatically - no need to force it
-                updateLineStatusByChangesForEditorSafe(editor, scopeChangesMap);
+                updateLineStatusByChangesForEditor(editor, scopeChangesMap);
             }
         }, ModalityState.defaultModalityState(), __ -> token.disposed);
     }
 
-    private void updateLineStatusByChangesForEditorSafe(Editor editor, Map<String, Change> scopeChangesMap) {
+    private void updateLineStatusByChangesForEditor(Editor editor, Map<String, Change> scopeChangesMap) {
         if (editor == null || disposing.get()) return;
 
         Document doc = editor.getDocument();
@@ -355,19 +352,10 @@ public class MyLineStatusTrackerImpl implements Disposable {
                         if (disposing.get()) {
                             return;
                         }
-                        
-                        // Use bulk update mode to batch changes and prevent flickering
-                        Document document = tracker.getDocument();
 
-                        DocumentUtil.executeInBulk(document, () -> {
-                            try {
-                                setBaseRevisionMethod.invoke(tracker, content);
-                            } catch (Exception e) {
-                                LOG.error("Failed to invoke setBaseRevision method", e);
-                            }
-                        });
+                        setBaseRevisionMethod.invoke(tracker, content);
                     } catch (Exception e) {
-                        LOG.error("Failed to execute in bulk mode", e);
+                        LOG.error("Failed to invoke setBaseRevision method", e);
                     }
                 });
             } else {
@@ -397,7 +385,7 @@ public class MyLineStatusTrackerImpl implements Disposable {
     /**
      * Release for a specific document if we hold it.
      */
-    private synchronized void safeRelease(@NotNull Document document) {
+    private synchronized void release(@NotNull Document document) {
         TrackerInfo info = trackers.get(document);
         if (info == null || !info.held) return;
 
