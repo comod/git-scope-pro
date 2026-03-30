@@ -10,7 +10,12 @@ import com.intellij.openapi.fileEditor.FileEditor;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.TextEditor;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.vcs.FilePath;
+import com.intellij.openapi.vcs.changes.ChangesUtil;
 import com.intellij.openapi.vcs.changes.Change;
+import com.intellij.openapi.vcs.changes.CurrentContentRevision;
+import com.intellij.openapi.vcs.changes.actions.diff.ChangeDiffRequestProducer;
+import com.intellij.openapi.vcs.changes.ui.ChangeDiffRequestChain;
 import com.intellij.openapi.vcs.changes.ui.SimpleAsyncChangesBrowser;
 import com.intellij.openapi.vfs.VirtualFile;
 import org.jetbrains.annotations.NotNull;
@@ -252,6 +257,29 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
                 }
             }
         });
+    }
+
+    /**
+     * Override diff request production so the right side of the diff shows the current
+     * working directory content (HEAD + local edits) instead of the pure HEAD revision.
+     */
+    @Override
+    protected @Nullable ChangeDiffRequestChain.Producer getDiffRequestProducer(@NotNull Object userObject) {
+        if (userObject instanceof Change change) {
+            // Replace afterRevision with CurrentContentRevision to show working tree content
+            FilePath filePath = ChangesUtil.getAfterPath(change);
+            if (filePath == null) {
+                filePath = ChangesUtil.getBeforePath(change);
+            }
+            if (filePath != null && filePath.getVirtualFile() != null) {
+                Change modifiedChange = new Change(
+                    change.getBeforeRevision(),
+                    new CurrentContentRevision(filePath)
+                );
+                return ChangeDiffRequestProducer.create(myProject, modifiedChange);
+            }
+        }
+        return super.getDiffRequestProducer(userObject);
     }
 
     @Override
