@@ -188,8 +188,6 @@ class ScopeLineStatusMarkerRenderer(
         // Use a holder to track current index that can be updated
         var currentIndex = sortedRanges.indexOf(range)
 
-        LOG.info("Popup for range at line ${range.line1}, index=$currentIndex, total ranges=${sortedRanges.size}")
-
         // Variable to hold the popup reference so actions can close it
         var popupRef: com.intellij.openapi.ui.popup.JBPopup? = null
 
@@ -233,7 +231,6 @@ class ScopeLineStatusMarkerRenderer(
                         editor.caretModel.moveToLogicalPosition(com.intellij.openapi.editor.LogicalPosition(previousRange.line1, 0))
                         editor.scrollingModel.scrollToCaret(com.intellij.openapi.editor.ScrollType.CENTER)
                         updateDiffPanel(previousRange)
-                        LOG.info("Navigated to previous change at line ${previousRange.line1}, new index=$currentIndex")
                     }
                 }
 
@@ -251,7 +248,6 @@ class ScopeLineStatusMarkerRenderer(
                         editor.caretModel.moveToLogicalPosition(com.intellij.openapi.editor.LogicalPosition(nextRange.line1, 0))
                         editor.scrollingModel.scrollToCaret(com.intellij.openapi.editor.ScrollType.CENTER)
                         updateDiffPanel(nextRange)
-                        LOG.info("Navigated to next change at line ${nextRange.line1}, new index=$currentIndex")
                     }
                 }
 
@@ -524,20 +520,20 @@ class ScopeLineStatusMarkerRenderer(
     private fun rollbackRange(editor: EditorEx, range: Range) {
         com.intellij.openapi.command.WriteCommandAction.runWriteCommandAction(project) {
             try {
-                LOG.info("Rolling back range type=${range.type}, line1=${range.line1}, line2=${range.line2}, vcsLine1=${range.vcsLine1}, vcsLine2=${range.vcsLine2}")
+                LOG.debug("Rolling back range type=${range.type}, line1=${range.line1}, line2=${range.line2}, vcsLine1=${range.vcsLine1}, vcsLine2=${range.vcsLine2}")
 
                 when (range.type) {
                     Range.INSERTED -> {
                         // For inserted lines, delete them
                         val startOffset = editor.logicalPositionToOffset(com.intellij.openapi.editor.LogicalPosition(range.line1, 0))
                         val endOffset = editor.logicalPositionToOffset(com.intellij.openapi.editor.LogicalPosition(range.line2, 0))
-                        LOG.info("Deleting inserted range: startOffset=$startOffset, endOffset=$endOffset")
+                        LOG.debug("Deleting inserted range: startOffset=$startOffset, endOffset=$endOffset")
                         document.deleteString(startOffset, endOffset)
                     }
                     Range.DELETED -> {
                         // For deleted lines, insert the base content (without context)
                         val baseContent = diffViewer.getVcsContentForRange(range, includeContext = false)
-                        LOG.info("Restoring deleted content: length=${baseContent.length}, content='$baseContent'")
+                        LOG.debug("Restoring deleted content: ${baseContent.length} chars")
                         if (baseContent.isNotEmpty()) {
                             val offset = editor.logicalPositionToOffset(com.intellij.openapi.editor.LogicalPosition(range.line1, 0))
                             document.insertString(offset, baseContent + "\n")
@@ -546,13 +542,13 @@ class ScopeLineStatusMarkerRenderer(
                     Range.MODIFIED -> {
                         // For modified lines, replace with base content (without context)
                         val baseContent = diffViewer.getVcsContentForRange(range, includeContext = false)
-                        LOG.info("Replacing modified content: length=${baseContent.length}, content='$baseContent'")
+                        LOG.debug("Replacing modified content: ${baseContent.length} chars")
                         val startOffset = editor.logicalPositionToOffset(com.intellij.openapi.editor.LogicalPosition(range.line1, 0))
                         val endOffset = editor.logicalPositionToOffset(com.intellij.openapi.editor.LogicalPosition(range.line2, 0))
                         document.replaceString(startOffset, endOffset, baseContent)
                     }
                 }
-                LOG.info("Successfully rolled back range at line ${range.line1}")
+                LOG.debug("Successfully rolled back range at line ${range.line1}")
             } catch (e: Exception) {
                 LOG.error("Error rolling back range", e)
             }

@@ -103,8 +103,6 @@ class ScopeDiffViewer(
      * Used by both diff viewer and rollback functionality.
      */
     fun getVcsContentForRange(range: Range, includeContext: Boolean = true): String {
-        LOG.info("getVcsContentForRange: type=${range.type}, vcsLine1=${range.vcsLine1}, vcsLine2=${range.vcsLine2}, includeContext=$includeContext, vcsBaseContent=${if (vcsBaseContent != null) "available (${vcsBaseContent!!.length} chars)" else "null"}")
-
         return when (range.type) {
             Range.INSERTED -> {
                 // For inserted ranges, there's nothing in VCS to restore (they were added locally)

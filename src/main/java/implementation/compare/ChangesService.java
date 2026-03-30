@@ -349,7 +349,7 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
                 if (revisionNumber != null) {
                     // We have a valid GitReference
                     scopeChanges = GitUtil.getDiffChanges(repo, file, revisionNumber);
-                    LOG.info("ChangesService - Repository: " + repoPath + ", Scope: " + scopeRef + ", scopeChanges count: " + scopeChanges.size());
+                    LOG.debug("ChangesService - Repository: " + repoPath + ", Scope: " + scopeRef + ", scopeChanges count: " + scopeChanges.size());
                 }
                 else {
                     // We do not have a valid GitReference => return ERROR_STATE
@@ -358,17 +358,17 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
             }
 
             // Log what we collected
-            LOG.info("ChangesService - Repository: " + repoPath + ", localChanges count: " + repoLocalChanges.size());
+            LOG.debug("ChangesService - Repository: " + repoPath + ", localChanges count: " + repoLocalChanges.size());
 
             // Create merged changes: start with scope changes, then add local changes
             mergedChanges.addAll(scopeChanges);
 
             // Add local changes that aren't already in the scope changes (excluding duplicates)
             Collection<Change> additionalLocalChanges = filterLocalChanges(repoLocalChanges, repoPath, scopeChanges);
-            LOG.info("ChangesService - Repository: " + repoPath + ", additionalLocalChanges count (after filtering): " + additionalLocalChanges.size());
+            LOG.debug("ChangesService - Repository: " + repoPath + ", additionalLocalChanges count (after filtering): " + additionalLocalChanges.size());
             mergedChanges.addAll(additionalLocalChanges);
 
-            LOG.info("ChangesService - Repository: " + repoPath + ", Final counts - scope: " + scopeChanges.size() + ", local: " + repoLocalChanges.size() + ", merged: " + mergedChanges.size());
+            LOG.debug("ChangesService - Repository: " + repoPath + ", Final counts - scope: " + scopeChanges.size() + ", local: " + repoLocalChanges.size() + ", merged: " + mergedChanges.size());
 
         } catch (VcsException e) {
             // Log VCS errors (e.g., locked files, git command failures) but don't fail entirely

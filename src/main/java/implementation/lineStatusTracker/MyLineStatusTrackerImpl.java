@@ -214,7 +214,7 @@ public class MyLineStatusTrackerImpl implements Disposable {
         String currentContent;
 
         if (changeForFile != null && changeForFile.getBeforeRevision() != null) {
-            LOG.info("MyLineStatusTrackerImpl - File: " + filePath + ", beforeRevision: " +
+            LOG.debug("MyLineStatusTrackerImpl - File: " + filePath + ", beforeRevision: " +
                 (changeForFile.getBeforeRevision() != null ? changeForFile.getBeforeRevision().getRevisionNumber() : "null") +
                 ", afterRevision: " +
                 (changeForFile.getAfterRevision() != null ? changeForFile.getAfterRevision().getRevisionNumber() : "null"));
@@ -222,7 +222,6 @@ public class MyLineStatusTrackerImpl implements Disposable {
             // Extract base content (target revision - e.g., HEAD~2)
             try {
                 baseContent = changeForFile.getBeforeRevision().getContent();
-                LOG.info("MyLineStatusTrackerImpl - File: " + filePath + ", beforeRevision lines: " + (baseContent != null ? baseContent.split("\n").length : "null"));
             } catch (VcsException e) {
                 LOG.warn("Error getting content for revision: " + filePath, e);
                 baseContent = null;
@@ -238,21 +237,20 @@ public class MyLineStatusTrackerImpl implements Disposable {
             currentContent = ApplicationManager.getApplication().runReadAction(
                 (Computable<String>) () -> doc.getImmutableCharSequence().toString()
             );
-            LOG.info("MyLineStatusTrackerImpl - File: " + filePath + ", current document lines: " + currentContent.split("\n").length);
 
         } else {
             // No scope change for this file - clear markers by using current content as base
             baseContent = ApplicationManager.getApplication().runReadAction(
                 (Computable<String>) () -> doc.getCharsSequence().toString());
             currentContent = baseContent;  // No diff
-            LOG.info("MyLineStatusTrackerImpl - File: " + filePath + ", no scope change - clearing markers");
+            LOG.debug("MyLineStatusTrackerImpl - File: " + filePath + ", no scope change - clearing markers");
         }
 
         // Precompute ranges off EDT
         String normalizedBase = StringUtil.convertLineSeparators(baseContent);
         String normalizedCurrent = StringUtil.convertLineSeparators(currentContent);
 
-        LOG.info("MyLineStatusTrackerImpl - File: " + filePath +
+        LOG.debug("MyLineStatusTrackerImpl - File: " + filePath +
             ", normalizedBase lines: " + normalizedBase.split("\n").length +
             ", normalizedCurrent lines: " + normalizedCurrent.split("\n").length +
             ", hasLocalChanges: " + hasLocalChanges);
@@ -266,7 +264,6 @@ public class MyLineStatusTrackerImpl implements Disposable {
                     headContent = localChange.getBeforeRevision().getContent();
                     if (headContent != null) {
                         headContent = StringUtil.convertLineSeparators(headContent);
-                        LOG.info("MyLineStatusTrackerImpl - Cached HEAD content, lines: " + headContent.split("\n").length);
                     }
                 } catch (VcsException e) {
                     LOG.warn("MyLineStatusTrackerImpl - Error caching HEAD content: " + e.getMessage());
@@ -285,9 +282,9 @@ public class MyLineStatusTrackerImpl implements Disposable {
                 ranges = RangesBuilder.INSTANCE.createRanges(normalizedCurrent, normalizedBase);
             }
 
-            LOG.info("MyLineStatusTrackerImpl - File: " + filePath + ", final ranges: " + ranges.size());
+            LOG.debug("MyLineStatusTrackerImpl - File: " + filePath + ", final ranges: " + ranges.size());
             for (Range range : ranges) {
-                LOG.info("MyLineStatusTrackerImpl - Range: line1=" + range.getLine1() + ", line2=" + range.getLine2() +
+                LOG.debug("MyLineStatusTrackerImpl - Range: line1=" + range.getLine1() + ", line2=" + range.getLine2() +
                     ", vcsLine1=" + range.getVcsLine1() + ", vcsLine2=" + range.getVcsLine2() + ", type=" + range.getType());
             }
         } catch (Exception e) {
@@ -401,7 +398,7 @@ public class MyLineStatusTrackerImpl implements Disposable {
         //   line1/line2       = HEAD lines
         //   vcsLine1/vcsLine2 = scopeBase lines  (EXACT VCS coordinates)
         List<Range> scopeRanges = RangesBuilder.INSTANCE.createRanges(headContent, normalizedBase);
-        LOG.info("computeScopeRangesInCurrentSpace [" + filePath + "] scope ranges: " + scopeRanges.size());
+        LOG.debug("computeScopeRangesInCurrentSpace [" + filePath + "] scope ranges: " + scopeRanges.size());
 
         if (scopeRanges.isEmpty()) {
             return Collections.emptyList();
@@ -411,7 +408,7 @@ public class MyLineStatusTrackerImpl implements Disposable {
         //   line1/line2       = current-doc lines
         //   vcsLine1/vcsLine2 = HEAD lines
         List<Range> localRanges = RangesBuilder.INSTANCE.createRanges(currentContent, headContent);
-        LOG.info("computeScopeRangesInCurrentSpace [" + filePath + "] local ranges: " + localRanges.size());
+        LOG.debug("computeScopeRangesInCurrentSpace [" + filePath + "] local ranges: " + localRanges.size());
 
         if (localRanges.isEmpty()) {
             // HEAD == current: scope ranges are already valid in current-doc space
@@ -469,7 +466,7 @@ public class MyLineStatusTrackerImpl implements Disposable {
                 if (!insideLocal) {
                     int pos = headStart + cumulativeDelta;
                     result.add(new Range(pos, pos, vcsStart, vcsEnd));
-                    LOG.info("mapScopeRangesToCurrentSpace [" + filePath
+                    LOG.debug("mapScopeRangesToCurrentSpace [" + filePath
                             + "] DELETED at current=" + pos + " vcs=[" + vcsStart + "-" + vcsEnd + "]");
                 }
                 continue;
@@ -534,7 +531,7 @@ public class MyLineStatusTrackerImpl implements Disposable {
             }
         }
 
-        LOG.info("mapScopeRangesToCurrentSpace [" + filePath
+        LOG.debug("mapScopeRangesToCurrentSpace [" + filePath
                 + "] " + scopeRanges.size() + " scope → " + result.size() + " result ranges");
         return result;
     }
@@ -576,7 +573,7 @@ public class MyLineStatusTrackerImpl implements Disposable {
 
         if (currentStart < currentEnd || segVcsStart < segVcsEnd) {
             result.add(new Range(currentStart, currentEnd, segVcsStart, segVcsEnd));
-            LOG.info("emitScopeSegment [" + filePath
+            LOG.debug("emitScopeSegment [" + filePath
                     + "] current=[" + currentStart + "-" + currentEnd
                     + "] vcs=[" + segVcsStart + "-" + segVcsEnd + "]");
         }
