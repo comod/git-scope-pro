@@ -88,10 +88,12 @@ public class MyModel extends MyModelBase {
     }
 
     // Getter and setter for custom tab name
+    @Override
     public String getCustomTabName() {
         return customTabName;
     }
 
+    @Override
     public void setCustomTabName(String customTabName) {
         this.customTabName = customTabName;
         changeObservable.onNext(field.tabName);
@@ -107,6 +109,16 @@ public class MyModel extends MyModelBase {
         changeObservable.onNext(field.changes);
     }
 
+    /**
+     * Sets changes with a pre-built map to avoid file system access on EDT.
+     * Use this when the map is already computed on a background thread.
+     */
+    public void setChangesWithMap(Collection<Change> changes, Map<String, Change> changesMap) {
+        this.changes = changes;
+        this.changesMap = changesMap;
+        changeObservable.onNext(field.changes);
+    }
+
     public Collection<Change> getLocalChanges() {
         return localChanges;
     }
@@ -114,6 +126,15 @@ public class MyModel extends MyModelBase {
     public void setLocalChanges(Collection<Change> localChanges) {
         this.localChanges = localChanges;
         this.localChangesMap = buildChangesByPathMap(localChanges);
+    }
+
+    /**
+     * Sets local changes with a pre-built map to avoid file system access on EDT.
+     * Use this when the map is already computed on a background thread.
+     */
+    public void setLocalChangesWithMap(Collection<Change> localChanges, Map<String, Change> localChangesMap) {
+        this.localChanges = localChanges;
+        this.localChangesMap = localChangesMap;
     }
 
     public Map<String, Change> getChangesMap() {
@@ -131,7 +152,7 @@ public class MyModel extends MyModelBase {
      * @param changes Collection of changes to convert to a map
      * @return Map of file path to Change, or null if changes is null
      */
-    private Map<String, Change> buildChangesByPathMap(Collection<Change> changes) {
+    public static Map<String, Change> buildChangesByPathMap(Collection<Change> changes) {
         if (changes == null) {
             return null;
         }

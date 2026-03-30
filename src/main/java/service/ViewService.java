@@ -676,13 +676,17 @@ public class ViewService implements Disposable {
         final DisposalToken token = this.disposalToken;
         changesExecutor.execute(() -> {
             changesService.collectChangesWithCallback(finalTargetBranchMap, result -> {
+                // Build maps on background thread to avoid slow file system operations on EDT
+                Map<String, Change> mergedChangesMap = MyModel.buildChangesByPathMap(result.mergedChanges());
+                Map<String, Change> localChangesMap = MyModel.buildChangesByPathMap(result.localChanges());
+
                 ApplicationManager.getApplication().invokeLater(() -> {
                     try {
                         long currentGen = applyGeneration.get();
                         if (!project.isDisposed() && !token.disposed && currentGen == gen) {
                             LOG.debug("Applying changes for generation " + gen);
-                            model.setChanges(result.mergedChanges());
-                            model.setLocalChanges(result.localChanges());
+                            model.setChangesWithMap(result.mergedChanges(), mergedChangesMap);
+                            model.setLocalChangesWithMap(result.localChanges(), localChangesMap);
                         } else {
                             LOG.debug("Discarding changes for generation " + gen + " (current generation is " + currentGen + ")");
                         }
