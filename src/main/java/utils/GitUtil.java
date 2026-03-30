@@ -77,8 +77,17 @@ public class GitUtil {
         Project project = repository.getProject();
 
         try {
+            // Get the current HEAD revision from the repository
+            String headRevisionStr = repository.getCurrentRevision();
+            if (headRevisionStr == null) {
+                throw new VcsException("Could not resolve HEAD reference");
+            }
+            GitRevisionNumber headRevision = new GitRevisionNumber(headRevisionStr);
+
+            // Compare target revision to HEAD (not working directory) to get only scope changes
+            // This excludes uncommitted local changes which are handled separately
             Collection<Change> changes =
-                    GitChangeUtils.getDiffWithWorkingDir(project, repository.getRoot(), revisionNumber.toString(), Collections.singletonList(filePath), false);
+                    GitChangeUtils.getDiff(project, repository.getRoot(), revisionNumber.asString(), headRevision.asString(), Collections.singletonList(filePath));
 
             if (changes.isEmpty() && GitHistoryUtils.getCurrentRevision(project, filePath, revisionNumber.toString()) == null) {
                 throw new VcsException("Could not get diff for base file:" + file + " and revision: " + revisionNumber);

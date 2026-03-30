@@ -59,6 +59,14 @@
         />
         <selectInTarget implementation="implementation.scope.MyScopeInTarget"/>
 
+        <!-- Settings -->
+        <applicationService serviceImplementation="settings.GitScopeSettings"/>
+        <applicationConfigurable
+                parentId="tools"
+                instance="settings.GitScopeSettingsConfigurable"
+                id="settings.GitScopeSettingsConfigurable"
+                displayName="Git Scope"/>
+
         <!-- Config (Persistent) -->
         <projectService serviceImplementation="state.State"/>
         <projectService serviceImplementation="service.StatusBarService"/>

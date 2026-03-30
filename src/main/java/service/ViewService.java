@@ -9,6 +9,7 @@ import com.intellij.openapi.editor.EditorKind;
 import com.intellij.openapi.editor.ex.EditorEx;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.FileStatusManager;
+import com.intellij.openapi.vcs.VcsApplicationSettings;
 import com.intellij.openapi.vcs.changes.Change;
 import com.intellij.openapi.vcs.impl.LineStatusTrackerManagerI;
 import com.intellij.openapi.wm.ToolWindow;
@@ -678,6 +679,7 @@ public class ViewService implements Disposable {
             changesService.collectChangesWithCallback(finalTargetBranchMap, result -> {
                 // Build maps on background thread to avoid slow file system operations on EDT
                 Map<String, Change> mergedChangesMap = MyModel.buildChangesByPathMap(result.mergedChanges());
+                Map<String, Change> scopeChangesMap = MyModel.buildChangesByPathMap(result.scopeChanges());
                 Map<String, Change> localChangesMap = MyModel.buildChangesByPathMap(result.localChanges());
 
                 ApplicationManager.getApplication().invokeLater(() -> {
@@ -686,6 +688,7 @@ public class ViewService implements Disposable {
                         if (!project.isDisposed() && !token.disposed && currentGen == gen) {
                             LOG.debug("Applying changes for generation " + gen);
                             model.setChangesWithMap(result.mergedChanges(), mergedChangesMap);
+                            model.setScopeChangesWithMap(result.scopeChanges(), scopeChangesMap);
                             model.setLocalChangesWithMap(result.localChanges(), localChangesMap);
                         } else {
                             LOG.debug("Discarding changes for generation " + gen + " (current generation is " + currentGen + ")");
@@ -790,6 +793,16 @@ public class ViewService implements Disposable {
     }
 
     /**
+     * Gets a HashMap of scope changes indexed by file path for O(1) lookup.
+     * Returns the cached map that was built when changes were set.
+     *
+     * @return Map of file path to Change, or null if not initialized
+     */
+    public Map<String, Change> getScopeChangesMap() {
+        return getChangesMapInternal(MyModel::getScopeChangesMap);
+    }
+
+    /**
      * Gets a HashMap of local changes indexed by file path for O(1) lookup.
      * Returns the cached map that was built when changes were set.
      *
@@ -800,7 +813,7 @@ public class ViewService implements Disposable {
     }
 
     /**
-     * Gets a HashMap of scope changes indexed by file path for O(1) lookup.
+     * Gets a HashMap of merged changes (scope + local) indexed by file path for O(1) lookup.
      * Returns the cached map that was built when changes were set.
      *
      * @return Map of file path to Change, or null if not initialized
@@ -972,9 +985,11 @@ public class ViewService implements Disposable {
             if (token.disposed) return;
 
             updateStatusBarWidget();
-            // Get the current scope changes map to pass to line status tracker
-            Map<String, Change> scopeChangesMap = getCurrentScopeChangesMap();
-            myLineStatusTrackerImpl.update(scopeChangesMap);
+
+            // Determine which changes to show in gutter based on IDE's VCS gutter setting
+            Map<String, Change> gutterChangesMap = getGutterChangesMap();
+            Map<String, Change> localChangesMap = getLocalChangesTowardsHeadMap();
+            myLineStatusTrackerImpl.update(gutterChangesMap, localChangesMap);
             myScope.update(changes);
 
             // Perform scroll restoration after all UI updates are complete
@@ -994,6 +1009,26 @@ public class ViewService implements Disposable {
                 }
             });
         }, ModalityState.any(), __ -> token.disposed);
+    }
+
+    /**
+     * Determines which changes should be shown in the gutter based on IDE's VCS settings.
+     * If IDE's gutter markers are enabled, only show scope changes (IDE will show local changes).
+     * If IDE's gutter markers are disabled, show both scope and local changes.
+     *
+     * @return Map of file path to Change for gutter rendering
+     */
+    private Map<String, Change> getGutterChangesMap() {
+        VcsApplicationSettings vcsSettings = VcsApplicationSettings.getInstance();
+        boolean ideGutterEnabled = vcsSettings.SHOW_LST_GUTTER_MARKERS;
+
+        if (ideGutterEnabled) {
+            // IDE gutter is enabled, we paint scope changes (IDE paints local changes)
+            return getScopeChangesMap();
+        } else {
+            // IDE gutter is disabled, turn off our plugin gutter rendering completely
+            return new java.util.HashMap<>();  // Empty map = no gutter rendering
+        }
     }
 
     private void updateStatusBarWidget() {

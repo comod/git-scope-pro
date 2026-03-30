@@ -51,9 +51,9 @@ public class GitScopeFileStatusProvider implements FileStatusProvider {
             return null;
         }
 
-        // File is NOT in local changes - check if it's in the Git Scope
+        // File is NOT in local changes - check if it's in the Git Scope (scope changes only)
         // Use HashMap lookup for O(1) performance instead of iterating through all changes
-        Map<String, Change> scopeChangesMap = viewService.getCurrentScopeChangesMap();
+        Map<String, Change> scopeChangesMap = viewService.getScopeChangesMap();
         if (scopeChangesMap == null || scopeChangesMap.isEmpty()) {
             // No changes in scope - return null to fall back to default behavior
             return null;
