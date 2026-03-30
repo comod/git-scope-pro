@@ -55,14 +55,14 @@ public final class PlatformApiReflection {
     // type after adaptation: (Object receiver) -> Object
     private static final @Nullable MethodHandle COMMIT_GET_CHANGES;
 
-    // ── Tag lookup — new path (getTagsHolder, 2026.1+) ───────────────────────
+    // ── Tag lookup (IDE 2026.1+): getTagsHolder() API ────────────────────────
     // Each handle: (Object receiver [, args]) -> Object
     private static final @Nullable MethodHandle REPO_GET_TAGS_HOLDER;
     private static final @Nullable MethodHandle TAGS_HOLDER_GET_STATE;
     private static final @Nullable MethodHandle STATE_FLOW_GET_VALUE;
     private static final @Nullable MethodHandle TAGS_STATE_GET_TAGS_MAP;
 
-    // ── Tag lookup — legacy path (getTagHolder, deprecated) ──────────────────
+    // ── Tag lookup (pre-2026.1): getTagHolder() API (deprecated) ─────────────
     private static final @Nullable MethodHandle REPO_GET_TAG_HOLDER;
     private static final @Nullable MethodHandle TAG_HOLDER_GET_TAG;  // (Object, Object name) -> Object
 
@@ -249,7 +249,7 @@ public final class PlatformApiReflection {
      */
     @Nullable
     public static GitReference findTagByName(@NotNull GitRepository repo, @NotNull String tagName) {
-        // New path: getTagsHolder() -> state -> value -> tagsToCommitHashes -> find by name
+        // IDE 2026.1+: getTagsHolder() -> state -> value -> tagsToCommitHashes -> find by name
         if (REPO_GET_TAGS_HOLDER != null && TAGS_HOLDER_GET_STATE != null
                 && STATE_FLOW_GET_VALUE != null && TAGS_STATE_GET_TAGS_MAP != null) {
             try {
@@ -267,18 +267,18 @@ public final class PlatformApiReflection {
                 }
                 return null;
             } catch (Throwable t) {
-                LOG.warn("PlatformApiReflection: findTagByName (new path) failed", t);
+                LOG.warn("PlatformApiReflection: findTagByName (2026.1+ path) failed", t);
             }
         }
 
-        // Legacy fallback: getTagHolder().getTag(name)
+        // Pre-2026.1 fallback: getTagHolder().getTag(name)
         if (REPO_GET_TAG_HOLDER != null && TAG_HOLDER_GET_TAG != null) {
             try {
                 Object tagHolder = REPO_GET_TAG_HOLDER.invoke(repo);
                 Object result    = TAG_HOLDER_GET_TAG.invoke(tagHolder, tagName);
                 return result instanceof GitReference ref ? ref : null;
             } catch (Throwable t) {
-                LOG.warn("PlatformApiReflection: findTagByName (legacy path) failed", t);
+                LOG.warn("PlatformApiReflection: findTagByName (pre-2026.1 path) failed", t);
             }
         }
         return null;

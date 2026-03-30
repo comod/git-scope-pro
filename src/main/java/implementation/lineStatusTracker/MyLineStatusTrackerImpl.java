@@ -369,23 +369,22 @@ public class MyLineStatusTrackerImpl implements Disposable {
     /**
      * Computes scope ranges in current-document coordinate space using HEAD as a bridge.
      *
-     * <p>Instead of diff(current, scopeBase) and stripping local changes (which conflates
-     * scope and local edits in the same diff block and requires error-prone proportional VCS
-     * estimation), this method:
+     * <p>Uses a three-step algorithm to maintain exact VCS coordinates while accounting
+     * for uncommitted local changes:
      * <ol>
-     *   <li>Computes diff(HEAD, scopeBase) → pure scope ranges with <em>exact</em> VCS coords
-     *   <li>Computes diff(current, HEAD)   → local change ranges (HEAD-space line numbers)
-     *   <li>Maps scope ranges from HEAD space into current-doc space, suppressing or splitting
+     *   <li>diff(HEAD, scopeBase) → pure scope ranges with <em>exact</em> VCS coords
+     *   <li>diff(current, HEAD)   → local change ranges (HEAD-space line numbers)
+     *   <li>Map scope ranges from HEAD space into current-doc space, suppressing or splitting
      *       any sub-segments that overlap with local changes
      * </ol>
      *
-     * <p>Benefits over the old approach:
+     * <p>This ensures:
      * <ul>
      *   <li>VCS coordinates are always exact for non-split ranges
      *   <li>Current-doc line positions are exact (cumulative-delta, not proportional)
      *   <li>Scope and local changes are never conflated in the same diff block
-     *   <li>Partial-overlap is handled correctly: e.g. a scope range covering lines 1-4
-     *       where the user edits only line 4 will continue to show lines 1-3 in the gutter
+     *   <li>Partial-overlap is handled correctly: a scope range covering lines 1-4
+     *       where the user edits only line 4 continues to show lines 1-3 in the gutter
      * </ul>
      */
     private List<Range> computeScopeRangesInCurrentSpace(

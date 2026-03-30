@@ -191,6 +191,6 @@ abstract class LineStatusGutterMarkerRenderer : LineMarkerRendererEx, ActiveGutt
      * Called by IDE when marker is clicked. Subclasses should implement to show popup.
      */
     override fun doAction(editor: Editor, e: MouseEvent) {
-        // Will be implemented by ScopeLineStatusMarkerRenderer
+        // Subclasses override to show a diff/rollback popup for the clicked range.
     }
 }
