@@ -3,6 +3,7 @@ package implementation.lineStatusTracker;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.util.Alarm;
 import com.intellij.openapi.editor.Document;
@@ -52,6 +53,16 @@ public class CommitDiffWorkaround implements Disposable {
 
     // Callback interface for base revision switching
     private final BaseRevisionSwitcher baseRevisionSwitcher;
+
+    private static final class HeadContentSource {
+        private final ContentRevision beforeRevision;
+        private final String fallbackContent;
+
+        private HeadContentSource(@Nullable ContentRevision beforeRevision, @Nullable String fallbackContent) {
+            this.beforeRevision = beforeRevision;
+            this.fallbackContent = fallbackContent;
+        }
+    }
 
     /**
      * Interface for switching base revisions.
@@ -417,31 +428,29 @@ public class CommitDiffWorkaround implements Disposable {
                 return null;
             }
 
-            ChangeListManager changeListManager = ChangeListManager.getInstance(project);
-            Collection<Change> allChanges = changeListManager.getAllChanges();
+            HeadContentSource source = ReadAction.compute(() -> {
+                ChangeListManager changeListManager = ChangeListManager.getInstance(project);
+                Collection<Change> allChanges = changeListManager.getAllChanges();
 
-            // Find the change for this file
-            for (Change change : allChanges) {
-                VirtualFile changeFile = change.getVirtualFile();
-                if (changeFile != null && changeFile.equals(file)) {
-                    // The "before" revision is HEAD
-                    ContentRevision beforeRevision = change.getBeforeRevision();
-                    if (beforeRevision != null) {
-                        String content = beforeRevision.getContent();
-                        if (content != null) {
-                            return StringUtil.convertLineSeparators(content);
-                        }
+                for (Change change : allChanges) {
+                    VirtualFile changeFile = change.getVirtualFile();
+                    if (changeFile != null && changeFile.equals(file)) {
+                        return new HeadContentSource(change.getBeforeRevision(), null);
                     }
+                }
+
+                Document doc = FileDocumentManager.getInstance().getDocument(file);
+                return new HeadContentSource(null, doc != null ? doc.getText() : null);
+            });
+
+            if (source.beforeRevision != null) {
+                String content = source.beforeRevision.getContent();
+                if (content != null) {
+                    return StringUtil.convertLineSeparators(content);
                 }
             }
 
-            // File is not modified - current content IS HEAD
-            Document doc = FileDocumentManager.getInstance().getDocument(file);
-            if (doc != null) {
-                return doc.getText();
-            }
-
-            return null;
+            return source.fallbackContent != null ? StringUtil.convertLineSeparators(source.fallbackContent) : null;
         } catch (Exception e) {
             LOG.warn("Error fetching HEAD revision content for " + file.getName(), e);
             return null;

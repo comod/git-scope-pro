@@ -45,34 +45,28 @@ public class MyTabContentListener implements ContentManagerListener {
     }
 
     public void selectionChanged(@NotNull ContentManagerEvent event) {
-        ContentManagerEvent.ContentOperation operation = event.getOperation();
-        ContentManagerEvent.ContentOperation add = ContentManagerEvent.ContentOperation.add;
-
         @NlsContexts.TabTitle String tabName = event.getContent().getTabName();
-        if (operation.equals(add)) {
-            ViewService service = getViewService(); // Get service only when needed
-            service.setTabIndex(event.getIndex());
-            
-            if (Objects.equals(tabName, PLUS_TAB_LABEL)) {
-                SwingUtilities.invokeLater(service::plusTabClicked);
-                return;
-            }
+        ViewService service = getViewService();
+        service.setTabIndex(event.getIndex());
 
-            service.setTabIndex(event.getIndex());
-            service.setActiveModel();
-            
-            // Notify VcsTree about the tab switch
-            SwingUtilities.invokeLater(() -> {
-                try {
-                    VcsTree vcsTree = getToolWindowService().getVcsTree();
-                    if (vcsTree != null) {
-                        vcsTree.onTabSwitched();
-                    }
-                } catch (Exception e) {
-                    LOG.error("MyTabContentListener: Error notifying VcsTree about tab switch: " + e.getMessage());
-                }
-            });
+        if (Objects.equals(tabName, PLUS_TAB_LABEL)) {
+            SwingUtilities.invokeLater(service::plusTabClicked);
+            return;
         }
+
+        service.setActiveModel();
+
+        // Notify VcsTree about the tab switch
+        SwingUtilities.invokeLater(() -> {
+            try {
+                VcsTree vcsTree = getToolWindowService().getVcsTree();
+                if (vcsTree != null) {
+                    vcsTree.onTabSwitched();
+                }
+            } catch (Exception e) {
+                LOG.error("MyTabContentListener: Error notifying VcsTree about tab switch: " + e.getMessage());
+            }
+        });
     }
 
     public void contentRemoved(@NotNull ContentManagerEvent event) {

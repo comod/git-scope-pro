@@ -48,7 +48,7 @@ public class ViewService implements Disposable {
     public static final String PLUS_TAB_LABEL = "+";
     public static final int DEBOUNCE_MS = 50;
     public List<MyModel> collection = new ArrayList<>();
-    public Integer currentTabIndex = 0;
+    private volatile int currentTabIndex = 0;
     private final Project project;
     private volatile boolean isDisposed = false;
 
@@ -715,43 +715,7 @@ public class ViewService implements Disposable {
     }
 
     public MyModel getCurrent() {
-        // Check if disposed or not initialized
-        if (isDisposed || toolWindowService == null) {
-            return myHeadModel; // Safe fallback
-        }
-
-        // Get tool window safely
-        ToolWindow toolWindow = toolWindowService.getToolWindow();
-        if (toolWindow == null) {
-            return myHeadModel; // Tool window not available
-        }
-
-        // Get the currently selected tab's model directly from ContentManager
-        ContentManager contentManager = toolWindow.getContentManager();
-        Content selectedContent = contentManager.getSelectedContent();
-
-        if (selectedContent == null) {
-            return myHeadModel;
-        }
-
-        // Check if it's the HEAD tab
-        if (selectedContent.getTabName().equals(GitService.BRANCH_HEAD)) {
-            return myHeadModel;
-        }
-
-        // Check if it's the + tab
-        if (selectedContent.getTabName().equals(PLUS_TAB_LABEL)) {
-            return myHeadModel; // or handle differently
-        }
-
-        // Get the model for this content
-        MyModel model = toolWindowService.getModelForContent(selectedContent);
-        if (model != null) {
-            return model;
-        }
-
-        // Fallback to HEAD
-        return myHeadModel;
+        return getModelForTabIndex(currentTabIndex);
     }
 
     public List<MyModel> getCollection() {
@@ -770,17 +734,35 @@ public class ViewService implements Disposable {
      * @return Map of file path to Change, or null if not initialized
      */
     private Map<String, Change> getChangesMapInternal(Function<MyModel, Map<String, Change>> mapGetter) {
-        // Early return if ViewService is not fully initialized yet
-        if (toolWindowService == null) {
-            return null;
-        }
-
         MyModel current = getCurrent();
         if (current == null) {
             return null;
         }
 
         return mapGetter.apply(current);
+    }
+
+    private MyModel getModelForTabIndex(int tabIndex) {
+        if (isDisposed) {
+            return myHeadModel;
+        }
+
+        if (tabIndex <= 0) {
+            return myHeadModel;
+        }
+
+        List<MyModel> models = collection;
+        if (models == null) {
+            return myHeadModel;
+        }
+
+        int modelIndex = getModelIndex(tabIndex);
+        if (modelIndex < 0 || modelIndex >= models.size()) {
+            return myHeadModel;
+        }
+
+        MyModel model = models.get(modelIndex);
+        return model != null ? model : myHeadModel;
     }
 
     /**
