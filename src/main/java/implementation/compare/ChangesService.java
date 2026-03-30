@@ -170,9 +170,9 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
                     }
                 });
 
-                // Return ERROR_STATE if ANY repository had an invalid reference
-                // Since target branch is per-repo, if the specified repo fails, the entire scope is invalid
-                if (!errorRepos.isEmpty()) {
+                // Return ERROR_STATE only if ALL repositories failed (e.g. commit hash not found in any repo).
+                // Individual repo failures are expected in multi-repo setups where a commit exists in only one repo.
+                if (!errorRepos.isEmpty() && errorRepos.size() == repositories.size()) {
                     result = new ChangesResult(ERROR_STATE, new ArrayList<>(), new ArrayList<>());
                 } else {
                     result = new ChangesResult(_changes, _scopeChanges, _localChanges);

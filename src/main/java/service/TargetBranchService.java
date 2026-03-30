@@ -5,8 +5,10 @@ import git4idea.repo.GitRepository;
 import model.TargetBranchMap;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Consumer;
 
 public class TargetBranchService {
@@ -29,7 +31,7 @@ public class TargetBranchService {
         }
 
         gitService.getRepositoriesAsync(repositories -> {
-            List<String> branches = new ArrayList<>();
+            Set<String> branches = new LinkedHashSet<>();
 
             repositories.forEach(repo -> {
                 String currentBranchName = getTargetBranchByRepositoryDisplay(repo, targetBranch);
@@ -47,7 +49,7 @@ public class TargetBranchService {
         if (targetBranch == null) {
             return GitService.BRANCH_HEAD;
         }
-        List<String> branches = new ArrayList<>();
+        Set<String> branches = new LinkedHashSet<>();
         gitService.getRepositoriesAsync(repositories -> {
             repositories.forEach(repo -> {
                 String currentBranchName = getTargetBranchByRepositoryDisplay(repo, targetBranch);

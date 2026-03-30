@@ -85,7 +85,7 @@
             <add-to-group group-id="ToolsMenu" anchor="last"/>
             <keyboard-shortcut keymap="$default" first-keystroke="alt H"/>
         </action>
-        <action id="listener.VcsContextMenuAction" class="listener.VcsContextMenuAction" text="Use Commit as Git Scope">
+        <action id="listener.VcsContextMenuAction" class="listener.VcsContextMenuAction" text="Use Commit as Git Scope" icon="AllIcons.Actions.Diff">
             <add-to-group group-id="Vcs.Log.ContextMenu" anchor="after"
                           relative-to-action="Vcs.CopyRevisionNumberAction"/>
         </action>
