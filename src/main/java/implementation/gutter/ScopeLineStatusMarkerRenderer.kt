@@ -59,6 +59,9 @@ class ScopeLineStatusMarkerRenderer(
     @Volatile
     private var gutterHighlighter: RangeHighlighter? = null
 
+    // Per-range highlighters for the thin error stripe marks on the right side of the editor
+    private val errorStripeHighlighters: MutableList<RangeHighlighter> = mutableListOf()
+
     @Volatile
     private var currentRanges: List<Range> = emptyList()
 
@@ -519,8 +522,84 @@ class ScopeLineStatusMarkerRenderer(
             createGutterHighlighter()
         }
 
+        // Update the thin error stripe marks on the right side of the editor
+        updateErrorStripeMarks(ranges)
+
         // Repaint the gutter
         repaintGutter()
+    }
+
+    /**
+     * Updates the thin error stripe marks on the right side of the editor.
+     * Creates per-range RangeHighlighters with thin error stripe marks.
+     */
+    @RequiresEdt
+    private fun updateErrorStripeMarks(ranges: List<Range>) {
+        val markupModel = DocumentMarkupModel.forDocument(document, project, false) as? MarkupModelEx
+            ?: return
+
+        // Remove old error stripe highlighters
+        for (highlighter in errorStripeHighlighters) {
+            try {
+                if (highlighter.isValid) {
+                    markupModel.removeHighlighter(highlighter)
+                }
+            } catch (e: Exception) {
+                LOG.warn("Error removing error stripe highlighter", e)
+            }
+        }
+        errorStripeHighlighters.clear()
+
+        if (ranges.isEmpty()) return
+
+        val markupModelForCreate = DocumentMarkupModel.forDocument(document, project, true) as MarkupModelEx
+
+        for (range in ranges) {
+            try {
+                val color = getErrorStripeColor(range.type) ?: continue
+
+                // Calculate document offsets for this range
+                val startLine = range.line1.coerceIn(0, document.lineCount - 1)
+                val endLine = if (range.type == Range.DELETED) {
+                    // Deleted ranges have line1 == line2; use line1 for a point marker
+                    startLine
+                } else {
+                    (range.line2 - 1).coerceIn(startLine, document.lineCount - 1)
+                }
+
+                val startOffset = document.getLineStartOffset(startLine)
+                val endOffset = document.getLineEndOffset(endLine)
+
+                val highlighter = markupModelForCreate.addRangeHighlighterAndChangeAttributes(
+                    null,
+                    startOffset,
+                    endOffset,
+                    GUTTER_LAYER,
+                    HighlighterTargetArea.LINES_IN_RANGE,
+                    false
+                ) { rh: RangeHighlighterEx ->
+                    rh.setErrorStripeMarkColor(color)
+                    rh.setThinErrorStripeMark(true)
+                }
+
+                errorStripeHighlighters.add(highlighter)
+            } catch (e: Exception) {
+                LOG.warn("Error creating error stripe highlighter for range $range", e)
+            }
+        }
+    }
+
+    private fun getErrorStripeColor(type: Byte): java.awt.Color? {
+        // Use the same colors as the gutter markers
+        val editors = EditorFactory.getInstance().getEditors(document, project)
+        val editor = editors.firstOrNull() as? EditorEx ?: return null
+        val scheme = editor.colorsScheme
+        return when (type) {
+            Range.INSERTED -> scheme.getColor(EditorColors.ADDED_LINES_COLOR) ?: java.awt.Color(0x507520)
+            Range.DELETED -> scheme.getColor(EditorColors.DELETED_LINES_COLOR) ?: java.awt.Color(0x9C2A2A)
+            Range.MODIFIED -> scheme.getColor(EditorColors.MODIFIED_LINES_COLOR) ?: java.awt.Color(0x365880)
+            else -> null
+        }
     }
 
     /**
@@ -658,18 +737,30 @@ class ScopeLineStatusMarkerRenderer(
 
         currentRanges = emptyList()
 
+        val markupModel = DocumentMarkupModel.forDocument(document, project, false) as? MarkupModelEx
+
         gutterHighlighter?.let { highlighter ->
             try {
                 if (highlighter.isValid) {
-                    val markupModel = DocumentMarkupModel.forDocument(document, project, false) as? MarkupModelEx
                     markupModel?.removeHighlighter(highlighter)
                 }
             } catch (e: Exception) {
                 LOG.warn("Error removing highlighter", e)
             }
         }
-
         gutterHighlighter = null
+
+        // Remove error stripe highlighters
+        for (highlighter in errorStripeHighlighters) {
+            try {
+                if (highlighter.isValid) {
+                    markupModel?.removeHighlighter(highlighter)
+                }
+            } catch (e: Exception) {
+                LOG.warn("Error removing error stripe highlighter", e)
+            }
+        }
+        errorStripeHighlighters.clear()
     }
 
     override fun dispose() {
