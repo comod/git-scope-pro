@@ -12,7 +12,6 @@ import com.intellij.openapi.vcs.FileStatusManager;
 import com.intellij.openapi.vcs.VcsApplicationSettings;
 import com.intellij.openapi.vcs.changes.Change;
 import com.intellij.openapi.vcs.impl.LineStatusTrackerManagerI;
-import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.ui.content.Content;
 import com.intellij.ui.content.ContentManager;
@@ -74,6 +73,8 @@ public class ViewService implements Disposable {
     private boolean vcsReady = false;
     private boolean toolWindowReady = false;
     private MyModel myHeadModel;
+    // Cached current model for safe access from background threads (avoids calling getContentManager() off-EDT)
+    private volatile MyModel cachedCurrentModel;
     private boolean isInit;
     private int lastTabIndex;
     private Integer savedTabIndex;
@@ -417,6 +418,7 @@ public class ViewService implements Disposable {
 
     private void initHeadTab() {
         this.myHeadModel = new MyModel(true);
+        this.cachedCurrentModel = myHeadModel;
         toolWindowService.addTab(myHeadModel, GitService.BRANCH_HEAD, false);
         subscribeToObservable(myHeadModel);
     }
@@ -723,45 +725,39 @@ public class ViewService implements Disposable {
     }
 
     public MyModel getCurrent() {
-        // Check if disposed or not initialized
         if (isDisposed || toolWindowService == null) {
-            return myHeadModel; // Safe fallback
+            return myHeadModel;
         }
 
-        // Get tool window safely
+        // Background threads must not call getContentManager() — it requires EDT
+        // (createContentIfNeeded() asserts EDT in IntelliJ 2026.1+).
+        // Return the cached value that is kept up-to-date on EDT.
+        if (!ApplicationManager.getApplication().isDispatchThread()) {
+            MyModel cached = cachedCurrentModel;
+            return cached != null ? cached : myHeadModel;
+        }
+
+        // On EDT: do the full lookup and keep the cache fresh.
         ToolWindow toolWindow = toolWindowService.getToolWindow();
         if (toolWindow == null) {
-            return myHeadModel; // Tool window not available
+            return myHeadModel;
         }
 
-        // Access ContentManager safely from any thread
-        return ApplicationManager.getApplication().runReadAction((Computable<MyModel>) () -> {
-            ContentManager contentManager = toolWindow.getContentManager();
-            Content selectedContent = contentManager.getSelectedContent();
+        ContentManager contentManager = toolWindow.getContentManager();
+        Content selectedContent = contentManager.getSelectedContent();
 
-            if (selectedContent == null) {
-                return myHeadModel;
-            }
-
-            // Check if it's the HEAD tab
-            if (selectedContent.getTabName().equals(GitService.BRANCH_HEAD)) {
-                return myHeadModel;
-            }
-
-            // Check if it's the + tab
-            if (selectedContent.getTabName().equals(PLUS_TAB_LABEL)) {
-                return myHeadModel; // or handle differently
-            }
-
-            // Get the model for this content
+        MyModel result = myHeadModel;
+        if (selectedContent != null
+                && !selectedContent.getTabName().equals(GitService.BRANCH_HEAD)
+                && !selectedContent.getTabName().equals(PLUS_TAB_LABEL)) {
             MyModel model = toolWindowService.getModelForContent(selectedContent);
             if (model != null) {
-                return model;
+                result = model;
             }
+        }
 
-            // Fallback to HEAD
-            return myHeadModel;
-        });
+        cachedCurrentModel = result;
+        return result;
     }
 
     public List<MyModel> getCollection() {
