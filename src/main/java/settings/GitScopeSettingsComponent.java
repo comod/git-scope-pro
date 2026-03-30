@@ -14,15 +14,15 @@ import javax.swing.*;
 public class GitScopeSettingsComponent {
     private final JPanel mainPanel;
     private final JBCheckBox separateGutterRenderingCheckBox;
-    private final JBCheckBox scopeTabColorsCheckBox;
+    private final JBCheckBox scopeFileColorsCheckBox;
 
     public GitScopeSettingsComponent() {
         separateGutterRenderingCheckBox = new JBCheckBox(
             "Separate Git Scope and IDE gutter rendering"
         );
 
-        scopeTabColorsCheckBox = new JBCheckBox(
-            "Color editor tabs based on Git Scope"
+        scopeFileColorsCheckBox = new JBCheckBox(
+            "Color files based on Git Scope"
         );
 
         mainPanel = FormBuilder.createFormBuilder()
@@ -30,9 +30,9 @@ public class GitScopeSettingsComponent {
             .addComponent(separateGutterRenderingCheckBox, 1)
             .addTooltip("When enabled, GitScope gutter markers is rendered to the left of the line numbers. ")
             .addVerticalGap(10)
-            .addComponent(new TitledSeparator("Tab Colors"))
-            .addComponent(scopeTabColorsCheckBox, 1)
-            .addTooltip("When enabled (default), editor tab colors reflect the active Git Scope")
+            .addComponent(new TitledSeparator("File Colors"))
+            .addComponent(scopeFileColorsCheckBox, 1)
+            .addTooltip("When enabled (default), project and editor file colors reflect the active Git Scope")
             .addComponentFillVertically(new JPanel(), 0)
             .getPanel();
 
@@ -55,11 +55,11 @@ public class GitScopeSettingsComponent {
         separateGutterRenderingCheckBox.setSelected(value);
     }
 
-    public boolean isScopeTabColors() {
-        return scopeTabColorsCheckBox.isSelected();
+    public boolean isScopeFileColors() {
+        return scopeFileColorsCheckBox.isSelected();
     }
 
-    public void setScopeTabColors(boolean value) {
-        scopeTabColorsCheckBox.setSelected(value);
+    public void setScopeFileColors(boolean value) {
+        scopeFileColorsCheckBox.setSelected(value);
     }
 }

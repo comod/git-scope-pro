@@ -29,7 +29,7 @@ public class GitScopeFileStatusProvider implements FileStatusProvider {
 
     @Override
     public @Nullable FileStatus getFileStatus(@NotNull VirtualFile virtualFile) {
-        if (!GitScopeSettings.getInstance().isScopeTabColors()) {
+        if (!GitScopeSettings.getInstance().isScopeFileColors()) {
             return null;
         }
 

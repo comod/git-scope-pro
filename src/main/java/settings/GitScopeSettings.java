@@ -30,7 +30,7 @@ public class GitScopeSettings implements PersistentStateComponent<GitScopeSettin
      * If false, the IDE's default tab coloring (diff from HEAD) is used.
      * Default: true (scope-based tab colors)
      */
-    public boolean scopeTabColors = true;
+    public boolean scopeFileColors = true;
 
     public static GitScopeSettings getInstance() {
         return ApplicationManager.getApplication().getService(GitScopeSettings.class);
@@ -56,11 +56,11 @@ public class GitScopeSettings implements PersistentStateComponent<GitScopeSettin
         this.separateGutterRendering = separateGutterRendering;
     }
 
-    public boolean isScopeTabColors() {
-        return scopeTabColors;
+    public boolean isScopeFileColors() {
+        return scopeFileColors;
     }
 
-    public void setScopeTabColors(boolean scopeTabColors) {
-        this.scopeTabColors = scopeTabColors;
+    public void setScopeFileColors(boolean scopeFileColors) {
+        this.scopeFileColors = scopeFileColors;
     }
 }

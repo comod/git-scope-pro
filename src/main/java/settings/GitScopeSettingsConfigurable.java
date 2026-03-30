@@ -38,15 +38,15 @@ public class GitScopeSettingsConfigurable implements Configurable {
     public boolean isModified() {
         GitScopeSettings settings = GitScopeSettings.getInstance();
         return settingsComponent.isSeparateGutterRendering() != settings.isSeparateGutterRendering()
-            || settingsComponent.isScopeTabColors() != settings.isScopeTabColors();
+            || settingsComponent.isScopeFileColors() != settings.isScopeFileColors();
     }
 
     @Override
     public void apply() throws ConfigurationException {
         GitScopeSettings settings = GitScopeSettings.getInstance();
-        boolean tabColorsChanged = settingsComponent.isScopeTabColors() != settings.isScopeTabColors();
+        boolean tabColorsChanged = settingsComponent.isScopeFileColors() != settings.isScopeFileColors();
         settings.setSeparateGutterRendering(settingsComponent.isSeparateGutterRendering());
-        settings.setScopeTabColors(settingsComponent.isScopeTabColors());
+        settings.setScopeFileColors(settingsComponent.isScopeFileColors());
 
         if (tabColorsChanged) {
             for (var project : ProjectManager.getInstance().getOpenProjects()) {
@@ -64,7 +64,7 @@ public class GitScopeSettingsConfigurable implements Configurable {
     public void reset() {
         GitScopeSettings settings = GitScopeSettings.getInstance();
         settingsComponent.setSeparateGutterRendering(settings.isSeparateGutterRendering());
-        settingsComponent.setScopeTabColors(settings.isScopeTabColors());
+        settingsComponent.setScopeFileColors(settings.isScopeFileColors());
     }
 
     @Override
