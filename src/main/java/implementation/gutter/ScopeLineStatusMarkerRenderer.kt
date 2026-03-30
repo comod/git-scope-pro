@@ -13,6 +13,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.EditorFactory
+import com.intellij.openapi.editor.TextAnnotationGutterProvider
 import com.intellij.openapi.editor.colors.EditorColors
 import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.openapi.editor.ex.MarkupModelEx
@@ -84,6 +85,30 @@ class ScopeLineStatusMarkerRenderer(
 
     private val diffViewer: ScopeDiffViewer = ScopeDiffViewer(project, document, file)
 
+    // Filler that reserves annotation area width to push line numbers right in separate mode.
+    // Managed dynamically: re-registers after blame close, unregisters when setting is off.
+    @Volatile private var fillerDesired = false
+    @Volatile private var suppressFillerCallback = false
+
+    private val gutterFiller: TextAnnotationGutterProvider.Filler = object : TextAnnotationGutterProvider.Filler {
+        override fun getWidth(): Int = JBUI.scale(6)
+        override fun getLineText(line: Int, editor: Editor?): String? = null
+        override fun getToolTip(line: Int, editor: Editor?): String? = null
+        override fun getStyle(line: Int, editor: Editor?) = com.intellij.openapi.editor.colors.EditorFontType.PLAIN
+        override fun getColor(line: Int, editor: Editor?): com.intellij.openapi.editor.colors.ColorKey? = null
+        override fun getBgColor(line: Int, editor: Editor?): java.awt.Color? = null
+        override fun getPopupActions(line: Int, editor: Editor?): List<com.intellij.openapi.actionSystem.AnAction> = emptyList()
+        override fun useMargin(): Boolean = false
+        override fun gutterClosed() {
+            // Re-register after external removal (e.g. blame closeAllAnnotations)
+            if (!suppressFillerCallback && fillerDesired && !disposed) {
+                ApplicationManager.getApplication().invokeLater {
+                    if (fillerDesired && !disposed) ensureFillerOnAllEditors()
+                }
+            }
+        }
+    }
+
     // Mouse listener to detect when mouse exits the gutter area
     private val mouseMotionListener = object : MouseMotionAdapter() {
         override fun mouseMoved(e: MouseEvent) {
@@ -114,6 +139,7 @@ class ScopeLineStatusMarkerRenderer(
                         gutter.addMouseListener(mouseListener)
                     }
                 }
+                syncFillerWithSetting()
             }
         }
     }
@@ -160,7 +186,41 @@ class ScopeLineStatusMarkerRenderer(
             repaintGutter()
         }
     }
-    
+
+    /**
+     * Syncs filler registration with the current [GitScopeSettings.isSeparateGutterRendering] value.
+     * Called from [updateRanges] (on every scope update) and [installMouseListeners].
+     */
+    private fun syncFillerWithSetting() {
+        val shouldHaveFiller = settings.GitScopeSettings.getInstance().isSeparateGutterRendering
+        if (shouldHaveFiller != fillerDesired) {
+            fillerDesired = shouldHaveFiller
+            ensureFillerOnAllEditors()
+        }
+    }
+
+    /**
+     * Ensures the filler is registered on all editors if [fillerDesired], or removed if not.
+     * Uses [suppressFillerCallback] to prevent [gutterClosed] from re-registering during
+     * intentional removal.
+     */
+    private fun ensureFillerOnAllEditors() {
+        suppressFillerCallback = true
+        try {
+            for (editor in EditorFactory.getInstance().getEditors(document, project)) {
+                if (editor is EditorEx) {
+                    // Always close first to avoid duplicates (no-op if not present)
+                    editor.gutter.closeTextAnnotations(listOf(gutterFiller))
+                    if (fillerDesired) {
+                        editor.gutter.registerTextAnnotation(gutterFiller)
+                    }
+                }
+            }
+        } finally {
+            suppressFillerCallback = false
+        }
+    }
+
     /**
      * Returns true if the pixel y falls within the painted area of [range].
      * DELETED ranges have line1 == line2 so y1 == y2; give them the same
@@ -578,6 +638,9 @@ class ScopeLineStatusMarkerRenderer(
     fun updateRanges(ranges: List<Range>) {
         if (disposed) return
 
+        // Sync filler with current setting (handles setting toggle and re-registration after blame close)
+        syncFillerWithSetting()
+
         currentRanges = ranges
 
         // Ensure highlighter exists
@@ -831,6 +894,9 @@ class ScopeLineStatusMarkerRenderer(
     }
 
     private fun removeMouseListeners() {
+        fillerDesired = false
+        ensureFillerOnAllEditors()
+
         val editors = EditorFactory.getInstance().getEditors(document, project)
         for (editor in editors) {
             if (editor is EditorEx) {
@@ -840,4 +906,5 @@ class ScopeLineStatusMarkerRenderer(
             }
         }
     }
+
 }
