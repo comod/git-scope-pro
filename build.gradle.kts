@@ -101,13 +101,13 @@ intellijPlatform {
 
 }
 
+gradle.taskGraph.whenReady {
+    val isRelease = hasTask(":signPlugin") || hasTask(":publishPlugin") || hasTask(":verifyPlugin")
+    tasks.named("buildSearchableOptions") { enabled = isRelease }
+    tasks.named("prepareJarSearchableOptions") { enabled = isRelease }
+}
+
 tasks {
-    buildSearchableOptions {
-        enabled = false
-    }
-    prepareJarSearchableOptions {
-        enabled = false
-    }
     wrapper {
         gradleVersion = providers.gradleProperty("gradleVersion").get()
         distributionType = Wrapper.DistributionType.BIN
