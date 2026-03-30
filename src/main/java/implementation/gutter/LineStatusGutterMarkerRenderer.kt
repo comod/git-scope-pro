@@ -80,9 +80,14 @@ abstract class LineStatusGutterMarkerRenderer : LineMarkerRendererEx, ActiveGutt
 
         val x: Int
         if (settings.isSeparateGutterRendering) {
-            // Separate rendering: paint to the left of line numbers
-            // Expand to the right when hovering (x stays same, width increases)
-            x = gutter.annotationsAreaOffset
+            // Separate rendering: paint just to the left of line numbers.
+            // annotationsAreaOffset + annotationsAreaWidth == the left edge of the line-number
+            // column (public API equivalent of the @ApiInternal lineNumberAreaOffset).
+            // Subtract normalWidth so the marker's right edge aligns with the line numbers
+            // rather than its left edge, preventing it from covering the first digit.
+            // maxOf guards the case where annotationsAreaWidth == 0 (no blame), which would
+            // produce a negative x without the clamp.
+            x = maxOf(gutter.annotationsAreaOffset, gutter.annotationsAreaOffset + gutter.annotationsAreaWidth - normalWidth)
         } else {
             // Merged rendering: paint at far right of gutter (where IDE VCS markers are)
             // Expand to the left when hovering (x shifts left, width increases)
@@ -164,8 +169,8 @@ abstract class LineStatusGutterMarkerRenderer : LineMarkerRendererEx, ActiveGutt
         val detectionWidth: Int
 
         if (settings.isSeparateGutterRendering) {
-            // Separate: expands to the right
-            markerX = gutter.annotationsAreaOffset
+            // Separate: marker right-edge aligns with line numbers (public API, blame-aware)
+            markerX = maxOf(gutter.annotationsAreaOffset, gutter.annotationsAreaOffset + gutter.annotationsAreaWidth - JBUI.scale(4))
             detectionWidth = JBUI.scale(9)  // 4px normal + 2px expansion + margin
         } else {
             // Merged: expands to the left, aligned with IDE

@@ -331,9 +331,9 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
             } else {
                 GitReference gitReference;
 
-                // First try to find matching branch or tag
+                // First try to find matching branch or tag (skip for relative refs like HEAD~1)
                 gitReference = repo.getBranches().findBranchByName(scopeRef);
-                if (gitReference == null) {
+                if (gitReference == null && !scopeRef.contains("~") && !scopeRef.contains("^")) {
                     // ... try a tag
                     gitReference = repo.getTagHolder().getTag(scopeRef);
                 }

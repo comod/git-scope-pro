@@ -124,8 +124,8 @@ class ScopeLineStatusMarkerRenderer(
         val inMarkerArea: Boolean
 
         if (gitScopeSettings.isSeparateGutterRendering) {
-            // Separate: expands to the right
-            markerX = gutter.annotationsAreaOffset
+            // Separate: marker right-edge aligns with line numbers (public API, blame-aware)
+            markerX = maxOf(gutter.annotationsAreaOffset, gutter.annotationsAreaOffset + gutter.annotationsAreaWidth - JBUI.scale(4))
             inMarkerArea = x in (markerX - JBUI.scale(1))..(markerX + JBUI.scale(9))
         } else {
             // Merged: expands to the left, aligned with IDE
