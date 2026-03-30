@@ -23,7 +23,7 @@ import model.TargetBranchMap;
 import org.jetbrains.annotations.NotNull;
 import service.GitService;
 import system.Defs;
-import utils.GitCommitReflection;
+import utils.PlatformApiReflection;
 import utils.GitUtil;
 
 import java.util.*;
@@ -274,8 +274,7 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
         List<GitCommit> commits = GitHistoryUtils.history(project, repo.getRoot(), branchToCompare);
         Map<FilePath, Change> changeMap = new HashMap<>();
         for (GitCommit commit : commits) {
-            // TODO: Reflection used to avoid triggering experimental API usage
-            for (Change change : GitCommitReflection.getChanges(commit)) {
+            for (Change change : PlatformApiReflection.getCommitChanges(commit)) {
                 FilePath path = ChangesUtil.getFilePath(change);
                 changeMap.put(path, change);
             }
@@ -335,7 +334,7 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
                 gitReference = repo.getBranches().findBranchByName(scopeRef);
                 if (gitReference == null && !scopeRef.contains("~") && !scopeRef.contains("^")) {
                     // ... try a tag
-                    gitReference = repo.getTagHolder().getTag(scopeRef);
+                    gitReference = PlatformApiReflection.findTagByName(repo, scopeRef);
                 }
 
                 GitRevisionNumber revisionNumber;

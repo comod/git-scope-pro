@@ -14,6 +14,7 @@ import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vcs.VcsApplicationSettings;
@@ -228,19 +229,21 @@ public class MyLineStatusTrackerImpl implements Disposable {
             }
 
             if (baseContent == null) {
-                baseContent = com.intellij.openapi.application.ReadAction.compute(() -> doc.getCharsSequence().toString());
+                baseContent = ApplicationManager.getApplication().runReadAction(
+                    (Computable<String>) () -> doc.getCharsSequence().toString());
             }
 
             // Always use current document content for comparison
             // This is what's actually displayed in the editor
-            currentContent = com.intellij.openapi.application.ReadAction.compute(() ->
-                doc.getImmutableCharSequence().toString()
+            currentContent = ApplicationManager.getApplication().runReadAction(
+                (Computable<String>) () -> doc.getImmutableCharSequence().toString()
             );
             LOG.info("MyLineStatusTrackerImpl - File: " + filePath + ", current document lines: " + currentContent.split("\n").length);
 
         } else {
             // No scope change for this file - clear markers by using current content as base
-            baseContent = com.intellij.openapi.application.ReadAction.compute(() -> doc.getCharsSequence().toString());
+            baseContent = ApplicationManager.getApplication().runReadAction(
+                (Computable<String>) () -> doc.getCharsSequence().toString());
             currentContent = baseContent;  // No diff
             LOG.info("MyLineStatusTrackerImpl - File: " + filePath + ", no scope change - clearing markers");
         }
@@ -596,9 +599,9 @@ public class MyLineStatusTrackerImpl implements Disposable {
                 return;
             }
 
-            // Get current document content (ReadAction can be called from any thread)
-            String currentContent = com.intellij.openapi.application.ReadAction.compute(() ->
-                document.getImmutableCharSequence().toString()
+            // Get current document content from any thread
+            String currentContent = ApplicationManager.getApplication().runReadAction(
+                (Computable<String>) () -> document.getImmutableCharSequence().toString()
             );
             String normalizedCurrent = StringUtil.convertLineSeparators(currentContent);
             

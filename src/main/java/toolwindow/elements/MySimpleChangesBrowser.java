@@ -26,7 +26,8 @@ import toolwindow.VcsTreeActions;
 import javax.swing.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.lang.reflect.Method;
+import utils.PlatformApiReflection;
+
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -123,62 +124,8 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
         });
     }
 
-    /**
-     * Tries to open a file in preview tab using reflection. If it fails, does nothing.
-     */
     private void openInPreviewTab(Project project, VirtualFile file) {
-        try {
-            FileEditorManager editorManager = FileEditorManager.getInstance(project);
-
-            // TODO: Reflection used to get access to preview tab method
-
-            // Use reflection to create FileEditorOpenOptions
-            Class<?> optionsClass = Class.forName("com.intellij.openapi.fileEditor.impl.FileEditorOpenOptions");
-            Object options = optionsClass.getDeclaredConstructor().newInstance();
-
-            // Chain the methods using reflection
-            Method withRequestFocus = optionsClass.getMethod("withRequestFocus", boolean.class);
-            Method withUsePreviewTab = optionsClass.getMethod("withUsePreviewTab", boolean.class);
-            Method withReuseOpen = optionsClass.getMethod("withReuseOpen", boolean.class);
-
-            options = withRequestFocus.invoke(options, false);
-            options = withUsePreviewTab.invoke(options, true);
-            options = withReuseOpen.invoke(options, true);
-
-            // Look for the openFile method with FileEditorOpenOptions
-            Method openFileMethod = getMethod(editorManager, optionsClass);
-
-            if (openFileMethod != null) {
-                openFileMethod.setAccessible(true);
-                openFileMethod.invoke(editorManager, file, null, options);
-            } else {
-                LOG.debug("Preview tab method not found, doing nothing for single click");
-            }
-
-        } catch (Exception e) {
-            LOG.debug("Preview tab opening failed, doing nothing for single click", e);
-        }
-    }
-
-    private static @Nullable Method getMethod(FileEditorManager editorManager, Class<?> optionsClass) {
-        Method openFileMethod = null;
-        Class<?> currentClass = editorManager.getClass();
-
-        while (currentClass != null && openFileMethod == null) {
-            for (Method method : currentClass.getDeclaredMethods()) {
-                if ("openFile".equals(method.getName())) {
-                    Class<?>[] paramTypes = method.getParameterTypes();
-                    if (paramTypes.length == 3 &&
-                            VirtualFile.class.isAssignableFrom(paramTypes[0]) &&
-                            optionsClass.isAssignableFrom(paramTypes[2])) {
-                        openFileMethod = method;
-                        break;
-                    }
-                }
-            }
-            currentClass = currentClass.getSuperclass();
-        }
-        return openFileMethod;
+        PlatformApiReflection.openInPreviewTab(project, file);
     }
 
     /**

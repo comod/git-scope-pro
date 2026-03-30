@@ -12,6 +12,7 @@ import com.intellij.openapi.vcs.FileStatusManager;
 import com.intellij.openapi.vcs.VcsApplicationSettings;
 import com.intellij.openapi.vcs.changes.Change;
 import com.intellij.openapi.vcs.impl.LineStatusTrackerManagerI;
+import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.ui.content.Content;
 import com.intellij.ui.content.ContentManager;
@@ -733,8 +734,8 @@ public class ViewService implements Disposable {
             return myHeadModel; // Tool window not available
         }
 
-        // Access ContentManager on EDT using ReadAction
-        return com.intellij.openapi.application.ReadAction.compute(() -> {
+        // Access ContentManager safely from any thread
+        return ApplicationManager.getApplication().runReadAction((Computable<MyModel>) () -> {
             ContentManager contentManager = toolWindow.getContentManager();
             Content selectedContent = contentManager.getSelectedContent();
 

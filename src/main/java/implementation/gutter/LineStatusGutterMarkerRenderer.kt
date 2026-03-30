@@ -47,7 +47,6 @@ abstract class LineStatusGutterMarkerRenderer : LineMarkerRendererEx, ActiveGutt
      */
     private fun paintDefault(editor: EditorEx, g: Graphics, ranges: List<Range>) {
         val gutter = editor.gutterComponentEx
-        if (gutter == null) return
 
         for (range in ranges) {
             paintRange(editor, g, gutter, range)
