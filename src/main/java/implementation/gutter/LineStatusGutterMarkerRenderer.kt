@@ -10,7 +10,6 @@ import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.openapi.editor.ex.EditorGutterComponentEx
 import com.intellij.openapi.editor.markup.ActiveGutterRenderer
 import com.intellij.openapi.editor.markup.LineMarkerRendererEx
-import com.intellij.ui.ExperimentalUI
 import com.intellij.ui.JBColor
 import com.intellij.util.ui.JBUI
 import settings.GitScopeSettings
@@ -30,17 +29,11 @@ internal fun getGutterArea(editor: EditorEx): Pair<Int, Int> {
     val area = utils.PlatformApiReflection.getGutterArea(editor)
     if (area != null) return Pair(area[0], area[1])
 
-    // Fallback: derive from public APIs
+    // Fallback: derive from public APIs (new UI only — old UI was removed in 2024.1)
     val gutter = editor.gutterComponentEx
-    if (ExperimentalUI.isNewUI()) {
-        val areaWidth = JBUI.scale(4)
-        val endX = gutter.whitespaceSeparatorOffset
-        return Pair(endX - areaWidth, endX)
-    } else {
-        val x = gutter.lineMarkerFreePaintersAreaOffset + 1
-        val endX = gutter.whitespaceSeparatorOffset
-        return Pair(x, endX)
-    }
+    val areaWidth = JBUI.scale(4)
+    val endX = gutter.whitespaceSeparatorOffset
+    return Pair(endX - areaWidth, endX)
 }
 
 /**
