@@ -129,26 +129,20 @@ class ScopeLineStatusMarkerRenderer(
 
         // Check if in marker area (must match canDoAction logic)
         val gitScopeSettings = settings.GitScopeSettings.getInstance()
-        val markerX: Int
         val inMarkerArea: Boolean
 
         if (gitScopeSettings.isSeparateGutterRendering) {
-            // Separate: marker right-edge aligns with line numbers (public API, blame-aware)
-            markerX = maxOf(gutter.annotationsAreaOffset, gutter.annotationsAreaOffset + gutter.annotationsAreaWidth - JBUI.scale(4))
+            val markerX = maxOf(gutter.annotationsAreaOffset, gutter.annotationsAreaOffset + gutter.annotationsAreaWidth - JBUI.scale(4))
             inMarkerArea = x in (markerX - JBUI.scale(1))..(markerX + JBUI.scale(9))
         } else {
-            // Merged: expands to the left, aligned with IDE
-            markerX = gutter.whitespaceSeparatorOffset - JBUI.scale(3)
-            inMarkerArea = x in (markerX - JBUI.scale(3))..(markerX + JBUI.scale(9))
+            // Merged: use same gutter area as paint, expanded by hover margin
+            val gutterArea = getGutterArea(editor)
+            inMarkerArea = x in (gutterArea.first - JBUI.scale(3))..(gutterArea.second + JBUI.scale(3))
         }
 
         // Check if mouse is over any range (y-axis)
         val overRange = if (inMarkerArea) {
-            currentRanges.any { range ->
-                val y1 = editor.logicalPositionToXY(com.intellij.openapi.editor.LogicalPosition(range.line1, 0)).y
-                val y2 = editor.logicalPositionToXY(com.intellij.openapi.editor.LogicalPosition(range.line2, 0)).y
-                y in y1..y2
-            }
+            currentRanges.any { range -> rangeContainsY(editor, range, y) }
         } else {
             false
         }

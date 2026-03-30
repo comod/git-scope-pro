@@ -1,6 +1,7 @@
 package utils;
 
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.changes.Change;
@@ -42,6 +43,8 @@ import java.util.concurrent.atomic.AtomicReference;
  *       (2026.1+) or legacy {@code getTagHolder()} (older IDEs)</li>
  *   <li>{@link #openInPreviewTab} — open a file using {@code FileEditorOpenOptions}
  *       from the internal {@code fileEditor.impl} package</li>
+ *   <li>{@link #getGutterArea} — {@code LineStatusMarkerDrawUtil.getGutterArea(Editor)}
+ *       which uses {@code @ApiStatus.Internal} gutter offset methods</li>
  * </ul>
  */
 public final class PlatformApiReflection {
@@ -62,6 +65,12 @@ public final class PlatformApiReflection {
     // ── Tag lookup — legacy path (getTagHolder, deprecated) ──────────────────
     private static final @Nullable MethodHandle REPO_GET_TAG_HOLDER;
     private static final @Nullable MethodHandle TAG_HOLDER_GET_TAG;  // (Object, Object name) -> Object
+
+    // ── Gutter area (LineStatusMarkerDrawUtil.getGutterArea, uses @Internal offset) ─
+    // Static method: (Editor) -> IntPair;  IntPair has public int fields 'first', 'second'
+    private static final @Nullable MethodHandle GUTTER_GET_AREA;         // (Object editor) -> Object IntPair
+    private static final @Nullable MethodHandle INT_PAIR_FIRST;          // (Object) -> Object (int boxed)
+    private static final @Nullable MethodHandle INT_PAIR_SECOND;         // (Object) -> Object (int boxed)
 
     // ── Preview tab (FileEditorOpenOptions, internal impl package) ────────────
     private static final @Nullable Class<?>    OPEN_OPTIONS_CLASS;
@@ -90,6 +99,28 @@ public final class PlatformApiReflection {
         // ── Legacy tag path ────────────────────────────────────────────────
         REPO_GET_TAG_HOLDER = resolvePublicVirtual(GitRepository.class, "getTagHolder");
         TAG_HOLDER_GET_TAG  = resolveByClassName("git4idea.repo.GitTagHolder", "getTag", String.class);
+
+        // ── Gutter area (LineStatusMarkerDrawUtil) ─────────────────────────
+        MethodHandle gutterArea  = null;
+        MethodHandle pairFirst   = null;
+        MethodHandle pairSecond  = null;
+        try {
+            Class<?> drawUtilClass = Class.forName("com.intellij.openapi.diff.LineStatusMarkerDrawUtil");
+            Method m = drawUtilClass.getMethod("getGutterArea", Editor.class);
+            gutterArea = MethodHandles.publicLookup().unreflect(m)
+                    .asType(MethodType.genericMethodType(1));
+            // IntPair has public int fields 'first' and 'second'
+            Class<?> intPairClass = m.getReturnType();
+            pairFirst  = MethodHandles.publicLookup().unreflectGetter(intPairClass.getField("first"))
+                    .asType(MethodType.methodType(int.class, Object.class));
+            pairSecond = MethodHandles.publicLookup().unreflectGetter(intPairClass.getField("second"))
+                    .asType(MethodType.methodType(int.class, Object.class));
+        } catch (Exception e) {
+            LOG.debug("PlatformApiReflection: LineStatusMarkerDrawUtil.getGutterArea not available — " + e.getMessage());
+        }
+        GUTTER_GET_AREA  = gutterArea;
+        INT_PAIR_FIRST   = pairFirst;
+        INT_PAIR_SECOND  = pairSecond;
 
         // ── Preview tab options ────────────────────────────────────────────
         Class<?>     optClass   = null;
@@ -181,6 +212,28 @@ public final class PlatformApiReflection {
             LOG.error("PlatformApiReflection: getCommitChanges invocation failed", t);
         }
         return Collections.emptyList();
+    }
+
+    /**
+     * Returns the gutter area (x, endX) used by the IDE's own VCS line status markers,
+     * via {@code LineStatusMarkerDrawUtil.getGutterArea(Editor)}.
+     * This internally uses {@code @ApiStatus.Internal} gutter offset methods.
+     *
+     * @return {@code int[]{x, endX}}, or {@code null} when the reflection bridge is unavailable
+     */
+    public static int @Nullable [] getGutterArea(@NotNull Editor editor) {
+        if (GUTTER_GET_AREA == null || INT_PAIR_FIRST == null || INT_PAIR_SECOND == null) {
+            return null;
+        }
+        try {
+            Object intPair = GUTTER_GET_AREA.invoke(editor);
+            int x    = (int) INT_PAIR_FIRST.invoke(intPair);
+            int endX = (int) INT_PAIR_SECOND.invoke(intPair);
+            return new int[]{x, endX};
+        } catch (Throwable t) {
+            LOG.warn("PlatformApiReflection: getGutterArea invocation failed", t);
+            return null;
+        }
     }
 
     /**

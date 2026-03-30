@@ -8,6 +8,7 @@ import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.openapi.editor.ex.EditorGutterComponentEx
 import com.intellij.openapi.editor.markup.ActiveGutterRenderer
 import com.intellij.openapi.editor.markup.LineMarkerRendererEx
+import com.intellij.ui.ExperimentalUI
 import com.intellij.ui.JBColor
 import com.intellij.util.ui.JBUI
 import settings.GitScopeSettings
@@ -16,6 +17,29 @@ import java.awt.Graphics2D
 import java.awt.Rectangle
 import java.awt.RenderingHints
 import java.awt.event.MouseEvent
+
+/**
+ * Returns (x, endX) for the gutter VCS marker area.
+ * Delegates to LineStatusMarkerDrawUtil.getGutterArea() via reflection (which uses
+ * @ApiStatus.Internal offset methods internally), falling back to a public-API derivation.
+ */
+internal fun getGutterArea(editor: EditorEx): Pair<Int, Int> {
+    // Primary: exact IDE positioning via reflection
+    val area = utils.PlatformApiReflection.getGutterArea(editor)
+    if (area != null) return Pair(area[0], area[1])
+
+    // Fallback: derive from public APIs
+    val gutter = editor.gutterComponentEx
+    if (ExperimentalUI.isNewUI()) {
+        val areaWidth = JBUI.scale(4)
+        val endX = gutter.whitespaceSeparatorOffset
+        return Pair(endX - areaWidth, endX)
+    } else {
+        val x = gutter.lineMarkerFreePaintersAreaOffset + 1
+        val endX = gutter.whitespaceSeparatorOffset
+        return Pair(x, endX)
+    }
+}
 
 /**
  * Renders line status markers in the editor gutter.
@@ -76,30 +100,25 @@ abstract class LineStatusGutterMarkerRenderer : LineMarkerRendererEx, ActiveGutt
                         hoveredRange.line2 == range.line2 &&
                         hoveredRange.type == range.type)
 
-        // Width is thicker when hovered (matching IDE behavior)
-        val normalWidth = JBUI.scale(4)
-        val hoveredWidth = JBUI.scale(6)  // Changed from 7 to 6
-        val width = if (isHovered) hoveredWidth else normalWidth
-
         val x: Int
+        val width: Int
         if (settings.isSeparateGutterRendering) {
             // Separate rendering: paint just to the left of line numbers.
             // annotationsAreaOffset + annotationsAreaWidth == the left edge of the line-number
             // column (public API equivalent of the @ApiInternal lineNumberAreaOffset).
-            // Subtract normalWidth so the marker's right edge aligns with the line numbers
-            // rather than its left edge, preventing it from covering the first digit.
-            // maxOf guards the case where annotationsAreaWidth == 0 (no blame), which would
-            // produce a negative x without the clamp.
+            // Subtract the marker width so the marker's right edge aligns with the line numbers.
+            // maxOf guards the case where annotationsAreaWidth == 0 (no blame).
+            val normalWidth = JBUI.scale(4)
+            val hoveredWidth = JBUI.scale(6)
+            width = if (isHovered) hoveredWidth else normalWidth
             x = maxOf(gutter.annotationsAreaOffset, gutter.annotationsAreaOffset + gutter.annotationsAreaWidth - normalWidth)
         } else {
-            // Merged rendering: paint at far right of gutter (where IDE VCS markers are)
-            // Expand to the left when hovering (x shifts left, width increases)
-            val baseX = gutter.whitespaceSeparatorOffset - JBUI.scale(2)  // Aligns with IDE VCS marker left edge
-            x = if (isHovered) {
-                baseX - (hoveredWidth - normalWidth)  // Shift left by 2px when hovering
-            } else {
-                baseX
-            }
+            // Merged rendering: mirror LineStatusMarkerDrawUtil.getGutterArea()
+            // so our markers align exactly with the IDE's own VCS change bars.
+            val gutterArea = getGutterArea(editor)
+            // IDE expands left on hover, keeping right edge fixed at endX
+            x = if (isHovered) gutterArea.first - JBUI.scale(3) else gutterArea.first
+            width = gutterArea.second - x
         }
 
         // Arc size for rounded corners
@@ -149,28 +168,16 @@ abstract class LineStatusGutterMarkerRenderer : LineMarkerRendererEx, ActiveGutt
 
         // Check if mouse is in our marker x-area
         val settings = GitScopeSettings.getInstance()
-        val markerX: Int
-        val detectionWidth: Int
 
         if (settings.isSeparateGutterRendering) {
-            // Separate: marker right-edge aligns with line numbers (public API, blame-aware)
-            markerX = maxOf(gutter.annotationsAreaOffset, gutter.annotationsAreaOffset + gutter.annotationsAreaWidth - JBUI.scale(4))
-            detectionWidth = JBUI.scale(9)  // 4px normal + 2px expansion + margin
-        } else {
-            // Merged: expands to the left, aligned with IDE
-            markerX = gutter.whitespaceSeparatorOffset - JBUI.scale(2)
-            detectionWidth = JBUI.scale(9)  // Need to check left side too when it expands
-        }
-
-        // Check x bounds (allow detection on both sides for merged mode)
-        if (settings.isSeparateGutterRendering) {
-            // Separate: check from marker to the right
-            if (x !in (markerX - JBUI.scale(1))..(markerX + detectionWidth)) {
+            val markerX = maxOf(gutter.annotationsAreaOffset, gutter.annotationsAreaOffset + gutter.annotationsAreaWidth - JBUI.scale(4))
+            if (x !in (markerX - JBUI.scale(1))..(markerX + JBUI.scale(9))) {
                 return false
             }
         } else {
-            // Merged: check from left (when expanded) to right
-            if (x !in (markerX - JBUI.scale(3))..(markerX + detectionWidth)) {
+            // Merged: use same gutter area as paint, expanded by hover margin
+            val gutterArea = getGutterArea(editorEx)
+            if (x !in (gutterArea.first - JBUI.scale(3))..(gutterArea.second + JBUI.scale(3))) {
                 return false
             }
         }
