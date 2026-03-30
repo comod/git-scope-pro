@@ -218,19 +218,16 @@ public class MyLineStatusTrackerImpl implements Disposable {
         }
 
         final DisposalToken token = this.disposalToken;
-        ApplicationManager.getApplication().invokeLater(() -> {
-            if (token.disposed) return;
 
-            Editor[] editors = EditorFactory.getInstance().getAllEditors();
-            for (Editor editor : editors) {
-                if (isDiffView(editor)) continue;
-                // Platform handles gutter repainting automatically - no need to force it
-                updateLineStatusByChangesForEditor(editor, scopeChangesMap);
-            }
-        }, ModalityState.defaultModalityState(), __ -> token.disposed);
+        Editor[] editors = EditorFactory.getInstance().getAllEditors();
+        for (Editor editor : editors) {
+            if (isDiffView(editor)) continue;
+            // Platform handles gutter repainting automatically - no need to force it
+            updateLineStatusByChangesForEditor(editor, scopeChangesMap, token);
+        }
     }
 
-    private void updateLineStatusByChangesForEditor(Editor editor, Map<String, Change> scopeChangesMap) {
+    private void updateLineStatusByChangesForEditor(Editor editor, Map<String, Change> scopeChangesMap, DisposalToken token) {
         if (editor == null || disposing.get()) return;
 
         Document doc = editor.getDocument();
@@ -238,29 +235,41 @@ public class MyLineStatusTrackerImpl implements Disposable {
         if (file == null) return;
 
         String filePath = file.getPath();
-
-        // Look up the change for this editor's file using the map
         Change changeForFile = scopeChangesMap.get(filePath);
 
-        String content;
-        if (changeForFile != null && changeForFile.getBeforeRevision() != null) {
-            // Extract content for this specific file only
-            try {
-                content = changeForFile.getBeforeRevision().getContent();
-            } catch (VcsException e) {
-                LOG.warn("Error getting content for revision: " + filePath, e);
-                content = null;
+        // Get current document content as fallback (safe to read here)
+        String currentContent = doc.getCharsSequence().toString();
+
+        // Fetch content on background thread to avoid blocking EDT
+        ApplicationManager.getApplication().executeOnPooledThread(() -> {
+            if (token.disposed) return;
+
+            String content;
+            if (changeForFile != null && changeForFile.getBeforeRevision() != null) {
+                // Extract content for this specific file only
+                try {
+                    content = changeForFile.getBeforeRevision().getContent();
+                } catch (VcsException e) {
+                    LOG.warn("Error getting content for revision: " + filePath, e);
+                    content = null;
+                }
+
+                if (content == null) {
+                    content = currentContent;
+                }
+            } else {
+                // No revision content available, use current document content
+                content = currentContent;
             }
 
-            if (content == null) {
-                content = doc.getCharsSequence().toString();
-            }
-        } else {
-            // No revision content available, use current document content
-            content = doc.getCharsSequence().toString();
-        }
-
-        updateTrackerBaseContent(doc, content);
+            // Update tracker on EDT
+            String finalContent = content;
+            ApplicationManager.getApplication().invokeLater(() -> {
+                if (!token.disposed) {
+                    updateTrackerBaseContent(doc, finalContent);
+                }
+            }, ModalityState.defaultModalityState(), __ -> token.disposed);
+        });
     }
 
     /**

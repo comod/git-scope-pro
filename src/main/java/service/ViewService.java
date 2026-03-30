@@ -726,32 +726,34 @@ public class ViewService implements Disposable {
             return myHeadModel; // Tool window not available
         }
 
-        // Get the currently selected tab's model directly from ContentManager
-        ContentManager contentManager = toolWindow.getContentManager();
-        Content selectedContent = contentManager.getSelectedContent();
+        // Access ContentManager on EDT using ReadAction
+        return com.intellij.openapi.application.ReadAction.compute(() -> {
+            ContentManager contentManager = toolWindow.getContentManager();
+            Content selectedContent = contentManager.getSelectedContent();
 
-        if (selectedContent == null) {
+            if (selectedContent == null) {
+                return myHeadModel;
+            }
+
+            // Check if it's the HEAD tab
+            if (selectedContent.getTabName().equals(GitService.BRANCH_HEAD)) {
+                return myHeadModel;
+            }
+
+            // Check if it's the + tab
+            if (selectedContent.getTabName().equals(PLUS_TAB_LABEL)) {
+                return myHeadModel; // or handle differently
+            }
+
+            // Get the model for this content
+            MyModel model = toolWindowService.getModelForContent(selectedContent);
+            if (model != null) {
+                return model;
+            }
+
+            // Fallback to HEAD
             return myHeadModel;
-        }
-
-        // Check if it's the HEAD tab
-        if (selectedContent.getTabName().equals(GitService.BRANCH_HEAD)) {
-            return myHeadModel;
-        }
-
-        // Check if it's the + tab
-        if (selectedContent.getTabName().equals(PLUS_TAB_LABEL)) {
-            return myHeadModel; // or handle differently
-        }
-
-        // Get the model for this content
-        MyModel model = toolWindowService.getModelForContent(selectedContent);
-        if (model != null) {
-            return model;
-        }
-
-        // Fallback to HEAD
-        return myHeadModel;
+        });
     }
 
     public List<MyModel> getCollection() {
