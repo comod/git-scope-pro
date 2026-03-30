@@ -1,3 +1,9 @@
+## [2026.1]
+
+### Fixes
+
+- Fixed [EDT errors on startup](https://github.com/comod/git-scope-pro/issues/80)
+
 ## [2025.3.2]
 
 ### Fixes

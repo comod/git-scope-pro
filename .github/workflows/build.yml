@@ -17,7 +17,7 @@ jobs:
 
       - name: Download JetBrains Runtime (JBR 21)
         run: |
-          wget https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-21.0.9-linux-x64-b1038.76.tar.gz -O jbr.tar.gz
+          wget https://cache-redirector.jetbrains.com/intellij-jbr/jbr_jcef-21.0.10-linux-x64-b1163.110.tar.gz -O jbr.tar.gz
           mkdir -p jbr
           tar -xzf jbr.tar.gz -C jbr --strip-components=1
 
