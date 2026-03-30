@@ -579,7 +579,7 @@ class ScopeLineStatusMarkerRenderer(
                     false
                 ) { rh: RangeHighlighterEx ->
                     rh.setErrorStripeMarkColor(color)
-                    rh.setThinErrorStripeMark(true)
+                    rh.isThinErrorStripeMark = true
                 }
 
                 errorStripeHighlighters.add(highlighter)

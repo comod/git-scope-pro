@@ -9,6 +9,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import service.ViewService;
+import settings.GitScopeSettings;
 
 import java.util.Map;
 
@@ -28,6 +29,10 @@ public class GitScopeFileStatusProvider implements FileStatusProvider {
 
     @Override
     public @Nullable FileStatus getFileStatus(@NotNull VirtualFile virtualFile) {
+        if (!GitScopeSettings.getInstance().isScopeTabColors()) {
+            return null;
+        }
+
         // Get the project from the context
         Project project = getProjectFromFile(virtualFile);
         if (project == null || project.isDisposed()) {

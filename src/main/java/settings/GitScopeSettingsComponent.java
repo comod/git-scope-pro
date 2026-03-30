@@ -1,10 +1,9 @@
 package settings;
 
+import com.intellij.ui.TitledSeparator;
 import com.intellij.ui.components.JBCheckBox;
-import com.intellij.ui.components.JBLabel;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBUI;
-import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
 
@@ -15,28 +14,28 @@ import javax.swing.*;
 public class GitScopeSettingsComponent {
     private final JPanel mainPanel;
     private final JBCheckBox separateGutterRenderingCheckBox;
+    private final JBCheckBox scopeTabColorsCheckBox;
 
     public GitScopeSettingsComponent() {
-        // Create checkbox for gutter setting
         separateGutterRenderingCheckBox = new JBCheckBox(
-            "Separate GitScope gutter rendering from IDE"
+            "Separate Git Scope and IDE gutter rendering"
         );
-        
-        // Create informational label
-        JBLabel descriptionLabel = new JBLabel(
-            "<html>When enabled (default), GitScope markers render to the right of line numbers.<br>" +
-            "When disabled, GitScope markers render merged with IDE gutter markers (further right).</html>"
-        );
-        descriptionLabel.setFontColor(com.intellij.util.ui.UIUtil.FontColor.BRIGHTER);
 
-        // Build the form
+        scopeTabColorsCheckBox = new JBCheckBox(
+            "Color editor tabs based on Git Scope"
+        );
+
         mainPanel = FormBuilder.createFormBuilder()
-            .addLabeledComponent(new JBLabel("Gutter Rendering:"), new JPanel())
-            .addComponent(separateGutterRenderingCheckBox, 5)
-            .addComponent(descriptionLabel, 10)
+            .addComponent(new TitledSeparator("Gutter Rendering"))
+            .addComponent(separateGutterRenderingCheckBox, 1)
+            .addTooltip("When enabled, GitScope gutter markers is rendered to the left of the line numbers. ")
+            .addVerticalGap(10)
+            .addComponent(new TitledSeparator("Tab Colors"))
+            .addComponent(scopeTabColorsCheckBox, 1)
+            .addTooltip("When enabled (default), editor tab colors reflect the active Git Scope")
             .addComponentFillVertically(new JPanel(), 0)
             .getPanel();
-            
+
         mainPanel.setBorder(JBUI.Borders.empty(10));
     }
 
@@ -54,5 +53,13 @@ public class GitScopeSettingsComponent {
 
     public void setSeparateGutterRendering(boolean value) {
         separateGutterRenderingCheckBox.setSelected(value);
+    }
+
+    public boolean isScopeTabColors() {
+        return scopeTabColorsCheckBox.isSelected();
+    }
+
+    public void setScopeTabColors(boolean value) {
+        scopeTabColorsCheckBox.setSelected(value);
     }
 }

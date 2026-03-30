@@ -21,9 +21,16 @@ public class GitScopeSettings implements PersistentStateComponent<GitScopeSettin
     /**
      * If true, plugin gutter markers render separately to the right of line numbers.
      * If false, plugin gutter markers render merged with IDE gutters (further right).
-     * Default: true (separate rendering - to the right of line numbers)
+     * Default: false (merged with IDE gutter markers)
      */
-    public boolean separateGutterRendering = true;
+    public boolean separateGutterRendering = false;
+
+    /**
+     * If true, editor tab colors reflect the active Git Scope diff (scope vs. base branch).
+     * If false, the IDE's default tab coloring (diff from HEAD) is used.
+     * Default: true (scope-based tab colors)
+     */
+    public boolean scopeTabColors = true;
 
     public static GitScopeSettings getInstance() {
         return ApplicationManager.getApplication().getService(GitScopeSettings.class);
@@ -47,5 +54,13 @@ public class GitScopeSettings implements PersistentStateComponent<GitScopeSettin
 
     public void setSeparateGutterRendering(boolean separateGutterRendering) {
         this.separateGutterRendering = separateGutterRendering;
+    }
+
+    public boolean isScopeTabColors() {
+        return scopeTabColors;
+    }
+
+    public void setScopeTabColors(boolean scopeTabColors) {
+        this.scopeTabColors = scopeTabColors;
     }
 }
