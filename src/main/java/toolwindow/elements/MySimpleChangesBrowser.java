@@ -11,9 +11,13 @@ import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.TextEditor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.FilePath;
+import com.intellij.openapi.vcs.VcsException;
+import com.intellij.openapi.vcs.history.VcsRevisionNumber;
 import com.intellij.openapi.vcs.changes.ChangesUtil;
+import com.intellij.openapi.vcs.changes.ContentRevision;
 import com.intellij.openapi.vcs.changes.Change;
 import com.intellij.openapi.vcs.changes.CurrentContentRevision;
+import service.ViewService;
 import com.intellij.openapi.vcs.changes.actions.diff.ChangeDiffRequestProducer;
 import com.intellij.openapi.vcs.changes.ui.ChangeDiffRequestChain;
 import com.intellij.openapi.vcs.changes.ui.SimpleAsyncChangesBrowser;
@@ -209,6 +213,8 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
     /**
      * Override diff request production so the right side of the diff shows the current
      * working directory content (HEAD + local edits) instead of the pure HEAD revision.
+     * The left-side revision number is decorated with the active scope name so the diff
+     * panel header reads e.g. "abc1234 (master) | MyFile.kt".
      */
     @Override
     protected @Nullable ChangeDiffRequestChain.Producer getDiffRequestProducer(@NotNull Object userObject) {
@@ -220,13 +226,40 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
             }
             if (filePath != null && filePath.getVirtualFile() != null) {
                 Change modifiedChange = new Change(
-                    change.getBeforeRevision(),
+                    withScopeName(change.getBeforeRevision(), getScopeDisplayName()),
                     new CurrentContentRevision(filePath)
                 );
                 return ChangeDiffRequestProducer.create(myProject, modifiedChange);
             }
         }
         return super.getDiffRequestProducer(userObject);
+    }
+
+    private String getScopeDisplayName() {
+        try {
+            ViewService vs = myProject.getService(ViewService.class);
+            if (vs != null) {
+                model.MyModel m = vs.getCurrent();
+                if (m != null) return m.getDisplayName();
+            }
+        } catch (Exception ignored) {}
+        return "";
+    }
+
+    @Nullable
+    private static ContentRevision withScopeName(@Nullable ContentRevision original, @NotNull String scopeName) {
+        if (original == null || scopeName.isEmpty()) return original;
+        return new ContentRevision() {
+            @Override public @Nullable String getContent() throws VcsException { return original.getContent(); }
+            @Override public @NotNull FilePath getFile() { return original.getFile(); }
+            @Override public @NotNull VcsRevisionNumber getRevisionNumber() {
+                VcsRevisionNumber base = original.getRevisionNumber();
+                return new VcsRevisionNumber() {
+                    @Override public @NotNull String asString() { return base.asString() + " (" + scopeName + ")"; }
+                    @Override public int compareTo(@NotNull VcsRevisionNumber o) { return base.compareTo(o); }
+                };
+            }
+        };
     }
 
     @Override

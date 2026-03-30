@@ -92,7 +92,7 @@ abstract class LineStatusGutterMarkerRenderer : LineMarkerRendererEx, ActiveGutt
         } else {
             // Merged rendering: paint at far right of gutter (where IDE VCS markers are)
             // Expand to the left when hovering (x shifts left, width increases)
-            val baseX = gutter.whitespaceSeparatorOffset - JBUI.scale(3)  // Moved 1px right (was -4)
+            val baseX = gutter.whitespaceSeparatorOffset - JBUI.scale(2)  // Aligns with IDE VCS marker left edge
             x = if (isHovered) {
                 baseX - (hoveredWidth - normalWidth)  // Shift left by 2px when hovering
             } else {
@@ -175,7 +175,7 @@ abstract class LineStatusGutterMarkerRenderer : LineMarkerRendererEx, ActiveGutt
             detectionWidth = JBUI.scale(9)  // 4px normal + 2px expansion + margin
         } else {
             // Merged: expands to the left, aligned with IDE
-            markerX = gutter.whitespaceSeparatorOffset - JBUI.scale(3)
+            markerX = gutter.whitespaceSeparatorOffset - JBUI.scale(2)
             detectionWidth = JBUI.scale(9)  // Need to check left side too when it expands
         }
 
@@ -192,10 +192,15 @@ abstract class LineStatusGutterMarkerRenderer : LineMarkerRendererEx, ActiveGutt
             }
         }
 
-        // Check if y is over any range
+        // Check if y is over any range.
+        // DELETED ranges have line1 == line2, so y1 == y2 — use the painted height instead.
         return ranges.any { range ->
             val y1 = editor.logicalPositionToXY(com.intellij.openapi.editor.LogicalPosition(range.line1, 0)).y
-            val y2 = editor.logicalPositionToXY(com.intellij.openapi.editor.LogicalPosition(range.line2, 0)).y
+            val y2 = if (range.type == Range.DELETED) {
+                y1 + JBUI.scale(8)  // match the fixed height used in paintRange for DELETED
+            } else {
+                editor.logicalPositionToXY(com.intellij.openapi.editor.LogicalPosition(range.line2, 0)).y
+            }
             y in y1..y2
         }
     }

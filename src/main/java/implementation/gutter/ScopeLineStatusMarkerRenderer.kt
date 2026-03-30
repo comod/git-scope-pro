@@ -24,7 +24,11 @@ import com.intellij.openapi.editor.markup.MarkupEditorFilterFactory
 import com.intellij.openapi.editor.markup.RangeHighlighter
 import com.intellij.openapi.progress.DumbProgressIndicator
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.editor.event.EditorMouseEvent
+import com.intellij.openapi.editor.event.EditorMouseListener
 import com.intellij.openapi.ui.popup.JBPopupFactory
+import com.intellij.openapi.ui.popup.JBPopupListener
+import com.intellij.openapi.ui.popup.LightweightWindowEvent
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.EditorTextField
@@ -73,6 +77,9 @@ class ScopeLineStatusMarkerRenderer(
     private var hoveredRange: Range? = null
 
     private var lastMouseY: Int = -1
+
+    // Tracks the currently-open gutter popup so it can be closed before a new one opens
+    private var activePopup: com.intellij.openapi.ui.popup.JBPopup? = null
 
     private val diffViewer: ScopeDiffViewer = ScopeDiffViewer(project, document, file)
 
@@ -159,7 +166,22 @@ class ScopeLineStatusMarkerRenderer(
         }
     }
     
+    /**
+     * Returns true if the pixel y falls within the painted area of [range].
+     * DELETED ranges have line1 == line2 so y1 == y2; give them the same
+     * fixed height (8 px) used when painting them.
+     */
+    private fun rangeContainsY(editor: Editor, range: Range, y: Int): Boolean {
+        val y1 = editor.logicalPositionToXY(com.intellij.openapi.editor.LogicalPosition(range.line1, 0)).y
+        val y2 = if (range.type == Range.DELETED) y1 + JBUI.scale(8)
+                 else editor.logicalPositionToXY(com.intellij.openapi.editor.LogicalPosition(range.line2, 0)).y
+        return y in y1..y2
+    }
+
     private fun showPopupMenu(editor: EditorEx, range: Range, e: MouseEvent) {
+        // Close any existing popup before opening a new one
+        activePopup?.cancel()
+
         // Sort ranges once
         val sortedRanges = currentRanges.sortedBy { it.line1 }
 
@@ -263,6 +285,27 @@ class ScopeLineStatusMarkerRenderer(
                     }
                 })
             }
+
+            // Scope name label — shows the active diff base (e.g. "master", "HEAD~2")
+            val scopeName = try {
+                project.getService(service.ViewService::class.java)?.getCurrent()?.getDisplayName() ?: ""
+            } catch (_: Exception) { "" }
+            if (scopeName.isNotEmpty()) {
+                addSeparator()
+                add(object : AnAction(), com.intellij.openapi.actionSystem.ex.CustomComponentAction {
+                    override fun createCustomComponent(
+                        presentation: com.intellij.openapi.actionSystem.Presentation,
+                        place: String
+                    ): javax.swing.JComponent {
+                        val label = com.intellij.ui.components.JBLabel(scopeName)
+                        label.foreground = com.intellij.util.ui.UIUtil.getContextHelpForeground()
+                        label.border = com.intellij.util.ui.JBUI.Borders.emptyLeft(4)
+                        return label
+                    }
+                    override fun actionPerformed(e: AnActionEvent) {}
+                    override fun getActionUpdateThread() = ActionUpdateThread.EDT
+                })
+            }
         }
         
         // Create toolbar-style popup matching IDE VCS gutter popup
@@ -282,31 +325,51 @@ class ScopeLineStatusMarkerRenderer(
         // Initialize diff panel with the initial range
         updateDiffPanel(range)
 
-        // Create lightweight popup with toolbar and inline diff
+        // Create lightweight popup with toolbar and inline diff.
+        // cancelOnClickOutside=false: the EditorMouseListener handles closing so the gutter
+        // click is NOT consumed by the popup mechanism — enabling single-click switching.
         popupRef = JBPopupFactory.getInstance()
             .createComponentPopupBuilder(contentPanel, null)
             .setRequestFocus(false)
             .setFocusable(false)
             .setMovable(false)
             .setResizable(false)
+            .setCancelOnClickOutside(false)
             .createPopup()
 
         // Show at mouse position relative to the gutter component
         val relativePoint = RelativePoint(e)
         popupRef?.show(relativePoint)
+
+        // Track the active popup and add a mouse listener so clicking any marker
+        // closes it first (allowing doAction to open a new one in a single click)
+        val capturedPopup = popupRef ?: return
+        activePopup = capturedPopup
+
+        val popupDisposable = Disposer.newDisposable("ScopeGutterPopup")
+        capturedPopup.addListener(object : JBPopupListener {
+            override fun onClosed(event: LightweightWindowEvent) {
+                if (activePopup === capturedPopup) activePopup = null
+                Disposer.dispose(popupDisposable)
+            }
+        })
+        editor.addEditorMouseListener(object : EditorMouseListener {
+            override fun mousePressed(e: EditorMouseEvent) {
+                activePopup?.cancel()
+            }
+        }, popupDisposable)
     }
     
     private fun createInlineDiffPanel(editor: EditorEx, range: Range): JPanel {
         val panel = JPanel(BorderLayout())
 
-        // Get content based on range type
+        // Get content based on range type:
+        //   DELETED   → show the deleted scope-base lines (nothing exists in current)
+        //   MODIFIED  → show the scope-base lines; word-level diff highlights what changed
+        //   INSERTED  → nothing to show (the inserted lines are already visible in the editor)
         val content = when (range.type) {
-            Range.DELETED -> diffViewer.getVcsContentForRange(range, includeContext = false)
-            else -> {
-                val startOffset = editor.logicalPositionToOffset(com.intellij.openapi.editor.LogicalPosition(range.line1, 0))
-                val endOffset = editor.logicalPositionToOffset(com.intellij.openapi.editor.LogicalPosition(range.line2, 0))
-                document.getText(com.intellij.openapi.util.TextRange(startOffset, endOffset))
-            }
+            Range.DELETED, Range.MODIFIED -> diffViewer.getVcsContentForRange(range, includeContext = false)
+            else -> ""
         }
 
         if (content.isEmpty()) return panel
@@ -362,28 +425,36 @@ class ScopeLineStatusMarkerRenderer(
             popupEditor.settings.setTabSize(editor.settings.getTabSize(project))
             popupEditor.settings.setUseTabCharacter(editor.settings.isUseTabCharacter(project))
 
-            // Apply word-level diff highlighting for modified ranges
+            // Apply word-level diff highlighting for modified ranges.
+            // The popup shows the scope-base (vcs) text, so highlights land at offset1
+            // positions (left/old side of the diff). Fragments with an empty offset1
+            // range are pure insertions in the current file and produce no highlight.
             if (range.type == Range.MODIFIED) {
                 try {
-                    val vcsContent = diffViewer.getVcsContentForRange(range, includeContext = false)
-                    val currentContent = content
+                    val currentContent = run {
+                        val startOffset = editor.logicalPositionToOffset(
+                            com.intellij.openapi.editor.LogicalPosition(range.line1, 0))
+                        val endOffset = editor.logicalPositionToOffset(
+                            com.intellij.openapi.editor.LogicalPosition(range.line2, 0))
+                        document.getText(com.intellij.openapi.util.TextRange(startOffset, endOffset))
+                    }
 
-                    // Compute word diff
                     val comparisonManager = ComparisonManager.getInstance()
                     val wordDiff = comparisonManager.compareChars(
-                        vcsContent,
-                        currentContent,
+                        content,         // vcs (left/old)
+                        currentContent,  // current (right/new)
                         ComparisonPolicy.DEFAULT,
                         DumbProgressIndicator.INSTANCE
                     )
 
-                    // Apply inline diff highlighting
                     for (fragment in wordDiff) {
-                        val currentStart = fragment.startOffset2
-                        val currentEnd = fragment.endOffset2
-                        val type = DiffUtil.getDiffType(fragment)
-
-                        DiffDrawUtil.createInlineHighlighter(popupEditor, currentStart, currentEnd, type)
+                        // Highlight at offset1 — positions within the vcs text shown in the popup
+                        DiffDrawUtil.createInlineHighlighter(
+                            popupEditor,
+                            fragment.startOffset1,
+                            fragment.endOffset1,
+                            DiffUtil.getDiffType(fragment)
+                        )
                     }
                 } catch (e: com.intellij.openapi.progress.ProcessCanceledException) {
                     throw e
@@ -668,11 +739,7 @@ class ScopeLineStatusMarkerRenderer(
 
                 // Update hovered range based on mouse position
                 val newHoveredRange = if (result) {
-                    currentRanges.firstOrNull { range ->
-                        val y1 = editor.logicalPositionToXY(com.intellij.openapi.editor.LogicalPosition(range.line1, 0)).y
-                        val y2 = editor.logicalPositionToXY(com.intellij.openapi.editor.LogicalPosition(range.line2, 0)).y
-                        y in y1..y2
-                    }
+                    currentRanges.firstOrNull { range -> rangeContainsY(editor, range, y) }
                 } else {
                     null
                 }
@@ -698,11 +765,7 @@ class ScopeLineStatusMarkerRenderer(
                 val editorEx = editor as? EditorEx ?: return
                 val y = e.y
 
-                val clickedRange = currentRanges.firstOrNull { range ->
-                    val y1 = editor.logicalPositionToXY(com.intellij.openapi.editor.LogicalPosition(range.line1, 0)).y
-                    val y2 = editor.logicalPositionToXY(com.intellij.openapi.editor.LogicalPosition(range.line2, 0)).y
-                    y in y1..y2
-                }
+                val clickedRange = currentRanges.firstOrNull { range -> rangeContainsY(editor, range, y) }
 
                 if (clickedRange != null) {
                     showPopupMenu(editorEx, clickedRange, e)
