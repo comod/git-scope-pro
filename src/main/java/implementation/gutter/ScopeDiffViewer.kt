@@ -67,34 +67,10 @@ class ScopeDiffViewer(
     }
 
     private fun getCurrentContentForRange(range: Range): String {
+        val lines = document.text.split("\n")
         return when (range.type) {
-            Range.DELETED -> {
-                // For deleted ranges, get context line above (if available)
-                val text = document.text
-                val lines = text.split("\n")
-
-                // Get one line above for context
-                if (range.line1 > 0 && range.line1 <= lines.size) {
-                    lines[range.line1 - 1]
-                } else {
-                    ""
-                }
-            }
-            else -> {
-                // Get lines from current document with context
-                val text = document.text
-                val lines = text.split("\n")
-
-                // Add one line above and one line below for context
-                val startLine = maxOf(0, range.line1 - 1)
-                val endLine = minOf(range.line2 + 1, lines.size)
-
-                if (startLine < lines.size) {
-                    lines.subList(startLine, endLine).joinToString("\n")
-                } else {
-                    ""
-                }
-            }
+            Range.DELETED -> extractLines(lines, range.line1 - 1, range.line1)
+            else          -> extractLinesWithContext(lines, range.line1, range.line2)
         }
     }
 
@@ -103,80 +79,27 @@ class ScopeDiffViewer(
      * Used by both diff viewer and rollback functionality.
      */
     fun getVcsContentForRange(range: Range, includeContext: Boolean = true): String {
+        val baseContent = vcsBaseContent
+        if (baseContent == null) {
+            if (range.type == Range.DELETED || range.type == Range.MODIFIED) LOG.warn("VCS base content not available")
+            return ""
+        }
+        val lines = baseContent.split("\n")
         return when (range.type) {
-            Range.INSERTED -> {
-                // For inserted ranges, there's nothing in VCS to restore (they were added locally)
-                val baseContent = vcsBaseContent
-                if (baseContent != null && includeContext) {
-                    val lines = baseContent.split("\n")
-
-                    // Get one line above for context
-                    if (range.vcsLine1 > 0 && range.vcsLine1 <= lines.size) {
-                        lines[range.vcsLine1 - 1]
-                    } else {
-                        ""
-                    }
-                } else {
-                    ""
-                }
-            }
-            Range.DELETED -> {
-                // For deleted ranges, restore the deleted content
-                val baseContent = vcsBaseContent
-                if (baseContent != null) {
-                    val lines = baseContent.split("\n")
-
-                    if (includeContext) {
-                        // With context: one line above and below
-                        val startLine = maxOf(0, range.vcsLine1 - 1)
-                        val endLine = minOf(range.vcsLine2 + 1, lines.size)
-                        if (startLine < lines.size) {
-                            lines.subList(startLine, endLine).joinToString("\n")
-                        } else {
-                            ""
-                        }
-                    } else {
-                        // Without context: exact range only
-                        if (range.vcsLine1 >= 0 && range.vcsLine2 <= lines.size) {
-                            lines.subList(range.vcsLine1, range.vcsLine2).joinToString("\n")
-                        } else {
-                            ""
-                        }
-                    }
-                } else {
-                    LOG.warn("VCS base content not available")
-                    ""
-                }
-            }
-            Range.MODIFIED -> {
-                // For modified ranges, get the base version
-                val baseContent = vcsBaseContent
-                if (baseContent != null) {
-                    val lines = baseContent.split("\n")
-
-                    if (includeContext) {
-                        // With context: one line above and below
-                        val startLine = maxOf(0, range.vcsLine1 - 1)
-                        val endLine = minOf(range.vcsLine2 + 1, lines.size)
-                        if (startLine < lines.size) {
-                            lines.subList(startLine, endLine).joinToString("\n")
-                        } else {
-                            ""
-                        }
-                    } else {
-                        // Without context: exact range only
-                        if (range.vcsLine1 >= 0 && range.vcsLine2 <= lines.size) {
-                            lines.subList(range.vcsLine1, range.vcsLine2).joinToString("\n")
-                        } else {
-                            ""
-                        }
-                    }
-                } else {
-                    LOG.warn("VCS base content not available")
-                    ""
-                }
-            }
+            Range.INSERTED           -> if (includeContext) extractLines(lines, range.vcsLine1 - 1, range.vcsLine1) else ""
+            Range.DELETED, Range.MODIFIED ->
+                if (includeContext) extractLinesWithContext(lines, range.vcsLine1, range.vcsLine2)
+                else                     extractLines(lines, range.vcsLine1, range.vcsLine2)
             else -> ""
         }
+    }
+
+    private fun extractLines(lines: List<String>, from: Int, to: Int): String =
+        if (from >= 0 && to <= lines.size) lines.subList(from, to).joinToString("\n") else ""
+
+    private fun extractLinesWithContext(lines: List<String>, from: Int, to: Int): String {
+        val start = maxOf(0, from - 1)
+        val end = minOf(to + 1, lines.size)
+        return if (start < lines.size) lines.subList(start, end).joinToString("\n") else ""
     }
 }

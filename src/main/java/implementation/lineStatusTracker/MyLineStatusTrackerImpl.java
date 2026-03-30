@@ -257,7 +257,7 @@ public class MyLineStatusTrackerImpl implements Disposable {
 
         // Extract and cache HEAD content if we have local changes (for fast filtering)
         String headContent = null;
-        if (hasLocalChanges && localChangesMap != null) {
+        if (hasLocalChanges) {
             Change localChange = localChangesMap.get(filePath);
             if (localChange != null && localChange.getBeforeRevision() != null) {
                 try {

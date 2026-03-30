@@ -618,8 +618,8 @@ public class ViewService implements Disposable {
         LOG.debug("incrementUpdate() -> generation = " + newGen);
     }
 
-    public CompletableFuture<Void> collectChanges(boolean checkFs) {
-        return collectChanges(getCurrent(), checkFs);
+    public void collectChanges(boolean checkFs) {
+        collectChanges(getCurrent(), checkFs);
     }
 
     /**

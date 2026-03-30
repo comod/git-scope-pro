@@ -2,11 +2,13 @@
 package implementation.gutter
 
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.editor.LogicalPosition
 import com.intellij.openapi.editor.colors.EditorColors
 import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.openapi.editor.ex.EditorGutterComponentEx
 import com.intellij.openapi.editor.markup.ActiveGutterRenderer
 import com.intellij.openapi.editor.markup.LineMarkerRendererEx
+import com.intellij.ui.JBColor
 import com.intellij.util.ui.JBUI
 import settings.GitScopeSettings
 import java.awt.Graphics
@@ -106,46 +108,27 @@ abstract class LineStatusGutterMarkerRenderer : LineMarkerRendererEx, ActiveGutt
         val hoveredArcSize = JBUI.scale(7)  // More rounded when hovered
         val arcSize = if (isHovered) hoveredArcSize else normalArcSize
 
-        when (range.type) {
-            Range.INSERTED -> {
-                // Paint for inserted lines (has current lines, no VCS lines)
-                val y1 = editor.logicalPositionToXY(com.intellij.openapi.editor.LogicalPosition(range.line1, 0)).y
-                val y2 = editor.logicalPositionToXY(com.intellij.openapi.editor.LogicalPosition(range.line2, 0)).y
-                val height = y2 - y1
-
-                // Draw rounded rectangle
-                g2d.fillRoundRect(x, y1, width, height, arcSize, arcSize)
-            }
-            Range.DELETED -> {
-                // Paint for deleted lines (no current lines, has VCS lines)
-                val y = editor.logicalPositionToXY(com.intellij.openapi.editor.LogicalPosition(range.line1, 0)).y
-                val height = JBUI.scale(8)  // Fixed height for deleted marker
-
-                // Draw rounded rectangle at the deletion point
-                g2d.fillRoundRect(x, y, width, height, arcSize, arcSize)
-            }
-            Range.MODIFIED -> {
-                // Paint for modified lines (has both current and VCS lines)
-                val y1 = editor.logicalPositionToXY(com.intellij.openapi.editor.LogicalPosition(range.line1, 0)).y
-                val y2 = editor.logicalPositionToXY(com.intellij.openapi.editor.LogicalPosition(range.line2, 0)).y
-                val height = y2 - y1
-
-                // Draw rounded rectangle
-                g2d.fillRoundRect(x, y1, width, height, arcSize, arcSize)
-            }
-        }
+        val bounds = rangeYBounds(editor, range)
+        g2d.fillRoundRect(x, bounds.first, width, bounds.last - bounds.first, arcSize, arcSize)
         
         // Restore original rendering hints
         g2d.setRenderingHints(oldHints)
     }
 
+    private fun rangeYBounds(editor: Editor, range: Range): IntRange {
+        val y1 = editor.logicalPositionToXY(LogicalPosition(range.line1, 0)).y
+        val y2 = if (range.type == Range.DELETED) y1 + JBUI.scale(8)
+                 else editor.logicalPositionToXY(LogicalPosition(range.line2, 0)).y
+        return y1..y2
+    }
+
     private fun getColorForChangeType(editor: EditorEx, type: Byte): java.awt.Color {
         val scheme = editor.colorsScheme
         return when (type) {
-            Range.INSERTED -> scheme.getColor(EditorColors.ADDED_LINES_COLOR) ?: java.awt.Color.GREEN
-            Range.DELETED -> scheme.getColor(EditorColors.DELETED_LINES_COLOR) ?: java.awt.Color.RED
-            Range.MODIFIED -> scheme.getColor(EditorColors.MODIFIED_LINES_COLOR) ?: java.awt.Color.BLUE
-            else -> java.awt.Color.GRAY
+            Range.INSERTED -> scheme.getColor(EditorColors.ADDED_LINES_COLOR) ?: JBColor.GREEN
+            Range.DELETED -> scheme.getColor(EditorColors.DELETED_LINES_COLOR) ?: JBColor.RED
+            Range.MODIFIED -> scheme.getColor(EditorColors.MODIFIED_LINES_COLOR) ?: JBColor.BLUE
+            else -> JBColor.GRAY
         }
     }
 
@@ -194,15 +177,7 @@ abstract class LineStatusGutterMarkerRenderer : LineMarkerRendererEx, ActiveGutt
 
         // Check if y is over any range.
         // DELETED ranges have line1 == line2, so y1 == y2 — use the painted height instead.
-        return ranges.any { range ->
-            val y1 = editor.logicalPositionToXY(com.intellij.openapi.editor.LogicalPosition(range.line1, 0)).y
-            val y2 = if (range.type == Range.DELETED) {
-                y1 + JBUI.scale(8)  // match the fixed height used in paintRange for DELETED
-            } else {
-                editor.logicalPositionToXY(com.intellij.openapi.editor.LogicalPosition(range.line2, 0)).y
-            }
-            y in y1..y2
-        }
+        return ranges.any { range -> y in rangeYBounds(editor, range) }
     }
 
     /**

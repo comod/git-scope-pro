@@ -306,8 +306,8 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
 
     public RepoChangesResult doCollectChanges(Project project, GitRepository repo, String scopeRef) {
         VirtualFile file = repo.getRoot();
-        Collection<Change> scopeChanges = new ArrayList<>();
-        Collection<Change> mergedChanges = new ArrayList<>();
+        Collection<Change> scopeChanges;
+        Collection<Change> mergedChanges;
         Collection<Change> repoLocalChanges;
 
         try {
@@ -361,7 +361,7 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
             LOG.debug("ChangesService - Repository: " + repoPath + ", localChanges count: " + repoLocalChanges.size());
 
             // Create merged changes: start with scope changes, then add local changes
-            mergedChanges.addAll(scopeChanges);
+            mergedChanges = new ArrayList<>(scopeChanges);
 
             // Add local changes that aren't already in the scope changes (excluding duplicates)
             Collection<Change> additionalLocalChanges = filterLocalChanges(repoLocalChanges, repoPath, scopeChanges);

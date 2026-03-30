@@ -31,6 +31,7 @@ import com.intellij.openapi.ui.popup.JBPopupListener
 import com.intellij.openapi.ui.popup.LightweightWindowEvent
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.ui.ColorUtil
 import com.intellij.ui.EditorTextField
 import com.intellij.ui.Gray
 import com.intellij.ui.JBColor
@@ -290,12 +291,12 @@ class ScopeLineStatusMarkerRenderer(
                 addSeparator()
                 add(object : AnAction(), com.intellij.openapi.actionSystem.ex.CustomComponentAction {
                     override fun createCustomComponent(
-                        presentation: com.intellij.openapi.actionSystem.Presentation,
+                        presentation: Presentation,
                         place: String
                     ): javax.swing.JComponent {
                         val label = com.intellij.ui.components.JBLabel(scopeName)
                         label.foreground = com.intellij.util.ui.UIUtil.getContextHelpForeground()
-                        label.border = com.intellij.util.ui.JBUI.Borders.emptyLeft(4)
+                        label.border = JBUI.Borders.emptyLeft(4)
                         return label
                     }
                     override fun actionPerformed(e: AnActionEvent) {}
@@ -335,11 +336,11 @@ class ScopeLineStatusMarkerRenderer(
 
         // Show at mouse position relative to the gutter component
         val relativePoint = RelativePoint(e)
-        popupRef?.show(relativePoint)
+        popupRef.show(relativePoint)
 
         // Track the active popup and add a mouse listener so clicking any marker
         // closes it first (allowing doAction to open a new one in a single click)
-        val capturedPopup = popupRef ?: return
+        val capturedPopup = popupRef
         activePopup = capturedPopup
 
         val popupDisposable = Disposer.newDisposable("ScopeGutterPopup")
@@ -397,17 +398,17 @@ class ScopeLineStatusMarkerRenderer(
         if (shouldLimitHeight) {
             val lineHeight = editor.lineHeight
             val maxHeight = lineHeight * maxLines
-            textField.setPreferredSize(java.awt.Dimension(preferredWidth, maxHeight))
+            textField.preferredSize = java.awt.Dimension(preferredWidth, maxHeight)
         } else {
             val lineHeight = editor.lineHeight
             val contentHeight = lineHeight * lineCount
-            textField.setPreferredSize(java.awt.Dimension(preferredWidth, contentHeight))
+            textField.preferredSize = java.awt.Dimension(preferredWidth, contentHeight)
         }
 
         textField.addSettingsProvider { popupEditor ->
             popupEditor.setVerticalScrollbarVisible(true)
             popupEditor.setHorizontalScrollbarVisible(true)
-            popupEditor.settings.setUseSoftWraps(false)
+            popupEditor.settings.isUseSoftWraps = false
             popupEditor.isRendererMode = true
             popupEditor.setBorder(null)
             popupEditor.colorsScheme = editor.colorsScheme
@@ -477,9 +478,9 @@ class ScopeLineStatusMarkerRenderer(
 
                     val gradient = java.awt.GradientPaint(
                         0f, startY.toFloat(),
-                        java.awt.Color(popupBackgroundColor.red, popupBackgroundColor.green, popupBackgroundColor.blue, 0),
+                        ColorUtil.toAlpha(popupBackgroundColor, 0),
                         0f, height.toFloat(),
-                        java.awt.Color(popupBackgroundColor.red, popupBackgroundColor.green, popupBackgroundColor.blue, 255)
+                        ColorUtil.toAlpha(popupBackgroundColor, 255)
                     )
                     g2d.paint = gradient
                     g2d.fillRect(0, startY, width, fadeHeight)
@@ -648,7 +649,7 @@ class ScopeLineStatusMarkerRenderer(
                 ) { rh: RangeHighlighterEx ->
                     rh.setErrorStripeMarkColor(color)
                     rh.isThinErrorStripeMark = true
-                    rh.setEditorFilter(MarkupEditorFilterFactory.createIsNotDiffFilter())
+                    rh.editorFilter = MarkupEditorFilterFactory.createIsNotDiffFilter()
                 }
 
                 errorStripeHighlighters.add(highlighter)
@@ -664,9 +665,9 @@ class ScopeLineStatusMarkerRenderer(
         val editor = editors.firstOrNull() as? EditorEx ?: return null
         val scheme = editor.colorsScheme
         return when (type) {
-            Range.INSERTED -> scheme.getColor(EditorColors.ADDED_LINES_COLOR) ?: java.awt.Color(0x507520)
-            Range.DELETED -> scheme.getColor(EditorColors.DELETED_LINES_COLOR) ?: java.awt.Color(0x9C2A2A)
-            Range.MODIFIED -> scheme.getColor(EditorColors.MODIFIED_LINES_COLOR) ?: java.awt.Color(0x365880)
+            Range.INSERTED -> scheme.getColor(EditorColors.ADDED_LINES_COLOR) ?: JBColor.GREEN
+            Range.DELETED  -> scheme.getColor(EditorColors.DELETED_LINES_COLOR) ?: JBColor.RED
+            Range.MODIFIED -> scheme.getColor(EditorColors.MODIFIED_LINES_COLOR) ?: JBColor.BLUE
             else -> null
         }
     }
@@ -707,7 +708,7 @@ class ScopeLineStatusMarkerRenderer(
                 rangeHighlighter.isGreedyToLeft = true
                 rangeHighlighter.isGreedyToRight = true
                 // Suppress in diff editors — mirrors LineStatusMarkerRenderer's approach
-                rangeHighlighter.setEditorFilter(MarkupEditorFilterFactory.createIsNotDiffFilter())
+                rangeHighlighter.editorFilter = MarkupEditorFilterFactory.createIsNotDiffFilter()
             }
 
             gutterHighlighter = highlighter
