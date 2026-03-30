@@ -27,6 +27,8 @@ import com.intellij.openapi.editor.markup.MarkupEditorFilterFactory
 import com.intellij.openapi.editor.markup.RangeHighlighter
 import com.intellij.openapi.progress.DumbProgressIndicator
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.editor.event.EditorFactoryEvent
+import com.intellij.openapi.editor.event.EditorFactoryListener
 import com.intellij.openapi.editor.event.EditorMouseEvent
 import com.intellij.openapi.editor.event.EditorMouseListener
 import com.intellij.openapi.ui.popup.JBPopupFactory
@@ -123,6 +125,11 @@ class ScopeLineStatusMarkerRenderer(
         override fun mouseExited(e: MouseEvent) {
             clearHover()
         }
+        override fun mouseEntered(e: MouseEvent) {
+            // Re-evaluate on entry so any hover state stuck from a previous session
+            // (fast mouse exit, OS focus change, popup covering gutter) is corrected.
+            updateHoverState(e)
+        }
     }
 
     init {
@@ -131,18 +138,30 @@ class ScopeLineStatusMarkerRenderer(
     }
 
     private fun installMouseListeners() {
-        ApplicationManager.getApplication().invokeLater {
-            if (!disposed) {
-                val editors = EditorFactory.getInstance().getEditors(document, project)
-                for (editor in editors) {
-                    if (editor is EditorEx) {
-                        val gutter = editor.gutterComponentEx
-                        gutter.addMouseMotionListener(mouseMotionListener)
-                        gutter.addMouseListener(mouseListener)
-                    }
+        // Called from init, which always runs on EDT (renderer construction is EDT-only).
+        // Install synchronously — no invokeLater — so the editor that triggered this
+        // renderer's creation is found immediately via getEditors() without a timing race.
+        val factory = EditorFactory.getInstance()
+        for (editor in factory.getEditors(document, project)) {
+            installOnEditor(editor)
+        }
+        // Also catch split editors opened after this renderer is created.
+        factory.addEditorFactoryListener(object : EditorFactoryListener {
+            override fun editorCreated(event: EditorFactoryEvent) {
+                val editor = event.editor
+                if (!disposed && editor.document == document) {
+                    installOnEditor(editor)
                 }
-                syncFillerWithSetting()
             }
+        }, this@ScopeLineStatusMarkerRenderer)
+        syncFillerWithSetting()
+    }
+
+    private fun installOnEditor(editor: Editor) {
+        if (editor is EditorEx) {
+            val gutter = editor.gutterComponentEx
+            gutter.addMouseMotionListener(mouseMotionListener)
+            gutter.addMouseListener(mouseListener)
         }
     }
 
@@ -155,17 +174,19 @@ class ScopeLineStatusMarkerRenderer(
         val x = e.x
         val y = e.y
 
-        // Check if in marker area (must match canDoAction logic)
+        // Check if in marker area — must match canDoAction logic exactly so that
+        // hover is cleared precisely when the painted marker is no longer under the cursor.
         val gitScopeSettings = settings.GitScopeSettings.getInstance()
+        val gutterArea = getGutterArea(editor)
+        val areaWidth = gutterArea.second - gutterArea.first
+        val hoverExpansion = maxOf(areaWidth - JBUI.scale(1), JBUI.scale(1))
         val inMarkerArea: Boolean
 
         if (gitScopeSettings.isSeparateGutterRendering) {
-            val markerX = maxOf(gutter.annotationsAreaOffset, gutter.annotationsAreaOffset + gutter.annotationsAreaWidth - JBUI.scale(4))
-            inMarkerArea = x in (markerX - JBUI.scale(1))..(markerX + JBUI.scale(9))
+            val markerX = maxOf(gutter.annotationsAreaOffset, gutter.annotationsAreaOffset + gutter.annotationsAreaWidth - areaWidth)
+            inMarkerArea = x in (markerX - JBUI.scale(1))..(markerX + areaWidth + hoverExpansion)
         } else {
-            // Merged: use same gutter area as paint, expanded by hover margin
-            val gutterArea = getGutterArea(editor)
-            inMarkerArea = x in (gutterArea.first - JBUI.scale(3))..(gutterArea.second + JBUI.scale(3))
+            inMarkerArea = x in (gutterArea.first - hoverExpansion - JBUI.scale(1))..(gutterArea.second + JBUI.scale(1))
         }
 
         // Check if mouse is over any range (y-axis)
@@ -352,7 +373,7 @@ class ScopeLineStatusMarkerRenderer(
                     ): javax.swing.JComponent {
                         val label = com.intellij.ui.components.JBLabel(scopeName)
                         label.foreground = com.intellij.util.ui.UIUtil.getContextHelpForeground()
-                        label.border = JBUI.Borders.emptyLeft(4)
+                        label.border = JBUI.Borders.empty(0, 4, 0, 8)
                         return label
                     }
                     override fun actionPerformed(e: AnActionEvent) {}
@@ -381,6 +402,10 @@ class ScopeLineStatusMarkerRenderer(
         // Create lightweight popup with toolbar and inline diff.
         // cancelOnClickOutside=false: the EditorMouseListener handles closing so the gutter
         // click is NOT consumed by the popup mechanism — enabling single-click switching.
+        // setBorderColor: explicitly set the popup window border so it is consistent across
+        // themes. Without it, themes that don't decorate popup windows render the toolbar
+        // area without any surrounding border while the diff panel below it has one.
+        val popupBorderColor = JBColor.namedColor("VersionControl.MarkerPopup.borderColor", JBColor(Gray._206, Gray._75))
         popupRef = JBPopupFactory.getInstance()
             .createComponentPopupBuilder(contentPanel, null)
             .setRequestFocus(false)
@@ -388,6 +413,7 @@ class ScopeLineStatusMarkerRenderer(
             .setMovable(false)
             .setResizable(false)
             .setCancelOnClickOutside(false)
+            .setBorderColor(popupBorderColor)
             .createPopup()
 
         // Show at mouse position relative to the gutter component

@@ -95,6 +95,15 @@ abstract class LineStatusGutterMarkerRenderer : LineMarkerRendererEx, ActiveGutt
                         hoveredRange.line2 == range.line2 &&
                         hoveredRange.type == range.type)
 
+        // lineMarkerAreaWidth is @ApiStatus.Internal on EditorGutterComponentEx.
+        // getGutterArea() already reflects it: areaWidth == gutterArea.second - gutterArea.first.
+        // Using it here means normal and hover thickness are always platform-consistent
+        // (correct on both Windows and Linux without hardcoded pixel guesses).
+        val gutterArea = getGutterArea(editor)
+        val areaWidth = gutterArea.second - gutterArea.first
+        // Hover expands by (areaWidth - 1 px), matching the IDE's own VCS marker behaviour.
+        val hoverExpansion = maxOf(areaWidth - JBUI.scale(1), JBUI.scale(1))
+
         val x: Int
         val width: Int
         if (settings.isSeparateGutterRendering) {
@@ -103,16 +112,13 @@ abstract class LineStatusGutterMarkerRenderer : LineMarkerRendererEx, ActiveGutt
             // column (public API equivalent of the @ApiInternal lineNumberAreaOffset).
             // Subtract the marker width so the marker's right edge aligns with the line numbers.
             // maxOf guards the case where annotationsAreaWidth == 0 (no blame).
-            val normalWidth = JBUI.scale(4)
-            val hoveredWidth = JBUI.scale(6)
-            width = if (isHovered) hoveredWidth else normalWidth
-            x = maxOf(gutter.annotationsAreaOffset, gutter.annotationsAreaOffset + gutter.annotationsAreaWidth - normalWidth)
+            width = if (isHovered) areaWidth + hoverExpansion else areaWidth
+            x = maxOf(gutter.annotationsAreaOffset, gutter.annotationsAreaOffset + gutter.annotationsAreaWidth - areaWidth)
         } else {
             // Merged rendering: mirror LineStatusMarkerDrawUtil.getGutterArea()
             // so our markers align exactly with the IDE's own VCS change bars.
-            val gutterArea = getGutterArea(editor)
-            // IDE expands left on hover, keeping right edge fixed at endX
-            x = if (isHovered) gutterArea.first - JBUI.scale(3) else gutterArea.first
+            // IDE expands left on hover, keeping right edge fixed at gutterArea.second.
+            x = if (isHovered) gutterArea.first - hoverExpansion else gutterArea.first
             width = gutterArea.second - x
         }
 
@@ -161,18 +167,20 @@ abstract class LineStatusGutterMarkerRenderer : LineMarkerRendererEx, ActiveGutt
         val x = e.x
         val y = e.y
 
-        // Check if mouse is in our marker x-area
+        // Check if mouse is in our marker x-area (must match paint logic exactly)
         val settings = GitScopeSettings.getInstance()
+        val gutterArea = getGutterArea(editorEx)
+        val areaWidth = gutterArea.second - gutterArea.first
+        val hoverExpansion = maxOf(areaWidth - JBUI.scale(1), JBUI.scale(1))
 
         if (settings.isSeparateGutterRendering) {
-            val markerX = maxOf(gutter.annotationsAreaOffset, gutter.annotationsAreaOffset + gutter.annotationsAreaWidth - JBUI.scale(4))
-            if (x !in (markerX - JBUI.scale(1))..(markerX + JBUI.scale(9))) {
+            val markerX = maxOf(gutter.annotationsAreaOffset, gutter.annotationsAreaOffset + gutter.annotationsAreaWidth - areaWidth)
+            if (x !in (markerX - JBUI.scale(1))..(markerX + areaWidth + hoverExpansion)) {
                 return false
             }
         } else {
-            // Merged: use same gutter area as paint, expanded by hover margin
-            val gutterArea = getGutterArea(editorEx)
-            if (x !in (gutterArea.first - JBUI.scale(3))..(gutterArea.second + JBUI.scale(3))) {
+            // Merged: use same gutter area as paint, cover full hover extent
+            if (x !in (gutterArea.first - hoverExpansion - JBUI.scale(1))..(gutterArea.second + JBUI.scale(1))) {
                 return false
             }
         }

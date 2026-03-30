@@ -90,7 +90,8 @@ public class MyLineStatusTrackerImpl implements Disposable {
 
                     @Override
                     public void fileClosed(@NotNull FileEditorManager source, @NotNull VirtualFile file) {
-                        Document doc = FileDocumentManager.getInstance().getDocument(file);
+                        Document doc = ApplicationManager.getApplication().runReadAction(
+                                (Computable<Document>) () -> FileDocumentManager.getInstance().getDocument(file));
                         if (doc != null) {
                             release(doc);
                         }
