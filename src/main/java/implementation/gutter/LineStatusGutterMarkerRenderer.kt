@@ -1,4 +1,6 @@
-// Adapted from IntelliJ Platform for Git Scope Pro
+// Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Based on com.intellij.openapi.vcs.ex.LineStatusMarkerRenderer from the IntelliJ Platform
+// (platform/diff-impl), modified for Git Scope Pro.
 package implementation.gutter
 
 import com.intellij.openapi.editor.Editor
