@@ -21,7 +21,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import system.Defs;
 
-import java.awt.*;
+import java.awt.Component;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -143,17 +143,9 @@ public class CommitDiffWorkaround implements Disposable {
         synchronized (this) {
             // Register the editor
             commitDiffEditors.computeIfAbsent(doc, k -> new HashSet<>()).add(editor);
-
-            // Pre-cache HEAD content if tracked
-            if (baseRevisionSwitcher.isTracked(doc)) {
-                if (baseRevisionSwitcher.getCachedHeadContent(doc) == null) {
-                    String headContent = fetchHeadRevisionContent(file);
-                    if (headContent != null) {
-                        baseRevisionSwitcher.cacheHeadContent(doc, headContent);
-                    }
-                }
-            }
         }
+
+        prefetchHeadContent(doc, file);
 
         // Check if a commit diff editor is currently selected - if so, activate HEAD base
         scheduleActivationIfCommitDiffSelected();
@@ -288,6 +280,7 @@ public class CommitDiffWorkaround implements Disposable {
      * custom base restored.
      */
     private void activateHeadBaseForAllCommitDiffs() {
+        List<Document> documentsToActivate = new ArrayList<>();
         synchronized (this) {
             for (Map.Entry<Document, Set<Editor>> entry : commitDiffEditors.entrySet()) {
                 Document doc = entry.getKey();
@@ -296,40 +289,12 @@ public class CommitDiffWorkaround implements Disposable {
                 if (diffEditors.isEmpty()) {
                     continue;
                 }
-
-                VirtualFile file = FileDocumentManager.getInstance().getFile(doc);
-                if (file == null) {
-                    continue;
-                }
-
-                if (!baseRevisionSwitcher.isTracked(doc)) {
-                    continue;
-                }
-
-                if (baseRevisionSwitcher.isShowingHeadBase(doc)) {
-                    continue;
-                }
-
-                // Get HEAD content (fetch if not cached)
-                String headContent = baseRevisionSwitcher.getCachedHeadContent(doc);
-                if (headContent == null) {
-                    headContent = fetchHeadRevisionContent(file);
-                    if (headContent != null) {
-                        baseRevisionSwitcher.cacheHeadContent(doc, headContent);
-                    }
-                }
-
-                if (headContent != null) {
-                    baseRevisionSwitcher.markShowingHeadBase(doc, true);
-                    activeCommitDiffs.add(doc);
-
-                    String finalHeadContent = headContent;
-                    ApplicationManager.getApplication().invokeLater(() -> {
-                        if (disposing.get()) return;
-                        baseRevisionSwitcher.switchToHeadBase(doc, finalHeadContent);
-                    }, ModalityState.defaultModalityState(), __ -> disposing.get());
-                }
+                documentsToActivate.add(doc);
             }
+        }
+
+        for (Document doc : documentsToActivate) {
+            activateHeadBaseForDocument(doc);
         }
     }
 
@@ -366,6 +331,84 @@ public class CommitDiffWorkaround implements Disposable {
                 baseRevisionSwitcher.switchToCustomBase(doc, customContent);
             }, ModalityState.defaultModalityState(), __ -> disposing.get());
         }
+    }
+
+    private void prefetchHeadContent(@NotNull Document document, @NotNull VirtualFile file) {
+        if (!baseRevisionSwitcher.isTracked(document) || baseRevisionSwitcher.getCachedHeadContent(document) != null) {
+            return;
+        }
+
+        ApplicationManager.getApplication().executeOnPooledThread(() -> {
+            String headContent = fetchHeadRevisionContent(file);
+            if (headContent == null) {
+                return;
+            }
+
+            ApplicationManager.getApplication().invokeLater(() -> {
+                if (disposing.get() || !baseRevisionSwitcher.isTracked(document)) return;
+                if (baseRevisionSwitcher.getCachedHeadContent(document) == null) {
+                    baseRevisionSwitcher.cacheHeadContent(document, headContent);
+                }
+            }, ModalityState.defaultModalityState(), __ -> disposing.get());
+        });
+    }
+
+    private void activateHeadBaseForDocument(@NotNull Document document) {
+        if (disposing.get() || !baseRevisionSwitcher.isTracked(document) || baseRevisionSwitcher.isShowingHeadBase(document)) {
+            return;
+        }
+        if (!hasCommitDiffEditorsFor(document)) {
+            return;
+        }
+
+        VirtualFile file = FileDocumentManager.getInstance().getFile(document);
+        if (file == null) {
+            return;
+        }
+
+        String cachedHeadContent = baseRevisionSwitcher.getCachedHeadContent(document);
+        if (cachedHeadContent != null) {
+            applyHeadBase(document, cachedHeadContent);
+            return;
+        }
+
+        ApplicationManager.getApplication().executeOnPooledThread(() -> {
+            String headContent = fetchHeadRevisionContent(file);
+            if (headContent == null) {
+                return;
+            }
+
+            ApplicationManager.getApplication().invokeLater(() -> {
+                if (disposing.get()) return;
+                if (!baseRevisionSwitcher.isTracked(document) || baseRevisionSwitcher.isShowingHeadBase(document)) return;
+                if (!hasCommitDiffEditorsFor(document)) return;
+
+                if (baseRevisionSwitcher.getCachedHeadContent(document) == null) {
+                    baseRevisionSwitcher.cacheHeadContent(document, headContent);
+                }
+                applyHeadBase(document, headContent);
+            }, ModalityState.defaultModalityState(), __ -> disposing.get());
+        });
+    }
+
+    private void applyHeadBase(@NotNull Document document, @NotNull String headContent) {
+        if (disposing.get() || !baseRevisionSwitcher.isTracked(document) || baseRevisionSwitcher.isShowingHeadBase(document)) {
+            return;
+        }
+        if (!hasCommitDiffEditorsFor(document)) {
+            return;
+        }
+
+        baseRevisionSwitcher.markShowingHeadBase(document, true);
+        synchronized (this) {
+            activeCommitDiffs.add(document);
+        }
+
+        ApplicationManager.getApplication().invokeLater(() -> {
+            if (disposing.get()) return;
+            if (!baseRevisionSwitcher.isShowingHeadBase(document)) return;
+            baseRevisionSwitcher.switchToHeadBase(document, headContent);
+        }, ModalityState.defaultModalityState(), __ -> disposing.get());
     }
 
     private String fetchHeadRevisionContent(@NotNull VirtualFile file) {

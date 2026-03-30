@@ -67,6 +67,18 @@ public class MyLineStatusTrackerImpl implements Disposable {
         }
     }
 
+    private static final class TrackerUpdateRequest {
+        private final Document document;
+        private final String filePath;
+        private final Change change;
+
+        private TrackerUpdateRequest(@NotNull Document document, @NotNull String filePath, @Nullable Change change) {
+            this.document = document;
+            this.filePath = filePath;
+            this.change = change;
+        }
+    }
+
     @Override
     public void dispose() {
         disposalToken.disposed = true;
@@ -221,46 +233,75 @@ public class MyLineStatusTrackerImpl implements Disposable {
         ApplicationManager.getApplication().invokeLater(() -> {
             if (token.disposed) return;
 
-            Editor[] editors = EditorFactory.getInstance().getAllEditors();
-            for (Editor editor : editors) {
-                if (isDiffView(editor)) continue;
-                // Platform handles gutter repainting automatically - no need to force it
-                updateLineStatusByChangesForEditor(editor, scopeChangesMap);
-            }
+            Collection<TrackerUpdateRequest> requests = collectTrackerUpdateRequests(scopeChangesMap);
+            if (requests.isEmpty()) return;
+
+            ApplicationManager.getApplication().executeOnPooledThread(() -> {
+                Map<Document, String> resolvedContent = resolveRevisionContent(requests);
+                ApplicationManager.getApplication().invokeLater(() -> {
+                    if (token.disposed) return;
+                    applyTrackerUpdates(requests, resolvedContent);
+                }, ModalityState.defaultModalityState(), __ -> token.disposed);
+            });
         }, ModalityState.defaultModalityState(), __ -> token.disposed);
     }
 
-    private void updateLineStatusByChangesForEditor(Editor editor, Map<String, Change> scopeChangesMap) {
-        if (editor == null || disposing.get()) return;
+    private @NotNull Collection<TrackerUpdateRequest> collectTrackerUpdateRequests(@NotNull Map<String, Change> scopeChangesMap) {
+        Map<Document, TrackerUpdateRequest> requests = new LinkedHashMap<>();
+        Editor[] editors = EditorFactory.getInstance().getAllEditors();
+        for (Editor editor : editors) {
+            if (editor.isDisposed() || isDiffView(editor)) continue;
 
-        Document doc = editor.getDocument();
-        VirtualFile file = FileDocumentManager.getInstance().getFile(doc);
-        if (file == null) return;
+            Document document = editor.getDocument();
+            if (requests.containsKey(document)) continue;
 
-        String filePath = file.getPath();
+            VirtualFile file = FileDocumentManager.getInstance().getFile(document);
+            if (file == null) continue;
 
-        // Look up the change for this editor's file using the map
-        Change changeForFile = scopeChangesMap.get(filePath);
-
-        String content;
-        if (changeForFile != null && changeForFile.getBeforeRevision() != null) {
-            // Extract content for this specific file only
-            try {
-                content = changeForFile.getBeforeRevision().getContent();
-            } catch (VcsException e) {
-                LOG.warn("Error getting content for revision: " + filePath, e);
-                content = null;
-            }
-
-            if (content == null) {
-                content = doc.getCharsSequence().toString();
-            }
-        } else {
-            // No revision content available, use current document content
-            content = doc.getCharsSequence().toString();
+            String filePath = file.getPath();
+            requests.put(document, new TrackerUpdateRequest(document, filePath, scopeChangesMap.get(filePath)));
         }
+        return requests.values();
+    }
 
-        updateTrackerBaseContent(doc, content);
+    private @NotNull Map<Document, String> resolveRevisionContent(@NotNull Collection<TrackerUpdateRequest> requests) {
+        Map<Document, String> resolvedContent = new HashMap<>();
+        for (TrackerUpdateRequest request : requests) {
+            Change change = request.change;
+            if (change == null || change.getBeforeRevision() == null) continue;
+
+            try {
+                String content = change.getBeforeRevision().getContent();
+                if (content != null) {
+                    resolvedContent.put(request.document, content);
+                }
+            } catch (VcsException e) {
+                LOG.warn("Error getting content for revision: " + request.filePath, e);
+            }
+        }
+        return resolvedContent;
+    }
+
+    private void applyTrackerUpdates(@NotNull Collection<TrackerUpdateRequest> requests,
+                                     @NotNull Map<Document, String> resolvedContent) {
+        for (TrackerUpdateRequest request : requests) {
+            if (!hasOpenMainEditor(request.document)) continue;
+
+            String content = resolvedContent.get(request.document);
+            if (content == null) {
+                content = request.document.getCharsSequence().toString();
+            }
+            updateTrackerBaseContent(request.document, content);
+        }
+    }
+
+    private boolean hasOpenMainEditor(@NotNull Document document) {
+        for (Editor editor : EditorFactory.getInstance().getAllEditors()) {
+            if (!editor.isDisposed() && !isDiffView(editor) && editor.getDocument() == document) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
