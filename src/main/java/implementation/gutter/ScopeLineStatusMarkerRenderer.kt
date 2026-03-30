@@ -20,6 +20,7 @@ import com.intellij.openapi.editor.ex.RangeHighlighterEx
 import com.intellij.openapi.editor.impl.DocumentMarkupModel
 import com.intellij.openapi.editor.markup.HighlighterTargetArea
 import com.intellij.openapi.editor.markup.LineMarkerRenderer
+import com.intellij.openapi.editor.markup.MarkupEditorFilterFactory
 import com.intellij.openapi.editor.markup.RangeHighlighter
 import com.intellij.openapi.progress.DumbProgressIndicator
 import com.intellij.openapi.project.Project
@@ -580,6 +581,7 @@ class ScopeLineStatusMarkerRenderer(
                 ) { rh: RangeHighlighterEx ->
                     rh.setErrorStripeMarkColor(color)
                     rh.isThinErrorStripeMark = true
+                    rh.setEditorFilter(MarkupEditorFilterFactory.createIsNotDiffFilter())
                 }
 
                 errorStripeHighlighters.add(highlighter)
@@ -637,6 +639,8 @@ class ScopeLineStatusMarkerRenderer(
                 rangeHighlighter.lineMarkerRenderer = createGutterMarkerRenderer()
                 rangeHighlighter.isGreedyToLeft = true
                 rangeHighlighter.isGreedyToRight = true
+                // Suppress in diff editors — mirrors LineStatusMarkerRenderer's approach
+                rangeHighlighter.setEditorFilter(MarkupEditorFilterFactory.createIsNotDiffFilter())
             }
 
             gutterHighlighter = highlighter

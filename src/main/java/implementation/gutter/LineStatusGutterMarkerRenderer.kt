@@ -33,6 +33,8 @@ abstract class LineStatusGutterMarkerRenderer : LineMarkerRendererEx, ActiveGutt
     open fun getHoveredRange(): Range? = null
 
     override fun paint(editor: Editor, g: Graphics, r: Rectangle) {
+        // Mirror LineStatusTracker.isAvailableAt(): skip when the line marker area is hidden
+        if (!editor.settings.isLineMarkerAreaShown) return
         val ranges = getPaintedRanges() ?: return
         if (ranges.isEmpty()) return
 
