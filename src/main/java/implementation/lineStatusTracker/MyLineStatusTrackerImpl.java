@@ -55,9 +55,9 @@ public class MyLineStatusTrackerImpl implements Disposable {
 
     private static final class RendererInfo {
         volatile ScopeLineStatusMarkerRenderer renderer;
-        volatile String baseContent;  // Scope base revision content (e.g., HEAD~2)
-        volatile String headContent;  // HEAD content (cached for fast filtering)
-        volatile Change localChange;  // Local change for filtering
+        volatile String baseContent;          // Scope base revision content (e.g., HEAD~2)
+        volatile String headContent;          // HEAD content (cached for fast filtering)
+        volatile List<Range> scopeRanges;     // diff(HEAD, scopeBase) — stable between keystrokes
         volatile DocumentListener documentListener;
 
         RendererInfo(ScopeLineStatusMarkerRenderer renderer, String baseContent) {
@@ -116,16 +116,11 @@ public class MyLineStatusTrackerImpl implements Disposable {
         }
 
         final DisposalToken token = this.disposalToken;
-
         // Process editors in parallel on background threads
         ApplicationManager.getApplication().executeOnPooledThread(() -> {
             if (token.disposed) return;
 
             Editor[] editors = EditorFactory.getInstance().getAllEditors();
-
-            // Check if IDE gutter is enabled to determine rendering strategy
-            VcsApplicationSettings vcsSettings = VcsApplicationSettings.getInstance();
-            boolean ideGutterEnabled = vcsSettings.SHOW_LST_GUTTER_MARKERS;
 
             // Filter editors that need updates
             List<Editor> editorsToUpdate = new ArrayList<>();
@@ -189,19 +184,15 @@ public class MyLineStatusTrackerImpl implements Disposable {
         final Document document;
         final VirtualFile file;
         final String baseContent;
-        final String headContent;  // Cache HEAD content to avoid VCS calls on every keystroke
-        final String currentContent;
+        final String headContent;   // Cached HEAD content (avoids VCS calls on every keystroke)
         final List<Range> precomputedRanges;
-        final Change localChange;  // Store local change for future recalculations
 
-        UpdateInfo(Document document, VirtualFile file, String baseContent, String headContent, String currentContent, List<Range> ranges, Change localChange) {
+        UpdateInfo(Document document, VirtualFile file, String baseContent, String headContent, List<Range> ranges) {
             this.document = document;
             this.file = file;
             this.baseContent = baseContent;
             this.headContent = headContent;
-            this.currentContent = currentContent;
             this.precomputedRanges = ranges;
-            this.localChange = localChange;
         }
     }
 
@@ -282,19 +273,16 @@ public class MyLineStatusTrackerImpl implements Disposable {
 
         List<Range> ranges;
         try {
-            // Compare current document to base (target)
-            // This gives us all changes: scope + local combined
-            List<Range> allRanges = RangesBuilder.INSTANCE.createRanges(normalizedCurrent, normalizedBase);
-            LOG.info("MyLineStatusTrackerImpl - File: " + filePath + ", all ranges computed: " + allRanges.size());
-
-            // If file has local changes, filter/split ranges to show only scope changes
             if (headContent != null) {
-                ranges = filterAndSplitRanges(allRanges, normalizedCurrent, headContent, filePath);
+                // Use HEAD as bridge: diff(HEAD, scopeBase) gives exact VCS coords,
+                // then map to current space using diff(current, HEAD)
+                ranges = computeScopeRangesInCurrentSpace(headContent, normalizedBase, normalizedCurrent, filePath);
             } else {
-                ranges = allRanges;
+                // No local change info available: direct diff against scope base
+                ranges = RangesBuilder.INSTANCE.createRanges(normalizedCurrent, normalizedBase);
             }
 
-            LOG.info("MyLineStatusTrackerImpl - File: " + filePath + ", final ranges after filtering: " + ranges.size());
+            LOG.info("MyLineStatusTrackerImpl - File: " + filePath + ", final ranges: " + ranges.size());
             for (Range range : ranges) {
                 LOG.info("MyLineStatusTrackerImpl - Range: line1=" + range.getLine1() + ", line2=" + range.getLine2() +
                     ", vcsLine1=" + range.getVcsLine1() + ", vcsLine2=" + range.getVcsLine2() + ", type=" + range.getType());
@@ -304,58 +292,53 @@ public class MyLineStatusTrackerImpl implements Disposable {
             ranges = Collections.emptyList();
         }
 
-        // Get the local change for this file (if any) to store for future recalculations
-        Change localChange = (localChangesMap != null) ? localChangesMap.get(filePath) : null;
-        
-        return new UpdateInfo(doc, file, normalizedBase, headContent, normalizedCurrent, ranges, localChange);
+        return new UpdateInfo(doc, file, normalizedBase, headContent, ranges);
     }
 
     private void applyBatchedUpdates(List<UpdateInfo> updates) {
         for (UpdateInfo update : updates) {
             if (disposing.get()) break;
-            updateRendererWithPrecomputedRanges(update.document, update.file, update.baseContent, update.headContent, update.precomputedRanges, update.localChange);
+            updateRendererWithPrecomputedRanges(update.document, update.file, update.baseContent, update.headContent, update.precomputedRanges);
         }
     }
 
     /**
      * Updates or creates the renderer with precomputed ranges.
-     * This is called on EDT with ranges already computed off EDT for better performance.
+     * Called on EDT; ranges were already computed off EDT for performance.
      */
-    private synchronized void updateRendererWithPrecomputedRanges(@NotNull Document document, @NotNull VirtualFile file,
-                                                                   @NotNull String baseContent, String headContent, @NotNull List<Range> ranges, Change localChange) {
+    private synchronized void updateRendererWithPrecomputedRanges(
+            @NotNull Document document, @NotNull VirtualFile file,
+            @NotNull String baseContent, String headContent, @NotNull List<Range> ranges) {
         if (disposing.get()) return;
 
         try {
-            // Get or create renderer info
             RendererInfo info = renderers.get(document);
             if (info == null) {
-                // Create new renderer
                 ScopeLineStatusMarkerRenderer renderer = new ScopeLineStatusMarkerRenderer(
-                        project,
-                        document,
-                        file,
-                        this
-                );
+                        project, document, file, this);
                 info = new RendererInfo(renderer, baseContent);
                 renderers.put(document, info);
 
-                // Add document listener to track edits
-                DocumentListener documentListener = createDocumentListener(document);
+                DocumentListener documentListener = createDocumentListener(document, info);
                 info.documentListener = documentListener;
                 document.addDocumentListener(documentListener, this);
             } else {
-                // Update base content
                 info.baseContent = baseContent;
             }
 
-            // Cache HEAD content and local change for fast recalculations
             info.headContent = headContent;
-            info.localChange = localChange;
 
-            // Set the VCS base content so diff viewer can use it
+            // Pre-compute diff(HEAD, scopeBase) once — both are fixed git revisions and
+            // never change while the user types, so keystrokes only need diff(current, HEAD).
+            if (headContent != null) {
+                info.scopeRanges = RangesBuilder.INSTANCE.createRanges(headContent, baseContent);
+            } else {
+                info.scopeRanges = null;
+            }
+
+            // Let the diff viewer access the VCS base content for popups/rollback
             info.renderer.setVcsBaseContent(info.baseContent);
 
-            // Update the renderer with precomputed ranges
             info.renderer.updateRanges(ranges);
 
         } catch (Exception e) {
@@ -364,255 +347,236 @@ public class MyLineStatusTrackerImpl implements Disposable {
     }
 
     /**
-     * Creates a document listener that recalculates ranges on document changes.
-     * Recalculates instantly for "live" movement of scope markers as the user types.
+     * Creates a document listener that recalculates scope ranges on every document change.
+     * Runs off EDT so it does not block typing.
      */
-    private DocumentListener createDocumentListener(@NotNull Document document) {
+    private DocumentListener createDocumentListener(@NotNull Document document, @NotNull RendererInfo info) {
         return new DocumentListener() {
             @Override
             public void documentChanged(@NotNull DocumentEvent event) {
                 if (disposing.get()) return;
+                if (info.baseContent == null) return;
 
-                // Recalculate ranges when document changes for instant "live" movement
-                // This ensures scope markers adjust immediately as the user types
-                RendererInfo info = renderers.get(document);
-                if (info != null && info.baseContent != null) {
-                    // Schedule recalculation on pooled thread to avoid blocking EDT
-                    ApplicationManager.getApplication().executeOnPooledThread(() -> {
-                        if (!disposing.get()) {
-                            recalculateAndUpdateRangesAsync(document, info);
-                        }
-                    });
-                }
+                ApplicationManager.getApplication().executeOnPooledThread(() -> {
+                    if (!disposing.get()) {
+                        recalculateAndUpdateRangesAsync(document, info);
+                    }
+                });
             }
         };
     }
 
     /**
-     * Filters and splits scope change ranges to exclude local-only changes.
-     * When a scope range overlaps with a local change, it's split into parts before/after the local change.
-     * Uses cached HEAD content for performance (no VCS calls).
+     * Computes scope ranges in current-document coordinate space using HEAD as a bridge.
      *
-     * @param allRanges All ranges from comparing current document to base (scope + local combined)
-     * @param currentContent Current document content
-     * @param headContent HEAD revision content (cached)
-     * @param filePath File path for logging
-     * @return Filtered/split list with only scope change ranges
+     * <p>Instead of diff(current, scopeBase) and stripping local changes (which conflates
+     * scope and local edits in the same diff block and requires error-prone proportional VCS
+     * estimation), this method:
+     * <ol>
+     *   <li>Computes diff(HEAD, scopeBase) → pure scope ranges with <em>exact</em> VCS coords
+     *   <li>Computes diff(current, HEAD)   → local change ranges (HEAD-space line numbers)
+     *   <li>Maps scope ranges from HEAD space into current-doc space, suppressing or splitting
+     *       any sub-segments that overlap with local changes
+     * </ol>
+     *
+     * <p>Benefits over the old approach:
+     * <ul>
+     *   <li>VCS coordinates are always exact for non-split ranges
+     *   <li>Current-doc line positions are exact (cumulative-delta, not proportional)
+     *   <li>Scope and local changes are never conflated in the same diff block
+     *   <li>Partial-overlap is handled correctly: e.g. a scope range covering lines 1-4
+     *       where the user edits only line 4 will continue to show lines 1-3 in the gutter
+     * </ul>
      */
-    private List<Range> filterAndSplitRanges(List<Range> allRanges, String currentContent, String headContent, String filePath) {
-        LOG.info("MyLineStatusTrackerImpl - filterAndSplitRanges called for: " + filePath);
-        
-        if (headContent == null) {
-            LOG.info("MyLineStatusTrackerImpl - HEAD content is null, returning all ranges");
-            return new ArrayList<>(allRanges);
+    private List<Range> computeScopeRangesInCurrentSpace(
+            String headContent,
+            String normalizedBase,
+            String currentContent,
+            String filePath) {
+
+        // Step 1: pure scope changes — diff(HEAD, scopeBase)
+        //   line1/line2       = HEAD lines
+        //   vcsLine1/vcsLine2 = scopeBase lines  (EXACT VCS coordinates)
+        List<Range> scopeRanges = RangesBuilder.INSTANCE.createRanges(headContent, normalizedBase);
+        LOG.info("computeScopeRangesInCurrentSpace [" + filePath + "] scope ranges: " + scopeRanges.size());
+
+        if (scopeRanges.isEmpty()) {
+            return Collections.emptyList();
         }
-        
-        // Compare HEAD to current to identify local-only changes
-        List<Range> localOnlyRanges = RangesBuilder.INSTANCE.createRanges(currentContent, headContent);
-        LOG.info("MyLineStatusTrackerImpl - Local-only ranges: " + localOnlyRanges.size());
-        for (Range localRange : localOnlyRanges) {
-            LOG.info("MyLineStatusTrackerImpl - Local range: line1=" + localRange.getLine1() + 
-                ", line2=" + localRange.getLine2());
+
+        // Step 2: local changes — diff(current, HEAD)
+        //   line1/line2       = current-doc lines
+        //   vcsLine1/vcsLine2 = HEAD lines
+        List<Range> localRanges = RangesBuilder.INSTANCE.createRanges(currentContent, headContent);
+        LOG.info("computeScopeRangesInCurrentSpace [" + filePath + "] local ranges: " + localRanges.size());
+
+        if (localRanges.isEmpty()) {
+            // HEAD == current: scope ranges are already valid in current-doc space
+            return new ArrayList<>(scopeRanges);
         }
-        
-        if (localOnlyRanges.isEmpty()) {
-            // No local changes, return all scope ranges
-            return new ArrayList<>(allRanges);
-        }
-        
-        // Process each scope range, splitting if it overlaps with local changes
-        List<Range> result = new ArrayList<>();
-        for (Range scopeRange : allRanges) {
-            List<Range> splitRanges = splitRangeAroundLocalChanges(scopeRange, localOnlyRanges, filePath);
-            result.addAll(splitRanges);
-        }
-        
-        LOG.info("MyLineStatusTrackerImpl - Final ranges count: " + result.size() + 
-            " (from " + allRanges.size() + " original ranges)");
-        return result;
+
+        // Step 3: map scope ranges from HEAD space to current-doc space
+        return mapScopeRangesToCurrentSpace(scopeRanges, localRanges, filePath);
     }
-    
+
     /**
-     * Splits a scope range around local changes.
-     * If the scope range doesn't overlap with any local changes, returns it as-is.
-     * If it overlaps, returns the parts before/after the local change(s).
+     * Translates scope ranges from HEAD coordinate space into current-document space,
+     * splitting or suppressing any portions that overlap with local changes.
      *
-     * @param scopeRange The scope range to potentially split
-     * @param localRanges List of local-only change ranges
-     * @param filePath File path for logging
-     * @return List of ranges (may be empty, single original, or multiple split ranges)
+     * @param scopeRanges  from diff(HEAD, scopeBase):  line1/2=HEAD,    vcsLine1/2=scopeBase
+     * @param localRanges  from diff(current, HEAD):    line1/2=current, vcsLine1/2=HEAD
      */
-    private List<Range> splitRangeAroundLocalChanges(Range scopeRange, List<Range> localRanges, String filePath) {
+    private List<Range> mapScopeRangesToCurrentSpace(
+            List<Range> scopeRanges,
+            List<Range> localRanges,
+            String filePath) {
+
         List<Range> result = new ArrayList<>();
-        
-        // Find all local ranges that overlap with this scope range
-        List<Range> overlappingLocal = new ArrayList<>();
-        for (Range localRange : localRanges) {
-            if (rangesOverlap(scopeRange.getLine1(), scopeRange.getLine2(), 
-                             localRange.getLine1(), localRange.getLine2())) {
-                overlappingLocal.add(localRange);
+        int numLocals = localRanges.size();
+
+        // cumulativeDelta: for HEAD lines not inside any local change,
+        //   currentLine = headLine + cumulativeDelta
+        int cumulativeDelta = 0;
+        int localIdx = 0;
+
+        for (Range scope : scopeRanges) {
+            int headStart = scope.getLine1();
+            int headEnd   = scope.getLine2();
+            int vcsStart  = scope.getVcsLine1();
+            int vcsEnd    = scope.getVcsLine2();
+
+            // Advance cumulativeDelta past all locals that end completely before headStart
+            while (localIdx < numLocals && localRanges.get(localIdx).getVcsLine2() <= headStart) {
+                Range local = localRanges.get(localIdx);
+                cumulativeDelta += (local.getLine2() - local.getLine1())
+                                 - (local.getVcsLine2() - local.getVcsLine1());
+                localIdx++;
             }
-        }
-        
-        if (overlappingLocal.isEmpty()) {
-            // No overlap, keep the scope range as-is
-            result.add(scopeRange);
-            return result;
-        }
-        
-        LOG.info("MyLineStatusTrackerImpl - Splitting scope range [" + scopeRange.getLine1() + "-" + 
-            scopeRange.getLine2() + "] around " + overlappingLocal.size() + " local changes");
-        
-        // Sort overlapping local ranges by start line
-        overlappingLocal.sort(Comparator.comparingInt(Range::getLine1));
-        
-        int currentLine = scopeRange.getLine1();
-        int scopeEnd = scopeRange.getLine2();
-        int currentVcsLine = scopeRange.getVcsLine1();
-        int scopeVcsEnd = scopeRange.getVcsLine2();
-        
-        // Determine if this is an INSERTED range (green) - no VCS lines
-        boolean isInserted = (scopeRange.getVcsLine1() == scopeRange.getVcsLine2());
-        
-        for (Range localRange : overlappingLocal) {
-            int localStart = localRange.getLine1();
-            int localEnd = localRange.getLine2();
-            
-            // Add range before the local change (if any)
-            if (currentLine < localStart) {
-                Range beforeRange;
-                if (isInserted) {
-                    // For INSERTED ranges, keep vcsLine1 == vcsLine2 to maintain green color
-                    beforeRange = new Range(currentLine, localStart, currentVcsLine, currentVcsLine);
-                } else {
-                    // For MODIFIED/DELETED ranges, increment VCS lines proportionally
-                    int linesInSegment = localStart - currentLine;
-                    int totalCurrentLines = scopeEnd - scopeRange.getLine1();
-                    int totalVcsLines = scopeVcsEnd - scopeRange.getVcsLine1();
-                    int vcsLinesInSegment = (totalVcsLines * linesInSegment) / totalCurrentLines;
-                    beforeRange = new Range(currentLine, localStart, currentVcsLine, currentVcsLine + vcsLinesInSegment);
-                    currentVcsLine += vcsLinesInSegment;
+
+            // ── DELETED scope range (0 HEAD lines, >0 VCS lines) ─────────────────
+            // A point in HEAD where scopeBase lines were removed; rendered as a
+            // deletion marker between two gutter lines.
+            if (headStart == headEnd) {
+                boolean insideLocal = false;
+                for (int i = localIdx; i < numLocals; i++) {
+                    Range local = localRanges.get(i);
+                    if (local.getVcsLine1() > headStart) break;          // sorted; done
+                    if (local.getVcsLine2() > headStart) { insideLocal = true; break; }
                 }
-                result.add(beforeRange);
-                LOG.info("MyLineStatusTrackerImpl - Added before-segment: [" + currentLine + "-" + localStart + "], VCS: [" + 
-                    beforeRange.getVcsLine1() + "-" + beforeRange.getVcsLine2() + "], type: " + beforeRange.getType());
+                if (!insideLocal) {
+                    int pos = headStart + cumulativeDelta;
+                    result.add(new Range(pos, pos, vcsStart, vcsEnd));
+                    LOG.info("mapScopeRangesToCurrentSpace [" + filePath
+                            + "] DELETED at current=" + pos + " vcs=[" + vcsStart + "-" + vcsEnd + "]");
+                }
+                continue;
             }
-            
-            // Skip the local change area
-            currentLine = localEnd;
-        }
-        
-        // Add remaining range after last local change (if any)
-        if (currentLine < scopeEnd) {
-            Range afterRange;
-            if (isInserted) {
-                // For INSERTED ranges, keep vcsLine1 == vcsLine2 to maintain green color
-                afterRange = new Range(currentLine, scopeEnd, currentVcsLine, currentVcsLine);
+
+            // ── INSERTED / MODIFIED scope range ──────────────────────────────────
+            int tempLocalIdx = localIdx;
+            int headCursor;
+            int currentCursor;
+
+            // If a local change straddles headStart (started before, ends after),
+            // the scope range's beginning falls inside a local edit — skip past it.
+            if (tempLocalIdx < numLocals) {
+                Range straddle = localRanges.get(tempLocalIdx);
+                if (straddle.getVcsLine1() < headStart && straddle.getVcsLine2() > headStart) {
+                    headCursor    = straddle.getVcsLine2();
+                    currentCursor = straddle.getLine2();
+                    tempLocalIdx++;
+                } else {
+                    headCursor    = headStart;
+                    currentCursor = headStart + cumulativeDelta;
+                }
             } else {
-                // For MODIFIED/DELETED ranges, use remaining VCS lines
-                afterRange = new Range(currentLine, scopeEnd, currentVcsLine, scopeVcsEnd);
+                headCursor    = headStart;
+                currentCursor = headStart + cumulativeDelta;
             }
-            result.add(afterRange);
-            LOG.info("MyLineStatusTrackerImpl - Added after-segment: [" + currentLine + "-" + scopeEnd + "], VCS: [" + 
-                afterRange.getVcsLine1() + "-" + afterRange.getVcsLine2() + "], type: " + afterRange.getType());
+
+            while (headCursor < headEnd) {
+                // Find the next local change that starts before headEnd
+                Range nextLocal = null;
+                if (tempLocalIdx < numLocals) {
+                    Range candidate = localRanges.get(tempLocalIdx);
+                    if (candidate.getVcsLine1() < headEnd) nextLocal = candidate;
+                }
+
+                if (nextLocal != null) {
+                    int localHeadStart = nextLocal.getVcsLine1();
+                    int localHeadEnd   = nextLocal.getVcsLine2();
+
+                    // Emit the clean scope segment that precedes this local change
+                    if (localHeadStart > headCursor) {
+                        emitScopeSegment(result,
+                                headCursor, localHeadStart,
+                                currentCursor,
+                                headStart, headEnd, vcsStart, vcsEnd, filePath);
+                        currentCursor += (localHeadStart - headCursor);
+                    }
+
+                    // Suppress the portion of the scope range overlapped by the local change
+                    headCursor    = Math.max(headCursor, localHeadEnd);
+                    currentCursor = nextLocal.getLine2();
+                    tempLocalIdx++;
+
+                } else {
+                    // No more overlapping local changes — emit the rest of the scope range
+                    emitScopeSegment(result,
+                            headCursor, headEnd,
+                            currentCursor,
+                            headStart, headEnd, vcsStart, vcsEnd, filePath);
+                    headCursor = headEnd;
+                }
+            }
         }
-        
-        LOG.info("MyLineStatusTrackerImpl - Split scope range into " + result.size() + " segments");
+
+        LOG.info("mapScopeRangesToCurrentSpace [" + filePath
+                + "] " + scopeRanges.size() + " scope → " + result.size() + " result ranges");
         return result;
     }
 
     /**
-     * Filters out local-only changes from the combined ranges.
-     * We want to show only scope changes (HEAD~2 → HEAD), not local changes (HEAD → current).
+     * Emits one (possibly split) sub-segment of a scope range into {@code result}.
      *
-     * @param allRanges All ranges from comparing current document to base (scope + local combined)
-     * @param currentContent Current document content
-     * @param baseContent Base revision content (e.g., HEAD~2)
-     * @param localChange The local change object (HEAD → current)
-     * @param filePath File path for logging
-     * @return Filtered list with only scope change ranges
-     */
-    private List<Range> filterOutLocalChanges(List<Range> allRanges, String currentContent, String baseContent,
-                                               Change localChange, String filePath) {
-        LOG.info("MyLineStatusTrackerImpl - filterOutLocalChanges called for: " + filePath);
-        
-        if (localChange == null || localChange.getBeforeRevision() == null) {
-            LOG.info("MyLineStatusTrackerImpl - No local change or beforeRevision, returning all ranges");
-            return new ArrayList<>(allRanges);
-        }
-        
-        try {
-            // Get HEAD content (beforeRevision of localChange represents HEAD)
-            String headContent = localChange.getBeforeRevision().getContent();
-            if (headContent == null) {
-                LOG.warn("MyLineStatusTrackerImpl - HEAD content is null, returning all ranges");
-                return new ArrayList<>(allRanges);
-            }
-            
-            String normalizedHead = StringUtil.convertLineSeparators(headContent);
-            LOG.info("MyLineStatusTrackerImpl - HEAD content lines: " + normalizedHead.split("\n").length);
-            
-            // Compare HEAD to current to identify local-only changes
-            List<Range> localOnlyRanges = RangesBuilder.INSTANCE.createRanges(currentContent, normalizedHead);
-            LOG.info("MyLineStatusTrackerImpl - Local-only ranges: " + localOnlyRanges.size());
-            for (Range localRange : localOnlyRanges) {
-                LOG.info("MyLineStatusTrackerImpl - Local range: line1=" + localRange.getLine1() + 
-                    ", line2=" + localRange.getLine2() + 
-                    ", vcsLine1=" + localRange.getVcsLine1() + 
-                    ", vcsLine2=" + localRange.getVcsLine2());
-            }
-            
-            // Filter out ranges that overlap with local-only changes
-            List<Range> filteredRanges = new ArrayList<>();
-            for (Range range : allRanges) {
-                boolean overlapsWithLocal = false;
-                
-                for (Range localRange : localOnlyRanges) {
-                    // Check if ranges overlap in the current document
-                    // range uses line1/line2 for current document lines
-                    // localRange uses line1/line2 for current document lines
-                    if (rangesOverlap(range.getLine1(), range.getLine2(), 
-                                     localRange.getLine1(), localRange.getLine2())) {
-                        overlapsWithLocal = true;
-                        LOG.info("MyLineStatusTrackerImpl - Range overlaps with local: " +
-                            "range[" + range.getLine1() + "-" + range.getLine2() + "] overlaps with " +
-                            "local[" + localRange.getLine1() + "-" + localRange.getLine2() + "]");
-                        break;
-                    }
-                }
-                
-                if (!overlapsWithLocal) {
-                    filteredRanges.add(range);
-                } else {
-                    LOG.info("MyLineStatusTrackerImpl - Filtering out range: line1=" + range.getLine1() + 
-                        ", line2=" + range.getLine2() + " (overlaps with local change)");
-                }
-            }
-            
-            LOG.info("MyLineStatusTrackerImpl - Filtered ranges count: " + filteredRanges.size() + 
-                " (removed " + (allRanges.size() - filteredRanges.size()) + " local-only ranges)");
-            return filteredRanges;
-            
-        } catch (VcsException e) {
-            LOG.warn("MyLineStatusTrackerImpl - Error getting HEAD content: " + e.getMessage(), e);
-            return new ArrayList<>(allRanges);
-        }
-    }
-    
-    /**
-     * Checks if two line ranges overlap.
-     * Ranges are considered overlapping if they share any common lines.
+     * <p>When the full scope range is emitted unmodified, the VCS coordinates are exact
+     * (inherited from diff(HEAD, scopeBase)).
      *
-     * @param start1 Start line of first range (inclusive)
-     * @param end1 End line of first range (exclusive)
-     * @param start2 Start line of second range (inclusive)
-     * @param end2 End line of second range (exclusive)
-     * @return true if ranges overlap
+     * <p>When a MODIFIED scope block is split by a local change, the VCS coordinates of
+     * the sub-segment are estimated proportionally within the block.  This is a bounded
+     * approximation — the split point is correct at both block boundaries, and the error
+     * cannot exceed the VCS extent of the block.
      */
-    private boolean rangesOverlap(int start1, int end1, int start2, int end2) {
-        // Check if ranges don't overlap, then negate
-        // No overlap if: range1 ends before range2 starts OR range2 ends before range1 starts
-        return !(end1 <= start2 || end2 <= start1);
+    private void emitScopeSegment(
+            List<Range> result,
+            int headSegStart, int headSegEnd,     // HEAD lines for this segment
+            int currentStart,                     // current-doc start (exact, delta-based)
+            int headBlockStart, int headBlockEnd, // full scope block HEAD extents
+            int vcsBlockStart, int vcsBlockEnd,   // full scope block VCS extents
+            String filePath) {
+
+        int currentEnd  = currentStart + (headSegEnd - headSegStart);
+        int headBlockLen = headBlockEnd - headBlockStart;
+
+        int segVcsStart;
+        int segVcsEnd;
+
+        if (headBlockLen == 0) {
+            // INSERTED block: no HEAD lines, no splitting possible — use full VCS extent
+            segVcsStart = vcsBlockStart;
+            segVcsEnd   = vcsBlockEnd;
+        } else {
+            long vcsLen = vcsBlockEnd - vcsBlockStart;
+            segVcsStart = vcsBlockStart + (int)(vcsLen * (headSegStart - headBlockStart) / headBlockLen);
+            segVcsEnd   = vcsBlockStart + (int)(vcsLen * (headSegEnd   - headBlockStart) / headBlockLen);
+        }
+
+        if (currentStart < currentEnd || segVcsStart < segVcsEnd) {
+            result.add(new Range(currentStart, currentEnd, segVcsStart, segVcsEnd));
+            LOG.info("emitScopeSegment [" + filePath
+                    + "] current=[" + currentStart + "-" + currentEnd
+                    + "] vcs=[" + segVcsStart + "-" + segVcsEnd + "]");
+        }
     }
 
     /**
@@ -622,28 +586,36 @@ public class MyLineStatusTrackerImpl implements Disposable {
      */
     private void recalculateAndUpdateRangesAsync(@NotNull Document document, @NotNull RendererInfo info) {
         try {
+            // Respect the IDE gutter setting: if it's disabled, clear any displayed markers
+            if (!VcsApplicationSettings.getInstance().SHOW_LST_GUTTER_MARKERS) {
+                ApplicationManager.getApplication().invokeLater(() -> {
+                    if (!disposing.get() && info.renderer != null) {
+                        info.renderer.updateRanges(Collections.emptyList());
+                    }
+                }, ModalityState.defaultModalityState());
+                return;
+            }
+
             // Get current document content (ReadAction can be called from any thread)
             String currentContent = com.intellij.openapi.application.ReadAction.compute(() ->
                 document.getImmutableCharSequence().toString()
             );
             String normalizedCurrent = StringUtil.convertLineSeparators(currentContent);
             
-            // Compute all ranges by comparing current document with base revision
-            // This computation is done off EDT for better performance
-            List<Range> allRanges = RangesBuilder.INSTANCE.createRanges(
-                    normalizedCurrent,
-                    info.baseContent
-            );
+            VirtualFile file = FileDocumentManager.getInstance().getFile(document);
+            String filePath = (file != null) ? file.getPath() : "unknown";
 
-            // Apply filtering/splitting if we have cached HEAD content
             List<Range> filteredRanges;
-            if (info.headContent != null) {
-                VirtualFile file = FileDocumentManager.getInstance().getFile(document);
-                String filePath = (file != null) ? file.getPath() : "unknown";
-                // Use cached HEAD content for fast filtering (no VCS call)
-                filteredRanges = filterAndSplitRanges(allRanges, normalizedCurrent, info.headContent, filePath);
+            if (info.headContent != null && info.scopeRanges != null) {
+                // Fast path: diff(HEAD, scopeBase) is cached; only diff(current, HEAD) + mapping runs per keystroke.
+                List<Range> localRanges = RangesBuilder.INSTANCE.createRanges(normalizedCurrent, info.headContent);
+                if (localRanges.isEmpty()) {
+                    filteredRanges = new ArrayList<>(info.scopeRanges);
+                } else {
+                    filteredRanges = mapScopeRangesToCurrentSpace(info.scopeRanges, localRanges, filePath);
+                }
             } else {
-                filteredRanges = allRanges;
+                filteredRanges = RangesBuilder.INSTANCE.createRanges(normalizedCurrent, info.baseContent);
             }
 
             // Update the renderer on EDT
@@ -665,7 +637,6 @@ public class MyLineStatusTrackerImpl implements Disposable {
     private synchronized void release(@NotNull Document document) {
         RendererInfo info = renderers.remove(document);
         if (info != null) {
-            // Remove document listener
             if (info.documentListener != null) {
                 try {
                     document.removeDocumentListener(info.documentListener);
@@ -674,7 +645,6 @@ public class MyLineStatusTrackerImpl implements Disposable {
                 }
             }
 
-            // Dispose renderer
             if (info.renderer != null) {
                 try {
                     info.renderer.dispose();
