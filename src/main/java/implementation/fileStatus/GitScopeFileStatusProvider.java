@@ -9,6 +9,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import service.ViewService;
+import settings.GitScopeSettings;
 
 import java.util.Map;
 
@@ -28,6 +29,10 @@ public class GitScopeFileStatusProvider implements FileStatusProvider {
 
     @Override
     public @Nullable FileStatus getFileStatus(@NotNull VirtualFile virtualFile) {
+        if (!GitScopeSettings.getInstance().isScopeFileColors()) {
+            return null;
+        }
+
         // Get the project from the context
         Project project = getProjectFromFile(virtualFile);
         if (project == null || project.isDisposed()) {
@@ -51,9 +56,9 @@ public class GitScopeFileStatusProvider implements FileStatusProvider {
             return null;
         }
 
-        // File is NOT in local changes - check if it's in the Git Scope
+        // File is NOT in local changes - check if it's in the Git Scope (scope changes only)
         // Use HashMap lookup for O(1) performance instead of iterating through all changes
-        Map<String, Change> scopeChangesMap = viewService.getCurrentScopeChangesMap();
+        Map<String, Change> scopeChangesMap = viewService.getScopeChangesMap();
         if (scopeChangesMap == null || scopeChangesMap.isEmpty()) {
             // No changes in scope - return null to fall back to default behavior
             return null;

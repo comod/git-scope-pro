@@ -23,7 +23,7 @@ import model.TargetBranchMap;
 import org.jetbrains.annotations.NotNull;
 import service.GitService;
 import system.Defs;
-import utils.GitCommitReflection;
+import utils.PlatformApiReflection;
 import utils.GitUtil;
 
 import java.util.*;
@@ -46,12 +46,13 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
     public static final Collection<Change> ERROR_STATE = new ErrorStateList();
 
     /**
-     * Container for both merged changes and local changes towards HEAD.
+     * Container for merged changes, scope changes, and local changes towards HEAD.
      *
-     * @param mergedChanges Scope changes + local changes
+     * @param mergedChanges Scope changes + local changes (union of scopeChanges and localChanges)
+     * @param scopeChanges  Scope changes only (from target branch comparison)
      * @param localChanges  Local changes towards HEAD only
      */
-        public record ChangesResult(Collection<Change> mergedChanges, Collection<Change> localChanges) {
+        public record ChangesResult(Collection<Change> mergedChanges, Collection<Change> scopeChanges, Collection<Change> localChanges) {
     }
     private final Project project;
     private final GitService git;
@@ -77,8 +78,8 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
         return branchToCompare;
     }
 
-    // Cache for storing changes per repository
-    private final Map<String, Collection<Change>> changesCache = new ConcurrentHashMap<>();
+    // Cache for storing changes per repository (stores RepoChangesResult to preserve scope/local separation)
+    private final Map<String, RepoChangesResult> changesCache = new ConcurrentHashMap<>();
 
     public void collectChangesWithCallback(TargetBranchMap targetBranchByRepo, Consumer<ChangesResult> callBack, boolean checkFs) {
         // Capture the current project reference to ensure consistency
@@ -97,14 +98,11 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
                 }
 
                 Collection<Change> _changes = new ArrayList<>();
+                Collection<Change> _scopeChanges = new ArrayList<>();
                 Collection<Change> _localChanges = new ArrayList<>();
                 List<String> errorRepos = new ArrayList<>();
 
                 Collection<GitRepository> repositories = currentGitService.getRepositories();
-
-                // Get all local changes from ChangeListManager once
-                ChangeListManager changeListManager = ChangeListManager.getInstance(currentProject);
-                Collection<Change> allLocalChanges = changeListManager.getAllChanges();
 
                 // Clear cache if checkFs is true (force fresh fetch)
                 if (checkFs) {
@@ -118,42 +116,48 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
                         // Use repo path + target branch as cache key to ensure different branches don't share cache
                         String cacheKey = repo.getRoot().getPath() + "|" + branchToCompare;
 
-                        Collection<Change> changesPerRepo = null;
+                        RepoChangesResult repoResult;
 
                         if (!checkFs && changesCache.containsKey(cacheKey)) {
-                            // Use cached changes if checkFs is false and cache exists
-                            changesPerRepo = changesCache.get(cacheKey);
+                            // Use cached result (includes merged, scope, and local changes)
+                            repoResult = changesCache.get(cacheKey);
                         } else {
                             // Fetch fresh changes
-                            changesPerRepo = doCollectChanges(currentProject, repo, branchToCompare);
+                            repoResult = doCollectChanges(currentProject, repo, branchToCompare);
 
-                            // Cache the results (but don't cache error states)
-                            if (!(changesPerRepo instanceof ErrorStateList)) {
-                                changesCache.put(cacheKey, new ArrayList<>(changesPerRepo)); // Store a copy to avoid modification issues
+                            // Cache the complete result (but don't cache error states)
+                            if (!(repoResult.mergedChanges() instanceof ErrorStateList)) {
+                                // Create deep copies to avoid modification issues
+                                RepoChangesResult cachedResult = new RepoChangesResult(
+                                    new ArrayList<>(repoResult.mergedChanges()),
+                                    new ArrayList<>(repoResult.scopeChanges()),
+                                    new ArrayList<>(repoResult.localChanges())
+                                );
+                                changesCache.put(cacheKey, cachedResult);
                             }
                         }
 
-                        if (changesPerRepo instanceof ErrorStateList) {
+                        if (repoResult.mergedChanges() instanceof ErrorStateList) {
                             errorRepos.add(repo.getRoot().getPath());
                             return; // Skip this repo but continue with others
                         }
 
-                        // Handle null case
-                        if (changesPerRepo == null) {
-                            changesPerRepo = new ArrayList<>();
-                        }
-
-                        // Merge changes into the collection
-                        for (Change change : changesPerRepo) {
+                        // Merge merged changes into the collection
+                        for (Change change : repoResult.mergedChanges()) {
                             if (!_changes.contains(change)) {
                                 _changes.add(change);
                             }
                         }
 
-                        // Also collect local changes for this repository
-                        String repoPath = repo.getRoot().getPath();
-                        Collection<Change> repoLocalChanges = filterLocalChanges(allLocalChanges, repoPath, null);
-                        for (Change change : repoLocalChanges) {
+                        // Merge scope changes into the collection
+                        for (Change change : repoResult.scopeChanges()) {
+                            if (!_scopeChanges.contains(change)) {
+                                _scopeChanges.add(change);
+                            }
+                        }
+
+                        // Merge local changes from the repo result into the collection
+                        for (Change change : repoResult.localChanges()) {
                             if (!_localChanges.contains(change)) {
                                 _localChanges.add(change);
                             }
@@ -166,12 +170,12 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
                     }
                 });
 
-                // Return ERROR_STATE if ANY repository had an invalid reference
-                // Since target branch is per-repo, if the specified repo fails, the entire scope is invalid
-                if (!errorRepos.isEmpty()) {
-                    result = new ChangesResult(ERROR_STATE, new ArrayList<>());
+                // Return ERROR_STATE only if ALL repositories failed (e.g. commit hash not found in any repo).
+                // Individual repo failures are expected in multi-repo setups where a commit exists in only one repo.
+                if (!errorRepos.isEmpty() && errorRepos.size() == repositories.size()) {
+                    result = new ChangesResult(ERROR_STATE, new ArrayList<>(), new ArrayList<>());
                 } else {
-                    result = new ChangesResult(_changes, _localChanges);
+                    result = new ChangesResult(_changes, _scopeChanges, _localChanges);
                 }
             }
 
@@ -190,7 +194,7 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
             public void onThrowable(@NotNull Throwable error) {
                 ApplicationManager.getApplication().invokeLater(() -> {
                     if (!currentProject.isDisposed() && callBack != null) {
-                        callBack.accept(new ChangesResult(ERROR_STATE, new ArrayList<>()));
+                        callBack.accept(new ChangesResult(ERROR_STATE, new ArrayList<>(), new ArrayList<>()));
                     }
                 }, ModalityState.defaultModalityState(), __ -> disposing.get());
             }
@@ -270,8 +274,7 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
         List<GitCommit> commits = GitHistoryUtils.history(project, repo.getRoot(), branchToCompare);
         Map<FilePath, Change> changeMap = new HashMap<>();
         for (GitCommit commit : commits) {
-            // TODO: Reflection used to avoid triggering experimental API usage
-            for (Change change : GitCommitReflection.getChanges(commit)) {
+            for (Change change : PlatformApiReflection.getCommitChanges(commit)) {
                 FilePath path = ChangesUtil.getFilePath(change);
                 changeMap.put(path, change);
             }
@@ -292,30 +295,46 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
         return filterLocalChanges(localChanges, repoPath, null);
     }
 
-    public Collection<Change> doCollectChanges(Project project, GitRepository repo, String scopeRef) {
+    /**
+     * Result container for changes collection that separates scope, local, and merged changes.
+     *
+     * @param mergedChanges Scope changes + local changes (union)
+     * @param scopeChanges Scope changes only (from target branch comparison)
+     * @param localChanges Local changes only (towards HEAD, filtered by repository)
+     */
+    public record RepoChangesResult(Collection<Change> mergedChanges, Collection<Change> scopeChanges, Collection<Change> localChanges) {}
+
+    public RepoChangesResult doCollectChanges(Project project, GitRepository repo, String scopeRef) {
         VirtualFile file = repo.getRoot();
-        Collection<Change> _changes = new ArrayList<>();
+        Collection<Change> scopeChanges;
+        Collection<Change> mergedChanges;
+        Collection<Change> repoLocalChanges;
+
         try {
             // Local Changes
             ChangeListManager changeListManager = ChangeListManager.getInstance(project);
             Collection<Change> localChanges = changeListManager.getAllChanges();
+            String repoPath = repo.getRoot().getPath();
 
-            // Special handling for HEAD - return local changes filtered by this repository
+            // Filter local changes for this repository
+            repoLocalChanges = filterLocalChanges(localChanges, repoPath, null);
+
+            // Special handling for HEAD - return local changes only, no scope changes
             if (scopeRef.equals(GitService.BRANCH_HEAD)) {
-                return collectHeadChanges(localChanges, repo);
+                return new RepoChangesResult(new ArrayList<>(repoLocalChanges), new ArrayList<>(), repoLocalChanges);
             }
 
-            // Diff Changes
+            // Diff Changes - these are the pure scope changes
             if (scopeRef.contains("..")) {
-                _changes = getChangesByHistory(project, repo, scopeRef);
+                scopeChanges = getChangesByHistory(project, repo, scopeRef);
             } else {
                 GitReference gitReference;
 
-                // First try to find matching branch or tag
+                // First try to find matching branch or tag (skip for relative refs like HEAD~1)
                 gitReference = repo.getBranches().findBranchByName(scopeRef);
-                if (gitReference == null) {
+                if (gitReference == null && !scopeRef.contains("~") && !scopeRef.contains("^")) {
                     // ... try a tag
-                    gitReference = repo.getTagHolder().getTag(scopeRef);
+                    gitReference = PlatformApiReflection.findTagByName(repo, scopeRef);
                 }
 
                 GitRevisionNumber revisionNumber;
@@ -329,28 +348,39 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
 
                 if (revisionNumber != null) {
                     // We have a valid GitReference
-                    _changes = GitUtil.getDiffChanges(repo, file, revisionNumber);
+                    scopeChanges = GitUtil.getDiffChanges(repo, file, revisionNumber);
+                    LOG.debug("ChangesService - Repository: " + repoPath + ", Scope: " + scopeRef + ", scopeChanges count: " + scopeChanges.size());
                 }
                 else {
-                    // We do not have a valid GitReference => return null immediately (no point trying to add localChanges)
-                    // null will be interpreted as invalid reference and displayed accordingly
-                    return ERROR_STATE;
+                    // We do not have a valid GitReference => return ERROR_STATE
+                    return new RepoChangesResult(ERROR_STATE, new ArrayList<>(), new ArrayList<>());
                 }
             }
 
-            // Add local changes that aren't already in the diff (filtered by repository and excluding duplicates)
-            String repoPath = repo.getRoot().getPath();
-            Collection<Change> additionalLocalChanges = filterLocalChanges(localChanges, repoPath, _changes);
-            _changes.addAll(additionalLocalChanges);
+            // Log what we collected
+            LOG.debug("ChangesService - Repository: " + repoPath + ", localChanges count: " + repoLocalChanges.size());
+
+            // Create merged changes: start with scope changes, then add local changes
+            mergedChanges = new ArrayList<>(scopeChanges);
+
+            // Add local changes that aren't already in the scope changes (excluding duplicates)
+            Collection<Change> additionalLocalChanges = filterLocalChanges(repoLocalChanges, repoPath, scopeChanges);
+            LOG.debug("ChangesService - Repository: " + repoPath + ", additionalLocalChanges count (after filtering): " + additionalLocalChanges.size());
+            mergedChanges.addAll(additionalLocalChanges);
+
+            LOG.debug("ChangesService - Repository: " + repoPath + ", Final counts - scope: " + scopeChanges.size() + ", local: " + repoLocalChanges.size() + ", merged: " + mergedChanges.size());
 
         } catch (VcsException e) {
             // Log VCS errors (e.g., locked files, git command failures) but don't fail entirely
             LOG.warn("Error collecting changes for repository " + repo.getRoot().getPath() + ": " + e.getMessage());
+            return new RepoChangesResult(new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
         } catch (Exception e) {
             // Catch any other unexpected errors (e.g., file system issues)
             LOG.warn("Unexpected error collecting changes for repository " + repo.getRoot().getPath(), e);
+            return new RepoChangesResult(new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
         }
-        return _changes;
+
+        return new RepoChangesResult(mergedChanges, scopeChanges, repoLocalChanges);
     }
 
 }

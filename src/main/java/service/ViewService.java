@@ -9,6 +9,7 @@ import com.intellij.openapi.editor.EditorKind;
 import com.intellij.openapi.editor.ex.EditorEx;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.FileStatusManager;
+import com.intellij.openapi.vcs.VcsApplicationSettings;
 import com.intellij.openapi.vcs.changes.Change;
 import com.intellij.openapi.vcs.impl.LineStatusTrackerManagerI;
 import com.intellij.openapi.wm.ToolWindow;
@@ -72,6 +73,8 @@ public class ViewService implements Disposable {
     private boolean vcsReady = false;
     private boolean toolWindowReady = false;
     private MyModel myHeadModel;
+    // Cached current model for safe access from background threads (avoids calling getContentManager() off-EDT)
+    private volatile MyModel cachedCurrentModel;
     private boolean isInit;
     private int lastTabIndex;
     private Integer savedTabIndex;
@@ -415,6 +418,7 @@ public class ViewService implements Disposable {
 
     private void initHeadTab() {
         this.myHeadModel = new MyModel(true);
+        this.cachedCurrentModel = myHeadModel;
         toolWindowService.addTab(myHeadModel, GitService.BRANCH_HEAD, false);
         subscribeToObservable(myHeadModel);
     }
@@ -616,8 +620,8 @@ public class ViewService implements Disposable {
         LOG.debug("incrementUpdate() -> generation = " + newGen);
     }
 
-    public CompletableFuture<Void> collectChanges(boolean checkFs) {
-        return collectChanges(getCurrent(), checkFs);
+    public void collectChanges(boolean checkFs) {
+        collectChanges(getCurrent(), checkFs);
     }
 
     /**
@@ -676,13 +680,19 @@ public class ViewService implements Disposable {
         final DisposalToken token = this.disposalToken;
         changesExecutor.execute(() -> {
             changesService.collectChangesWithCallback(finalTargetBranchMap, result -> {
+                // Build maps on background thread to avoid slow file system operations on EDT
+                Map<String, Change> mergedChangesMap = MyModel.buildChangesByPathMap(result.mergedChanges());
+                Map<String, Change> scopeChangesMap = MyModel.buildChangesByPathMap(result.scopeChanges());
+                Map<String, Change> localChangesMap = MyModel.buildChangesByPathMap(result.localChanges());
+
                 ApplicationManager.getApplication().invokeLater(() -> {
                     try {
                         long currentGen = applyGeneration.get();
                         if (!project.isDisposed() && !token.disposed && currentGen == gen) {
                             LOG.debug("Applying changes for generation " + gen);
-                            model.setChanges(result.mergedChanges());
-                            model.setLocalChanges(result.localChanges());
+                            model.setChangesWithMap(result.mergedChanges(), mergedChangesMap);
+                            model.setScopeChangesWithMap(result.scopeChanges(), scopeChangesMap);
+                            model.setLocalChangesWithMap(result.localChanges(), localChangesMap);
                         } else {
                             LOG.debug("Discarding changes for generation " + gen + " (current generation is " + currentGen + ")");
                         }
@@ -715,43 +725,39 @@ public class ViewService implements Disposable {
     }
 
     public MyModel getCurrent() {
-        // Check if disposed or not initialized
         if (isDisposed || toolWindowService == null) {
-            return myHeadModel; // Safe fallback
+            return myHeadModel;
         }
 
-        // Get tool window safely
+        // Background threads must not call getContentManager() — it requires EDT
+        // (createContentIfNeeded() asserts EDT in IntelliJ 2026.1+).
+        // Return the cached value that is kept up-to-date on EDT.
+        if (!ApplicationManager.getApplication().isDispatchThread()) {
+            MyModel cached = cachedCurrentModel;
+            return cached != null ? cached : myHeadModel;
+        }
+
+        // On EDT: do the full lookup and keep the cache fresh.
         ToolWindow toolWindow = toolWindowService.getToolWindow();
         if (toolWindow == null) {
-            return myHeadModel; // Tool window not available
+            return myHeadModel;
         }
 
-        // Get the currently selected tab's model directly from ContentManager
         ContentManager contentManager = toolWindow.getContentManager();
         Content selectedContent = contentManager.getSelectedContent();
 
-        if (selectedContent == null) {
-            return myHeadModel;
+        MyModel result = myHeadModel;
+        if (selectedContent != null
+                && !selectedContent.getTabName().equals(GitService.BRANCH_HEAD)
+                && !selectedContent.getTabName().equals(PLUS_TAB_LABEL)) {
+            MyModel model = toolWindowService.getModelForContent(selectedContent);
+            if (model != null) {
+                result = model;
+            }
         }
 
-        // Check if it's the HEAD tab
-        if (selectedContent.getTabName().equals(GitService.BRANCH_HEAD)) {
-            return myHeadModel;
-        }
-
-        // Check if it's the + tab
-        if (selectedContent.getTabName().equals(PLUS_TAB_LABEL)) {
-            return myHeadModel; // or handle differently
-        }
-
-        // Get the model for this content
-        MyModel model = toolWindowService.getModelForContent(selectedContent);
-        if (model != null) {
-            return model;
-        }
-
-        // Fallback to HEAD
-        return myHeadModel;
+        cachedCurrentModel = result;
+        return result;
     }
 
     public List<MyModel> getCollection() {
@@ -784,6 +790,16 @@ public class ViewService implements Disposable {
     }
 
     /**
+     * Gets a HashMap of scope changes indexed by file path for O(1) lookup.
+     * Returns the cached map that was built when changes were set.
+     *
+     * @return Map of file path to Change, or null if not initialized
+     */
+    public Map<String, Change> getScopeChangesMap() {
+        return getChangesMapInternal(MyModel::getScopeChangesMap);
+    }
+
+    /**
      * Gets a HashMap of local changes indexed by file path for O(1) lookup.
      * Returns the cached map that was built when changes were set.
      *
@@ -794,7 +810,7 @@ public class ViewService implements Disposable {
     }
 
     /**
-     * Gets a HashMap of scope changes indexed by file path for O(1) lookup.
+     * Gets a HashMap of merged changes (scope + local) indexed by file path for O(1) lookup.
      * Returns the cached map that was built when changes were set.
      *
      * @return Map of file path to Change, or null if not initialized
@@ -966,9 +982,11 @@ public class ViewService implements Disposable {
             if (token.disposed) return;
 
             updateStatusBarWidget();
-            // Get the current scope changes map to pass to line status tracker
-            Map<String, Change> scopeChangesMap = getCurrentScopeChangesMap();
-            myLineStatusTrackerImpl.update(scopeChangesMap);
+
+            // Determine which changes to show in gutter based on IDE's VCS gutter setting
+            Map<String, Change> gutterChangesMap = getGutterChangesMap();
+            Map<String, Change> localChangesMap = getLocalChangesTowardsHeadMap();
+            myLineStatusTrackerImpl.update(gutterChangesMap, localChangesMap);
             myScope.update(changes);
 
             // Perform scroll restoration after all UI updates are complete
@@ -988,6 +1006,26 @@ public class ViewService implements Disposable {
                 }
             });
         }, ModalityState.any(), __ -> token.disposed);
+    }
+
+    /**
+     * Determines which changes should be shown in the gutter based on IDE's VCS settings.
+     * If IDE's gutter markers are enabled, only show scope changes (IDE will show local changes).
+     * If IDE's gutter markers are disabled, show both scope and local changes.
+     *
+     * @return Map of file path to Change for gutter rendering
+     */
+    private Map<String, Change> getGutterChangesMap() {
+        VcsApplicationSettings vcsSettings = VcsApplicationSettings.getInstance();
+        boolean ideGutterEnabled = vcsSettings.SHOW_LST_GUTTER_MARKERS;
+
+        if (ideGutterEnabled) {
+            // IDE gutter is enabled, we paint scope changes (IDE paints local changes)
+            return getScopeChangesMap();
+        } else {
+            // IDE gutter is disabled, turn off our plugin gutter rendering completely
+            return new java.util.HashMap<>();  // Empty map = no gutter rendering
+        }
     }
 
     private void updateStatusBarWidget() {

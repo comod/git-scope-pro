@@ -1,0 +1,21 @@
+Git Scope Pro
+Copyright (c) 2026 Magnus Wållberg, Michael Wölk
+Originally created by Michael Wölk
+
+This project is licensed under the GNU General Public License v3.0.
+See the LICENSE file for the full license text.
+
+---
+
+The following files are derived from the IntelliJ IDEA Community Edition
+project (https://github.com/JetBrains/intellij-community) and are licensed
+under the Apache License, Version 2.0:
+
+  src/main/java/implementation/gutter/LineStatusGutterMarkerRenderer.kt
+  src/main/java/implementation/gutter/Range.kt
+  src/main/java/implementation/gutter/RangesBuilder.kt
+  src/main/java/implementation/gutter/ScopeDiffViewer.kt
+  src/main/java/implementation/gutter/ScopeLineStatusMarkerRenderer.kt
+
+You may obtain a copy of the Apache License, Version 2.0 at:
+  http://www.apache.org/licenses/LICENSE-2.0

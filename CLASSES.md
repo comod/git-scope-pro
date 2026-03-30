@@ -82,7 +82,15 @@ unload. All classes should have **count = 0** after successful plugin unload.
 ### Line Status Tracker
 
 - `implementation.lineStatusTracker.MyLineStatusTrackerImpl`
-- `implementation.lineStatusTracker.CommitDiffWorkaround`
+
+### Gutter Rendering
+
+- `implementation.gutter.Range`
+- `implementation.gutter.RangesBuilder`
+- `implementation.gutter.LineStatusGutterMarkerRenderer`
+- `implementation.gutter.ScopeLineStatusMarkerRenderer`
+- `implementation.gutter.ScopeOverviewMarkerRenderer`
+- `implementation.gutter.ScopeDiffViewer`
 
 ### Scope
 
@@ -95,12 +103,18 @@ unload. All classes should have **count = 0** after successful plugin unload.
 
 - `implementation.fileStatus.GitScopeFileStatusProvider`
 
+## Settings
+
+- `settings.GitScopeSettings`
+- `settings.GitScopeSettingsComponent`
+- `settings.GitScopeSettingsConfigurable`
+
 ## Utility Classes
 
 - `utils.CustomRollback`
-- `utils.GitCommitReflection`
 - `utils.GitUtil`
 - `utils.Notification`
+- `utils.PlatformApiReflection`
 - `system.Defs`
 
 ## Anonymous/Inner Classes to Look For
@@ -112,8 +126,8 @@ unload. All classes should have **count = 0** after successful plugin unload.
 - `TabOperations$3` *(move left action)*
 - `TabOperations$4` *(move right action)*
 - `VcsTree$$Lambda` *(any lambda from VcsTree)*
-- `MyLineStatusTrackerImpl$1` *(BaseRevisionSwitcher anonymous inner class - circular reference)*
 - `MyLineStatusTrackerImpl$$Lambda` *(lambdas from line status tracker)*
+- `ScopeLineStatusMarkerRenderer$$Lambda` *(lambdas from gutter renderer)*
 - `MySimpleChangesBrowser$1` *(anonymous MouseAdapter)*
 - `BranchTree$MyColoredTreeCellRenderer`
 - Any class ending with `$$Lambda$...`
@@ -133,6 +147,7 @@ Filter the HPROF classes view using these prefixes:
 - `model.`
 - `state.`
 - `statusBar.`
+- `settings.`
 - `utils.`
 
 ### 2. Filter the Classes View
@@ -150,7 +165,8 @@ Filter the HPROF classes view using these prefixes:
 3. **ToolWindowView** - UI components must be disposed
 4. **ViewService** - RxJava subscriptions must be disposed
 5. **MyLineStatusTrackerImpl** - Background tasks must be cancelled
-6. **Any class with `$` in the name** - Anonymous/inner classes often capture outer references
+6. **ScopeLineStatusMarkerRenderer** - Highlighters and mouse listeners must be removed
+7. **Any class with `$` in the name** - Anonymous/inner classes often capture outer references
 
 ---
 

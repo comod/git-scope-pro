@@ -16,8 +16,10 @@ public class MyModel extends MyModelBase {
     private final PublishSubject<MyModel.field> changeObservable = PublishSubject.create();
     private final boolean isHeadTab;
     private Collection<Change> changes; // Merged changes (scope + local)
+    private Collection<Change> scopeChanges; // Scope changes only (from target branch comparison)
     private Collection<Change> localChanges; // Local changes towards HEAD only
     private Map<String, Change> changesMap; // Cached map of changes by file path
+    private Map<String, Change> scopeChangesMap; // Cached map of scope changes by file path
     private Map<String, Change> localChangesMap; // Cached map of local changes by file path
     private boolean isActive;
     private String customTabName; // Added field for custom tab name
@@ -88,10 +90,12 @@ public class MyModel extends MyModelBase {
     }
 
     // Getter and setter for custom tab name
+    @Override
     public String getCustomTabName() {
         return customTabName;
     }
 
+    @Override
     public void setCustomTabName(String customTabName) {
         this.customTabName = customTabName;
         changeObservable.onNext(field.tabName);
@@ -107,6 +111,34 @@ public class MyModel extends MyModelBase {
         changeObservable.onNext(field.changes);
     }
 
+    /**
+     * Sets changes with a pre-built map to avoid file system access on EDT.
+     * Use this when the map is already computed on a background thread.
+     */
+    public void setChangesWithMap(Collection<Change> changes, Map<String, Change> changesMap) {
+        this.changes = changes;
+        this.changesMap = changesMap;
+        changeObservable.onNext(field.changes);
+    }
+
+    public Collection<Change> getScopeChanges() {
+        return scopeChanges;
+    }
+
+    public void setScopeChanges(Collection<Change> scopeChanges) {
+        this.scopeChanges = scopeChanges;
+        this.scopeChangesMap = buildChangesByPathMap(scopeChanges);
+    }
+
+    /**
+     * Sets scope changes with a pre-built map to avoid file system access on EDT.
+     * Use this when the map is already computed on a background thread.
+     */
+    public void setScopeChangesWithMap(Collection<Change> scopeChanges, Map<String, Change> scopeChangesMap) {
+        this.scopeChanges = scopeChanges;
+        this.scopeChangesMap = scopeChangesMap;
+    }
+
     public Collection<Change> getLocalChanges() {
         return localChanges;
     }
@@ -116,8 +148,21 @@ public class MyModel extends MyModelBase {
         this.localChangesMap = buildChangesByPathMap(localChanges);
     }
 
+    /**
+     * Sets local changes with a pre-built map to avoid file system access on EDT.
+     * Use this when the map is already computed on a background thread.
+     */
+    public void setLocalChangesWithMap(Collection<Change> localChanges, Map<String, Change> localChangesMap) {
+        this.localChanges = localChanges;
+        this.localChangesMap = localChangesMap;
+    }
+
     public Map<String, Change> getChangesMap() {
         return changesMap;
+    }
+
+    public Map<String, Change> getScopeChangesMap() {
+        return scopeChangesMap;
     }
 
     public Map<String, Change> getLocalChangesMap() {
@@ -131,7 +176,7 @@ public class MyModel extends MyModelBase {
      * @param changes Collection of changes to convert to a map
      * @return Map of file path to Change, or null if changes is null
      */
-    private Map<String, Change> buildChangesByPathMap(Collection<Change> changes) {
+    public static Map<String, Change> buildChangesByPathMap(Collection<Change> changes) {
         if (changes == null) {
             return null;
         }

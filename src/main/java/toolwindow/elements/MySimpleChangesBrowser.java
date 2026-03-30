@@ -10,7 +10,16 @@ import com.intellij.openapi.fileEditor.FileEditor;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.TextEditor;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.vcs.FilePath;
+import com.intellij.openapi.vcs.VcsException;
+import com.intellij.openapi.vcs.history.VcsRevisionNumber;
+import com.intellij.openapi.vcs.changes.ChangesUtil;
+import com.intellij.openapi.vcs.changes.ContentRevision;
 import com.intellij.openapi.vcs.changes.Change;
+import com.intellij.openapi.vcs.changes.CurrentContentRevision;
+import service.ViewService;
+import com.intellij.openapi.vcs.changes.actions.diff.ChangeDiffRequestProducer;
+import com.intellij.openapi.vcs.changes.ui.ChangeDiffRequestChain;
 import com.intellij.openapi.vcs.changes.ui.SimpleAsyncChangesBrowser;
 import com.intellij.openapi.vfs.VirtualFile;
 import org.jetbrains.annotations.NotNull;
@@ -21,7 +30,8 @@ import toolwindow.VcsTreeActions;
 import javax.swing.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.lang.reflect.Method;
+import utils.PlatformApiReflection;
+
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -118,62 +128,8 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
         });
     }
 
-    /**
-     * Tries to open a file in preview tab using reflection. If it fails, does nothing.
-     */
     private void openInPreviewTab(Project project, VirtualFile file) {
-        try {
-            FileEditorManager editorManager = FileEditorManager.getInstance(project);
-
-            // TODO: Reflection used to get access to preview tab method
-
-            // Use reflection to create FileEditorOpenOptions
-            Class<?> optionsClass = Class.forName("com.intellij.openapi.fileEditor.impl.FileEditorOpenOptions");
-            Object options = optionsClass.getDeclaredConstructor().newInstance();
-
-            // Chain the methods using reflection
-            Method withRequestFocus = optionsClass.getMethod("withRequestFocus", boolean.class);
-            Method withUsePreviewTab = optionsClass.getMethod("withUsePreviewTab", boolean.class);
-            Method withReuseOpen = optionsClass.getMethod("withReuseOpen", boolean.class);
-
-            options = withRequestFocus.invoke(options, false);
-            options = withUsePreviewTab.invoke(options, true);
-            options = withReuseOpen.invoke(options, true);
-
-            // Look for the openFile method with FileEditorOpenOptions
-            Method openFileMethod = getMethod(editorManager, optionsClass);
-
-            if (openFileMethod != null) {
-                openFileMethod.setAccessible(true);
-                openFileMethod.invoke(editorManager, file, null, options);
-            } else {
-                LOG.debug("Preview tab method not found, doing nothing for single click");
-            }
-
-        } catch (Exception e) {
-            LOG.debug("Preview tab opening failed, doing nothing for single click", e);
-        }
-    }
-
-    private static @Nullable Method getMethod(FileEditorManager editorManager, Class<?> optionsClass) {
-        Method openFileMethod = null;
-        Class<?> currentClass = editorManager.getClass();
-
-        while (currentClass != null && openFileMethod == null) {
-            for (Method method : currentClass.getDeclaredMethods()) {
-                if ("openFile".equals(method.getName())) {
-                    Class<?>[] paramTypes = method.getParameterTypes();
-                    if (paramTypes.length == 3 &&
-                            VirtualFile.class.isAssignableFrom(paramTypes[0]) &&
-                            optionsClass.isAssignableFrom(paramTypes[2])) {
-                        openFileMethod = method;
-                        break;
-                    }
-                }
-            }
-            currentClass = currentClass.getSuperclass();
-        }
-        return openFileMethod;
+        PlatformApiReflection.openInPreviewTab(project, file);
     }
 
     /**
@@ -252,6 +208,58 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
                 }
             }
         });
+    }
+
+    /**
+     * Override diff request production so the right side of the diff shows the current
+     * working directory content (HEAD + local edits) instead of the pure HEAD revision.
+     * The left-side revision number is decorated with the active scope name so the diff
+     * panel header reads e.g. "abc1234 (master) | MyFile.kt".
+     */
+    @Override
+    protected @Nullable ChangeDiffRequestChain.Producer getDiffRequestProducer(@NotNull Object userObject) {
+        if (userObject instanceof Change change) {
+            // Replace afterRevision with CurrentContentRevision to show working tree content
+            FilePath filePath = ChangesUtil.getAfterPath(change);
+            if (filePath == null) {
+                filePath = ChangesUtil.getBeforePath(change);
+            }
+            if (filePath != null && filePath.getVirtualFile() != null) {
+                Change modifiedChange = new Change(
+                    withScopeName(change.getBeforeRevision(), getScopeDisplayName()),
+                    new CurrentContentRevision(filePath)
+                );
+                return ChangeDiffRequestProducer.create(myProject, modifiedChange);
+            }
+        }
+        return super.getDiffRequestProducer(userObject);
+    }
+
+    private String getScopeDisplayName() {
+        try {
+            ViewService vs = myProject.getService(ViewService.class);
+            if (vs != null) {
+                model.MyModel m = vs.getCurrent();
+                if (m != null) return m.getDisplayName();
+            }
+        } catch (Exception ignored) {}
+        return "";
+    }
+
+    @Nullable
+    private static ContentRevision withScopeName(@Nullable ContentRevision original, @NotNull String scopeName) {
+        if (original == null || scopeName.isEmpty()) return original;
+        return new ContentRevision() {
+            @Override public @Nullable String getContent() throws VcsException { return original.getContent(); }
+            @Override public @NotNull FilePath getFile() { return original.getFile(); }
+            @Override public @NotNull VcsRevisionNumber getRevisionNumber() {
+                VcsRevisionNumber base = original.getRevisionNumber();
+                return new VcsRevisionNumber() {
+                    @Override public @NotNull String asString() { return base.asString() + " (" + scopeName + ")"; }
+                    @Override public int compareTo(@NotNull VcsRevisionNumber o) { return base.compareTo(o); }
+                };
+            }
+        };
     }
 
     @Override
