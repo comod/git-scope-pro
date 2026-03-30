@@ -1,4 +1,4 @@
-# GIT SCOPE (Intellij Plugin)
+# Git Scope (Intellij Plugin)
 
 <!-- Plugin description -->
 
@@ -10,10 +10,10 @@ completely. Since feature branches typically contain multiple commits, this make
 changes over time. This plugin addresses that problem by making committed changes visible again.
 
 Create custom "scopes" for any Git reference—branch, tag, or commit hash. Each defined scope appears as a selectable tab
-in the **GIT SCOPE** tool window. The currently selected scope visualizes changes through:
+in the **Git Scope** tool window. The currently selected scope visualizes changes through:
 
-- **Scope tree diff** — Shows all modified files in the GIT SCOPE tool window
-- **File colors** - Files highlighted in editor tabs and project window according to the GIT SCOPE status (added;
+- **Scope tree diff** — Shows all modified files in the Git Scope tool window
+- **File colors** - Files highlighted in editor tabs and project window according to the Git Scope status (added;
   modified; deleted; ...)
 - **Editor line status** — Displays change markers in the editor gutter for open files
 - **Custom scope** — Enables filtered search, replace, and inspection operations
@@ -26,8 +26,7 @@ The plugin will add a new tool window named **Git Scope**:
 ![](docs/tool_window.png)
 
 By default, it will appear as a secondary tool window on the left side, but you can move it anywhere to suit your
-workflow. All features of this plugin are managed through the Git Scope tool window — no additional settings or
-preferences are added. In other words; the plugin extends the GUI of the Jetbrains IDE.
+workflow. Plugin settings are available under **Settings → Tools → Git Scope**.
 
 ### Plugin Features
 
@@ -54,7 +53,7 @@ In the "New*" tab you get a few different options to define the scope:
 ![](docs/icon.svg) **Change Browser:**
 
 Whenever the scope selection is done, the tab will turn into a "change browser" (similar to version control) that
-displays the current diff of the **GIT SCOPE**.
+displays the current diff of the **Git Scope**.
 
 ![](docs/toolwindow.png)
 
@@ -71,18 +70,41 @@ Right click on any file will present a number of actions:
 
 ![](docs/icon.svg) **Line Status Gutter:**
 
-Adjusts the line status according to your **GIT SCOPE**. Normally this built-in feature shows only the current "HEAD"
-changes
+Git Scope uses its own plugin-native gutter rendering system to show scope-aware diff markers directly
+in the editor. This avoids the side-effects and interference with native IDE functionality that earlier
+versions of the plugin experienced when hooking into the IDE's own gutter system.
 
-READ: https://www.jetbrains.com/help/phpstorm/file-status-highlights.html
+> **Note:** The Git Scope gutter markers are only visible when the IDE setting
+> **Version Control → Confirmation → Highlight modified lines in gutter** is enabled.
 
-| HEAD               | "main"-Branch            |
-|--------------------|--------------------------|
-| ![](docs/head.png) | ![](docs/linestatus.png) |
+Each changed line is marked with a colored bar — inserted, modified, and deleted lines each get their
+own dedicated color as defined by the active IDE theme — relative to the selected Git Scope target.
+Clicking any marker opens a popup with the following actions:
+
+- **↑ / ↓** — Navigate to the previous or next change
+- **↺** — Rollback this change to the scope base version
+- **Diff** — Open an inline diff showing exactly what changed
+- **Copy** — Copy the original scope-base content to the clipboard
+
+An overview stripe on the right-hand scrollbar provides a full-file summary of scope changes,
+making it easy to spot hotspots without scrolling.
+
+The gutter markers can be positioned in two ways, controlled via **Settings → Tools → Git Scope**:
+
+**Merged mode** (default) — Scope markers appear inline with the IDE's native gutter markers.
+Both sets of markers are visible at the same time:
+
+![](docs/merged_gutter.png)
+
+**Separate mode** — Scope markers are rendered in a dedicated column to the left of the line
+numbers. This makes it immediately clear which changes are relative to the Git Scope target and
+which are uncommitted local changes shown by the IDE's native HEAD diff markers:
+
+![](docs/separate_gutter.png)
 
 ![](docs/icon.svg) **Scope:**
 
-Adds a custom *Scope* (used to do inspections, search/replace, etc), i.e. search results are filtered by **GIT SCOPE**.
+Adds a custom *Scope* (used to do inspections, search/replace, etc), i.e. search results are filtered by **Git Scope**.
 
 READ: https://www.jetbrains.com/help/phpstorm/scopes.html
 
@@ -131,6 +153,17 @@ the Git Scope tool window (if the file is part of the current selected scope):
 
 ![](docs/select_opened.png)
 
+![](docs/icon.svg) **Settings**
+
+Plugin settings are available under **Settings → Tools → Git Scope**:
+
+![](docs/settings.png)
+
+| Setting                                         | Description                                                                                                                                                                                                                    |
+|-------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Separate Git Scope and IDE gutter rendering** | When enabled, Git Scope gutter markers are rendered in a dedicated column to the left of the line numbers, separate from the IDE's native markers. When disabled (default), both sets of markers share the same gutter column. |
+| **Color files based on Git Scope**              | When enabled (default), file colors in the project tree and editor tabs reflect the active Git Scope status. Disable to use the IDE's default HEAD-based file coloring.                                                        |
+
 ## Shortcuts (Added by this Plugin)
 
 | Shortcut | Description                                      |
@@ -144,14 +177,6 @@ the Git Scope tool window (if the file is part of the current selected scope):
 | Ctrl+D (on any file in a changes browser) | Open diff window               |
 | F7                                        | step forward (in diff window)  |
 | Shift+F7                                  | step backward (in diff window) |
-
-### Notes
-
-The examples above relies on the gutter highlighting feature in Jetbrains IDEs. Make sure that this feature is enabled
-via `Tools -> Diff & Merge -> Highlight modified lines in gutter` (IntelliJ).
-
-Previous versions of the plugin disabled this setting, while current versions rely on this setting being enabled to show
-changes in gutter.
 
 <!-- Plugin description end -->
 

@@ -1,8 +1,24 @@
 ## [2026.1]
 
+This release replaces the previous approach of hooking into the IDE's native gutter system — which
+caused several unwanted side-effects and interfered with standard IDE functionality — with a
+fully plugin-native gutter rendering system. The new markers can be placed either to the left of
+the line numbers on their own, or inline with the IDE's native gutter markers, in which case both
+work side by side. Clicking a marker opens a popup with navigation (prev/next), inline diff,
+rollback, and copy actions.
+
+### Added
+
+- Added [option to disable file coloring](https://github.com/comod/git-scope-pro/issues/82) in project explorer and editor tabs independently
+
 ### Fixes
 
 - Fixed [EDT errors on startup](https://github.com/comod/git-scope-pro/issues/80)
+- Fixed [relative git references (e.g. HEAD~2) no longer working with IDEs 2026.1+](https://github.com/comod/git-scope-pro/issues/85)
+- Fixed [`Use commit as Git Scope` generating invalid scope in multi-repo projects](https://github.com/comod/git-scope-pro/issues/81)
+- Fixed [missing license file](https://github.com/comod/git-scope-pro/issues/84)
+- Fixed [annotate with Git Blame conflicts with scope gutter markers](https://github.com/comod/git-scope-pro/issues/79)
+- Fixed [commit panel diff sometimes not working](https://github.com/comod/git-scope-pro/issues/56)
 
 ## [2025.3.2]
 
