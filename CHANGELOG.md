@@ -1,3 +1,10 @@
+## [2026.1.1]
+
+### Fixes
+
+- Fixed [gutter hoovering issue](https://github.com/comod/git-scope-pro/issues/89)
+- Fixed [scope file/tab coloring mixup](https://github.com/comod/git-scope-pro/issues/88)
+
 ## [2026.1]
 
 This release replaces the previous approach of hooking into the IDE's native gutter system — which
