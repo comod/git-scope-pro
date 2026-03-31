@@ -7,6 +7,7 @@ import com.intellij.diff.comparison.ComparisonManager
 import com.intellij.diff.comparison.ComparisonPolicy
 import com.intellij.diff.util.DiffDrawUtil
 import com.intellij.diff.util.DiffUtil
+import com.intellij.diff.util.TextDiffType
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.*
@@ -269,6 +270,23 @@ class ScopeLineStatusMarkerRenderer(
         // Variable to hold the popup reference so actions can close it
         var popupRef: com.intellij.openapi.ui.popup.JBPopup? = null
 
+        // Popup lifetime disposable — created early so editor highlights can be tied to it.
+        val popupDisposable = Disposer.newDisposable("ScopeGutterPopup")
+
+        // Child disposable for per-range editor highlights; replaced on prev/next navigation.
+        var editorHighlightsDisposable = Disposer.newDisposable("ScopeEditorHighlights")
+        Disposer.register(popupDisposable, editorHighlightsDisposable)
+
+        // Installs (or replaces) the editor highlights for [newRange].
+        fun updateEditorHighlights(newRange: Range) {
+            if (!Disposer.isDisposed(editorHighlightsDisposable)) {
+                Disposer.dispose(editorHighlightsDisposable)
+            }
+            editorHighlightsDisposable = Disposer.newDisposable("ScopeEditorHighlights")
+            Disposer.register(popupDisposable, editorHighlightsDisposable)
+            installEditorHighlights(editor, newRange, editorHighlightsDisposable)
+        }
+
         // Create inline diff preview (like IDE VCS gutter popup)
         val contentPanel = JPanel(BorderLayout())
 
@@ -309,6 +327,7 @@ class ScopeLineStatusMarkerRenderer(
                         editor.caretModel.moveToLogicalPosition(com.intellij.openapi.editor.LogicalPosition(previousRange.line1, 0))
                         editor.scrollingModel.scrollToCaret(com.intellij.openapi.editor.ScrollType.CENTER)
                         updateDiffPanel(previousRange)
+                        updateEditorHighlights(previousRange)
                     }
                 }
 
@@ -326,6 +345,7 @@ class ScopeLineStatusMarkerRenderer(
                         editor.caretModel.moveToLogicalPosition(com.intellij.openapi.editor.LogicalPosition(nextRange.line1, 0))
                         editor.scrollingModel.scrollToCaret(com.intellij.openapi.editor.ScrollType.CENTER)
                         updateDiffPanel(nextRange)
+                        updateEditorHighlights(nextRange)
                     }
                 }
 
@@ -396,8 +416,9 @@ class ScopeLineStatusMarkerRenderer(
         // Add toolbar to the top of the content panel
         contentPanel.add(toolbarComponent, BorderLayout.NORTH)
 
-        // Initialize diff panel with the initial range
+        // Initialize diff panel and editor highlights for the initial range
         updateDiffPanel(range)
+        updateEditorHighlights(range)
 
         // Create lightweight popup with toolbar and inline diff.
         // cancelOnClickOutside=false: the EditorMouseListener handles closing so the gutter
@@ -425,7 +446,6 @@ class ScopeLineStatusMarkerRenderer(
         val capturedPopup = popupRef
         activePopup = capturedPopup
 
-        val popupDisposable = Disposer.newDisposable("ScopeGutterPopup")
         capturedPopup.addListener(object : JBPopupListener {
             override fun onClosed(event: LightweightWindowEvent) {
                 if (activePopup === capturedPopup) activePopup = null
@@ -439,6 +459,72 @@ class ScopeLineStatusMarkerRenderer(
         }, popupDisposable)
     }
     
+    /**
+     * Installs line-level and word-level highlights on the current editor text for [range],
+     * mirroring the behaviour of the IDE's own VCS gutter popup
+     * (LineStatusMarkerPopupPanel.installMasterEditorWordHighlighters).
+     *
+     * All highlighters are automatically removed when [disposable] is disposed (i.e. when
+     * the popup closes or the user navigates to a different range).
+     */
+    private fun installEditorHighlights(editor: EditorEx, range: Range, disposable: Disposable) {
+        // DELETED ranges have no current lines — nothing to highlight in the editor.
+        if (range.type == Range.DELETED) return
+
+        val startLine = range.line1
+        val endLine   = range.line2
+        val diffType  = if (range.type == Range.INSERTED) TextDiffType.INSERTED else TextDiffType.MODIFIED
+
+        val highlighters = mutableListOf<RangeHighlighter>()
+
+        // Line-level background — use the dimmer "ignored" variant (withIgnored=true) so the
+        // highlight is subtle rather than the full opaque diff background.
+        // withHideStripeMarkers / withHideGutterMarkers avoids duplicating the overview-stripe
+        // and gutter icons that we already paint ourselves.
+        highlighters.addAll(
+            DiffDrawUtil.LineHighlighterBuilder(editor, startLine, endLine, diffType)
+                .withLayerPriority(1) // DiffDrawUtil.LAYER_PRIORITY_LST
+                .withIgnored(true)
+                .withHideStripeMarkers(true)
+                .withHideGutterMarkers(true)
+                .done()
+        )
+
+        // Word-level inline highlights — only meaningful for MODIFIED ranges.
+        if (range.type == Range.MODIFIED) {
+            try {
+                val vcsContent       = diffViewer.getVcsContentForRange(range, includeContext = false)
+                val currentTextRange = DiffUtil.getLinesRange(editor.document, startLine, endLine)
+                val currentContent   = editor.document.getText(currentTextRange)
+
+                val wordDiff = ComparisonManager.getInstance().compareChars(
+                    vcsContent, currentContent,
+                    ComparisonPolicy.DEFAULT,
+                    DumbProgressIndicator.INSTANCE
+                )
+
+                val baseOffset = currentTextRange.startOffset
+                for (fragment in wordDiff) {
+                    val start = baseOffset + fragment.startOffset2
+                    val end   = baseOffset + fragment.endOffset2
+                    if (start < end) {
+                        highlighters.addAll(
+                            DiffDrawUtil.InlineHighlighterBuilder(editor, start, end, DiffUtil.getDiffType(fragment))
+                                .withLayerPriority(1)
+                                .done()
+                        )
+                    }
+                }
+            } catch (e: com.intellij.openapi.progress.ProcessCanceledException) {
+                throw e
+            } catch (e: Exception) {
+                LOG.warn("Error computing word diff for editor highlights", e)
+            }
+        }
+
+        Disposer.register(disposable) { highlighters.forEach { it.dispose() } }
+    }
+
     private fun createInlineDiffPanel(editor: EditorEx, range: Range): JPanel {
         val panel = JPanel(BorderLayout())
 
