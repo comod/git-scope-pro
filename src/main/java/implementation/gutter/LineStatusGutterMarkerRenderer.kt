@@ -37,6 +37,18 @@ internal fun getGutterArea(editor: EditorEx): Pair<Int, Int> {
 }
 
 /**
+ * Returns true if the pixel y falls within the painted area of [range].
+ * DELETED ranges have line1 == line2 so y1 == y2; they are given the same
+ * fixed height (8 px) used when painting them.
+ */
+internal fun rangeContainsY(editor: Editor, range: Range, y: Int): Boolean {
+    val y1 = editor.logicalPositionToXY(LogicalPosition(range.line1, 0)).y
+    val y2 = if (range.type == Range.DELETED) y1 + JBUI.scale(8)
+             else editor.logicalPositionToXY(LogicalPosition(range.line2, 0)).y
+    return y in y1..y2
+}
+
+/**
  * Renders line status markers in the editor gutter.
  * Paints colored rectangles (green/blue/red) for different change types.
  * Implements ActiveGutterRenderer to handle mouse interactions.

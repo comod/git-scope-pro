@@ -105,6 +105,7 @@ gradle.taskGraph.whenReady {
     val isRelease = hasTask(":signPlugin") || hasTask(":publishPlugin") || hasTask(":verifyPlugin")
     tasks.named("buildSearchableOptions") { enabled = isRelease }
     tasks.named("prepareJarSearchableOptions") { enabled = isRelease }
+    tasks.named("jarSearchableOptions") { enabled = isRelease }
 }
 
 tasks {

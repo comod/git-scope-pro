@@ -27,17 +27,14 @@ jobs:
       - name: Verify Java version
         run: $JAVA_HOME/bin/java -version
 
-      - name: Validate Gradle Wrapper
-        uses: gradle/actions/wrapper-validation@v5
-
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v5
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Build Plugin
         run: ./gradlew buildPlugin
 
       - name: Upload Plugin Artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: plugin-artifact
           path: build/distributions/*.zip
