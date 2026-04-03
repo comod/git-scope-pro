@@ -4,6 +4,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.vcs.FileStatus;
 import com.intellij.openapi.vcs.changes.Change;
+import com.intellij.openapi.vcs.changes.ChangeListManager;
 import com.intellij.openapi.vcs.impl.FileStatusProvider;
 import com.intellij.openapi.vfs.VirtualFile;
 import org.jetbrains.annotations.NotNull;
@@ -47,11 +48,11 @@ public class GitScopeFileStatusProvider implements FileStatusProvider {
 
         String filePath = virtualFile.getPath();
 
-        // STRATEGY: If file is in local changes towards HEAD, let IntelliJ handle it
-        // This ensures gutter change bars work correctly for actively modified files
-        // Use HashMap lookup for O(1) performance instead of iterating through all changes
-        Map<String, Change> localChangesMap = viewService.getLocalChangesTowardsHeadMap();
-        if (localChangesMap != null && localChangesMap.containsKey(filePath)) {
+        // STRATEGY: If file is locally modified towards HEAD, let IntelliJ handle it.
+        // Use ChangeListManager for a live (non-cached) check so that after an undo the
+        // scope color is restored immediately without waiting for the next collectChanges().
+        FileStatus localStatus = ChangeListManager.getInstance(project).getStatus(virtualFile);
+        if (localStatus != FileStatus.NOT_CHANGED) {
             // File is actively being modified - let IntelliJ's default provider handle it
             return null;
         }
