@@ -29,6 +29,8 @@ import utils.GitUtil;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 public class ChangesService extends GitCompareWithRefAction implements Disposable {
@@ -58,6 +60,8 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
     private final GitService git;
     private Task.Backgroundable task;
     private final AtomicBoolean disposing = new AtomicBoolean(false);
+    private final AtomicReference<ProgressIndicator> currentIndicator = new AtomicReference<>();
+    private final AtomicLong collectionGeneration = new AtomicLong(0);
 
     public ChangesService(Project project) {
         this.project = project;
@@ -85,6 +89,7 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
         // Capture the current project reference to ensure consistency
         final Project currentProject = this.project;
         final GitService currentGitService = this.git;
+        final long gen = collectionGeneration.incrementAndGet();
 
         task = new Task.Backgroundable(currentProject, "Collecting " + Defs.APPLICATION_NAME, true) {
 
@@ -92,8 +97,10 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
 
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
-                // Early exit if disposing
-                if (disposing.get() || indicator.isCanceled()) {
+                currentIndicator.set(indicator);
+                try {
+                // Early exit if disposing or superseded by a newer collection request
+                if (disposing.get() || indicator.isCanceled() || collectionGeneration.get() != gen) {
                     return;
                 }
 
@@ -110,6 +117,7 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
                 }
 
                 repositories.forEach(repo -> {
+                    if (indicator.isCanceled() || collectionGeneration.get() != gen) return;
                     try {
                         String branchToCompare = getBranchToCompare(targetBranchByRepo, repo);
 
@@ -177,6 +185,9 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
                 } else {
                     result = new ChangesResult(_changes, _scopeChanges, _localChanges);
                 }
+                } finally {
+                    currentIndicator.compareAndSet(indicator, null);
+                }
             }
 
             @Override
@@ -199,6 +210,10 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
                 }, ModalityState.defaultModalityState(), __ -> disposing.get());
             }
         };
+        ProgressIndicator prev = currentIndicator.getAndSet(null);
+        if (prev != null) {
+            prev.cancel();
+        }
         task.queue();
     }
     

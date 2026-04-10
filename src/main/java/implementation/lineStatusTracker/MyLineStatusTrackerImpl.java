@@ -21,6 +21,7 @@ import com.intellij.openapi.vcs.VcsApplicationSettings;
 import com.intellij.openapi.vcs.VcsException;
 import com.intellij.openapi.vcs.changes.Change;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.util.concurrency.SequentialTaskExecutor;
 import com.intellij.util.messages.MessageBus;
 import com.intellij.util.messages.MessageBusConnection;
 import implementation.gutter.Range;
@@ -32,7 +33,9 @@ import system.Defs;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Manages custom line status markers for scope changes in editor gutters.
@@ -44,6 +47,9 @@ public class MyLineStatusTrackerImpl implements Disposable {
     private final Project project;
     private MessageBusConnection messageBusConnection;
     private final AtomicBoolean disposing = new AtomicBoolean(false);
+    private final ExecutorService updateExecutor =
+            SequentialTaskExecutor.createSequentialApplicationPoolExecutor("ScopeGutterUpdate");
+    private final AtomicLong updateGeneration = new AtomicLong(0);
 
     // Lightweight disposable token to check disposal state without capturing 'this'
     private static class DisposalToken {
@@ -70,6 +76,7 @@ public class MyLineStatusTrackerImpl implements Disposable {
     @Override
     public void dispose() {
         disposalToken.disposed = true;
+        updateExecutor.shutdownNow();
         releaseAll();
     }
 
@@ -118,9 +125,11 @@ public class MyLineStatusTrackerImpl implements Disposable {
         }
 
         final DisposalToken token = this.disposalToken;
-        // Process editors in parallel on background threads
-        ApplicationManager.getApplication().executeOnPooledThread(() -> {
-            if (token.disposed) return;
+        final long gen = updateGeneration.incrementAndGet();
+
+        updateExecutor.execute(() -> {
+            // Drop stale update if a newer one has been submitted while we were queued
+            if (token.disposed || updateGeneration.get() != gen) return;
 
             Editor[] editors = EditorFactory.getInstance().getAllEditors();
 
