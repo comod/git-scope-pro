@@ -84,7 +84,17 @@ public class ViewService implements Disposable {
 
     public ViewService(Project project) {
         this.project = project;
-        EventQueue.invokeLater(this::initDependencies);
+        ApplicationManager.getApplication().executeOnPooledThread(() -> {
+            // Force lazy service initialization on BGT where blocking ops are allowed,
+            // preventing EDT warnings from config loading (e.g. Maven path macro resolution)
+            project.getService(ChangesService.class);
+            project.getService(ToolWindowServiceInterface.class);
+            project.getService(StatusBarService.class);
+            project.getService(GitService.class);
+            project.getService(TargetBranchService.class);
+            project.getService(State.class);
+            EventQueue.invokeLater(ViewService.this::initDependencies);
+        });
     }
 
     private final @NotNull ExecutorService changesExecutor =
