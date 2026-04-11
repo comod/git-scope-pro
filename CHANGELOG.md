@@ -1,3 +1,10 @@
+## [2026.1.2]
+
+### Fixes
+
+- Fixed [multiple "Collecting Git Scope" tasks slow down PHPStorm](https://github.com/comod/git-scope-pro/issues/92)
+- Fixed one instance of illegal method call on EDT
+
 ## [2026.1.1]
 
 ### Fixes

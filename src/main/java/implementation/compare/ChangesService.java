@@ -195,7 +195,7 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
                 // Ensure result is accessed only on the UI thread to update the UI component
                 ApplicationManager.getApplication().invokeLater(() -> {
                     // Double-check the project is still valid
-                    if (!currentProject.isDisposed() && callBack != null) {
+                    if (!currentProject.isDisposed() && callBack != null && this.result != null) {
                         callBack.accept(this.result);
                     }
                 }, ModalityState.defaultModalityState(), __ -> disposing.get());
