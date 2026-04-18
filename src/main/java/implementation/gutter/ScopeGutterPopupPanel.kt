@@ -501,16 +501,22 @@ internal class ScopeGutterPopupPanel(
                         val baseContent = diffViewer.getVcsContentForRange(range, includeContext = false)
                         LOG.debug("Restoring deleted content: ${baseContent.length} chars")
                         if (baseContent.isNotEmpty()) {
-                            val offset = editor.logicalPositionToOffset(LogicalPosition(range.line1, 0))
-                            document.insertString(offset, baseContent + "\n")
+                            if (range.line1 >= document.lineCount) {
+                                // Inserting at end of document: prepend newline separator
+                                document.insertString(document.textLength, "\n" + baseContent)
+                            } else {
+                                // Inserting before an existing line: append newline to push it down
+                                val offset = document.getLineStartOffset(range.line1)
+                                document.insertString(offset, baseContent + "\n")
+                            }
                         }
                     }
                     Range.MODIFIED -> {
                         // For modified lines, replace with base content (without context)
                         val baseContent = diffViewer.getVcsContentForRange(range, includeContext = false)
                         LOG.debug("Replacing modified content: ${baseContent.length} chars")
-                        val startOffset = editor.logicalPositionToOffset(LogicalPosition(range.line1, 0))
-                        val endOffset = editor.logicalPositionToOffset(LogicalPosition(range.line2, 0))
+                        val startOffset = document.getLineStartOffset(range.line1)
+                        val endOffset = document.getLineEndOffset(range.line2 - 1)
                         document.replaceString(startOffset, endOffset, baseContent)
                     }
                 }
