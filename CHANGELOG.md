@@ -1,3 +1,9 @@
+## [2026.1.3]
+
+### Fixes
+
+- Fixed [Clicking gutter -> "Rollback Lines" loses newline](https://github.com/comod/git-scope-pro/issues/94)
+
 ## [2026.1.2]
 
 ### Fixes
