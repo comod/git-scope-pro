@@ -32,6 +32,18 @@ public class GitScopeSettings implements PersistentStateComponent<GitScopeSettin
      */
     public boolean scopeFileColors = true;
 
+    /**
+     * If true, untracked (unversioned) files are shown in the Git Scope view.
+     * Default: false
+     */
+    public boolean showUntrackedFiles = false;
+
+    /**
+     * If true, locally deleted files are shown in the Git Scope view.
+     * Default: false
+     */
+    public boolean showDeletedFiles = false;
+
     public static GitScopeSettings getInstance() {
         return ApplicationManager.getApplication().getService(GitScopeSettings.class);
     }
@@ -62,5 +74,21 @@ public class GitScopeSettings implements PersistentStateComponent<GitScopeSettin
 
     public void setScopeFileColors(boolean scopeFileColors) {
         this.scopeFileColors = scopeFileColors;
+    }
+
+    public boolean isShowUntrackedFiles() {
+        return showUntrackedFiles;
+    }
+
+    public void setShowUntrackedFiles(boolean showUntrackedFiles) {
+        this.showUntrackedFiles = showUntrackedFiles;
+    }
+
+    public boolean isShowDeletedFiles() {
+        return showDeletedFiles;
+    }
+
+    public void setShowDeletedFiles(boolean showDeletedFiles) {
+        this.showDeletedFiles = showDeletedFiles;
     }
 }

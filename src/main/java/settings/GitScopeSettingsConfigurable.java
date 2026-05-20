@@ -38,22 +38,31 @@ public class GitScopeSettingsConfigurable implements Configurable {
     public boolean isModified() {
         GitScopeSettings settings = GitScopeSettings.getInstance();
         return settingsComponent.isSeparateGutterRendering() != settings.isSeparateGutterRendering()
-            || settingsComponent.isScopeFileColors() != settings.isScopeFileColors();
+            || settingsComponent.isScopeFileColors() != settings.isScopeFileColors()
+            || settingsComponent.isShowUntrackedFiles() != settings.isShowUntrackedFiles()
+            || settingsComponent.isShowDeletedFiles() != settings.isShowDeletedFiles();
     }
 
     @Override
     public void apply() throws ConfigurationException {
         GitScopeSettings settings = GitScopeSettings.getInstance();
         boolean tabColorsChanged = settingsComponent.isScopeFileColors() != settings.isScopeFileColors();
+        boolean workingTreeChanged = settingsComponent.isShowUntrackedFiles() != settings.isShowUntrackedFiles()
+            || settingsComponent.isShowDeletedFiles() != settings.isShowDeletedFiles();
         settings.setSeparateGutterRendering(settingsComponent.isSeparateGutterRendering());
         settings.setScopeFileColors(settingsComponent.isScopeFileColors());
+        settings.setShowUntrackedFiles(settingsComponent.isShowUntrackedFiles());
+        settings.setShowDeletedFiles(settingsComponent.isShowDeletedFiles());
 
-        if (tabColorsChanged) {
-            for (var project : ProjectManager.getInstance().getOpenProjects()) {
-                if (!project.isDisposed()) {
-                    ViewService viewService = project.getService(ViewService.class);
-                    if (viewService != null && !viewService.isDisposed()) {
+        for (var project : ProjectManager.getInstance().getOpenProjects()) {
+            if (!project.isDisposed()) {
+                ViewService viewService = project.getService(ViewService.class);
+                if (viewService != null && !viewService.isDisposed()) {
+                    if (tabColorsChanged) {
                         viewService.refreshFileColors();
+                    }
+                    if (workingTreeChanged) {
+                        viewService.collectChanges(true);
                     }
                 }
             }
@@ -65,6 +74,8 @@ public class GitScopeSettingsConfigurable implements Configurable {
         GitScopeSettings settings = GitScopeSettings.getInstance();
         settingsComponent.setSeparateGutterRendering(settings.isSeparateGutterRendering());
         settingsComponent.setScopeFileColors(settings.isScopeFileColors());
+        settingsComponent.setShowUntrackedFiles(settings.isShowUntrackedFiles());
+        settingsComponent.setShowDeletedFiles(settings.isShowDeletedFiles());
     }
 
     @Override

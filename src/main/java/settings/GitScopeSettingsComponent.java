@@ -15,6 +15,8 @@ public class GitScopeSettingsComponent {
     private final JPanel mainPanel;
     private final JBCheckBox separateGutterRenderingCheckBox;
     private final JBCheckBox scopeFileColorsCheckBox;
+    private final JBCheckBox showUntrackedFilesCheckBox;
+    private final JBCheckBox showDeletedFilesCheckBox;
 
     public GitScopeSettingsComponent() {
         separateGutterRenderingCheckBox = new JBCheckBox(
@@ -25,6 +27,14 @@ public class GitScopeSettingsComponent {
             "Color files based on Git Scope"
         );
 
+        showUntrackedFilesCheckBox = new JBCheckBox(
+            "See untracked files"
+        );
+
+        showDeletedFilesCheckBox = new JBCheckBox(
+            "See deleted files"
+        );
+
         mainPanel = FormBuilder.createFormBuilder()
             .addComponent(new TitledSeparator("Gutter Rendering"))
             .addComponent(separateGutterRenderingCheckBox, 1)
@@ -33,6 +43,12 @@ public class GitScopeSettingsComponent {
             .addComponent(new TitledSeparator("File Colors"))
             .addComponent(scopeFileColorsCheckBox, 1)
             .addTooltip("When enabled (default), project and editor file colors reflect the active Git Scope")
+            .addVerticalGap(10)
+            .addComponent(new TitledSeparator("Working Tree"))
+            .addComponent(showUntrackedFilesCheckBox, 1)
+            .addTooltip("When enabled (default), untracked (unversioned) files appear in the Git Scope view")
+            .addComponent(showDeletedFilesCheckBox, 1)
+            .addTooltip("When enabled (default), locally deleted files appear in the Git Scope view")
             .addComponentFillVertically(new JPanel(), 0)
             .getPanel();
 
@@ -61,5 +77,21 @@ public class GitScopeSettingsComponent {
 
     public void setScopeFileColors(boolean value) {
         scopeFileColorsCheckBox.setSelected(value);
+    }
+
+    public boolean isShowUntrackedFiles() {
+        return showUntrackedFilesCheckBox.isSelected();
+    }
+
+    public void setShowUntrackedFiles(boolean value) {
+        showUntrackedFilesCheckBox.setSelected(value);
+    }
+
+    public boolean isShowDeletedFiles() {
+        return showDeletedFilesCheckBox.isSelected();
+    }
+
+    public void setShowDeletedFiles(boolean value) {
+        showDeletedFilesCheckBox.setSelected(value);
     }
 }

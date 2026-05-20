@@ -8,10 +8,12 @@ import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.FilePath;
+import com.intellij.openapi.vcs.FileStatus;
 import com.intellij.openapi.vcs.VcsException;
 import com.intellij.openapi.vcs.changes.Change;
 import com.intellij.openapi.vcs.changes.ChangeListManager;
 import com.intellij.openapi.vcs.changes.ChangesUtil;
+import com.intellij.openapi.vcs.changes.CurrentContentRevision;
 import com.intellij.openapi.vfs.VirtualFile;
 import git4idea.GitCommit;
 import git4idea.GitReference;
@@ -22,6 +24,7 @@ import git4idea.repo.GitRepository;
 import model.TargetBranchMap;
 import org.jetbrains.annotations.NotNull;
 import service.GitService;
+import settings.GitScopeSettings;
 import system.Defs;
 import utils.PlatformApiReflection;
 import utils.GitUtil;
@@ -249,17 +252,18 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
      */
     private Collection<Change> filterLocalChanges(Collection<Change> localChanges, String repoPath, Collection<Change> existingChanges) {
         Collection<Change> filtered = new ArrayList<>();
+        boolean showDeletedFiles = GitScopeSettings.getInstance().isShowDeletedFiles();
 
         for (Change change : localChanges) {
-            VirtualFile changeFile = change.getVirtualFile();
-            if (changeFile == null) {
+            FilePath changePath = ChangesUtil.getFilePath(change);
+            String changePathStr = changePath.getPath();
+
+            if (!showDeletedFiles && change.getType() == Change.Type.DELETED) {
                 continue;
             }
 
-            String changePath = changeFile.getPath();
-
             // Check if change belongs to this repository
-            if (!changePath.startsWith(repoPath)) {
+            if (!changePathStr.startsWith(repoPath)) {
                 continue;
             }
 
@@ -267,8 +271,8 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
             if (existingChanges != null && !existingChanges.isEmpty()) {
                 boolean isDuplicate = false;
                 for (Change existing : existingChanges) {
-                    VirtualFile existingFile = existing.getVirtualFile();
-                    if (existingFile != null && changePath.equals(existingFile.getPath())) {
+                    String existingPath = ChangesUtil.getFilePath(existing).getPath();
+                    if (changePathStr.equals(existingPath)) {
                         isDuplicate = true;
                         break;
                     }
@@ -333,6 +337,17 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
 
             // Filter local changes for this repository
             repoLocalChanges = filterLocalChanges(localChanges, repoPath, null);
+
+            // Add unversioned (untracked) files if the setting is enabled
+            if (GitScopeSettings.getInstance().isShowUntrackedFiles()) {
+                for (FilePath unversionedPath : changeListManager.getUnversionedFilesPaths()) {
+                    String filePathStr = unversionedPath.getPath();
+                    if (filePathStr.startsWith(repoPath)) {
+                        Change untrackedChange = new Change(null, new CurrentContentRevision(unversionedPath), FileStatus.UNKNOWN);
+                        repoLocalChanges.add(untrackedChange);
+                    }
+                }
+            }
 
             // Special handling for HEAD - return local changes only, no scope changes
             if (scopeRef.equals(GitService.BRANCH_HEAD)) {

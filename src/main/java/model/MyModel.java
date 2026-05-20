@@ -1,7 +1,7 @@
 package model;
 
 import com.intellij.openapi.vcs.changes.Change;
-import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.vcs.changes.ChangesUtil;
 import git4idea.repo.GitRepository;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.subjects.PublishSubject;
@@ -172,6 +172,7 @@ public class MyModel extends MyModelBase {
     /**
      * Helper method to build a HashMap from a collection of changes indexed by file path.
      * This provides O(1) lookup performance for file status checks.
+     * Uses ChangesUtil.getFilePath() to properly handle deleted files (where getVirtualFile() is null).
      *
      * @param changes Collection of changes to convert to a map
      * @return Map of file path to Change, or null if changes is null
@@ -183,10 +184,8 @@ public class MyModel extends MyModelBase {
 
         Map<String, Change> changeMap = new HashMap<>();
         for (Change change : changes) {
-            VirtualFile file = change.getVirtualFile();
-            if (file != null) {
-                changeMap.put(file.getPath(), change);
-            }
+            String path = ChangesUtil.getFilePath(change).getPath();
+            changeMap.put(path, change);
         }
         return changeMap;
     }
