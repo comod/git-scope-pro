@@ -1,3 +1,9 @@
+## [2026.1.4]
+
+### Added
+
+- Added [support for unversioned and deleted files](https://github.com/comod/git-scope-pro/pull/96)
+
 ## [2026.1.3]
 
 ### Fixes

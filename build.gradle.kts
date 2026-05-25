@@ -7,7 +7,7 @@ val platformType = properties("platformType")
 plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "2.3.20"
-    id("org.jetbrains.intellij.platform") version "2.13.1"
+    id("org.jetbrains.intellij.platform") version "2.16.0"
     id("org.jetbrains.changelog") version "2.5.0"
 }
 
@@ -148,6 +148,6 @@ listOf("build", "buildPlugin").forEach { taskName ->
 }
 
 dependencies {
-    implementation("com.google.code.gson:gson:2.13.2")
+    implementation("com.google.code.gson:gson:2.14.0")
     implementation("io.reactivex.rxjava3:rxjava:3.1.12")
 }
