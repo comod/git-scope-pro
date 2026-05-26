@@ -2,7 +2,8 @@
 
 ### Added
 
-- Added [support for unversioned and deleted files](https://github.com/comod/git-scope-pro/pull/96)
+- Added [support for unversioned and deleted files](https://github.com/comod/git-scope-pro/pull/96) (thanks to [@nmeylan](https://github.com/nmeylan))
+- Added [Create Patch action](https://github.com/comod/git-scope-pro/issues/97) to create a patch file from selected
 
 ## [2026.1.3]
 
