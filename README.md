@@ -53,20 +53,26 @@ In the "New*" tab you get a few different options to define the scope:
 ![](docs/icon.svg) **Change Browser:**
 
 Whenever the scope selection is done, the tab will turn into a "change browser" (similar to version control) that
-displays the current diff of the **Git Scope**.
+displays the current diff of the **Git Scope**. The change browser supports searching/filtering by file name using the
+built-in speed search — just start typing to narrow down the list.
 
 ![](docs/toolwindow.png)
 
 Right click on any file will present a number of actions:
 
-![](docs/show_in_project.png)
+![](docs/context_menu.png)
 
 - **Show Diff**: Opens a diff window showing the diff of the selected file(s) `<selected-scope>..HEAD`
 - **Show in Project**: Highlight this file in the Project tool window
+- **Create Patch...**: Opens a dialog to save the selected file(s) scope diff as a `.patch` file
+- **Copy as Patch to Clipboard**: Copies the selected file(s) scope diff as a unified patch directly to the clipboard
 - **Rollback...**: Rollback the selected files(s) to `<selected-scope>` version. Note that this will checkout the
   selected scope version of the file(s), and will in many cases leave you with a modified file that no longer show up in
   the Git Scope window since it is identical to the version pointed to by the scope. Commit the files using the
   standard Commit tool window.
+
+**Create Patch...**, **Copy as Patch to Clipboard**, and **Rollback...** all apply to the current selection,
+so you can select multiple files (or all files via **Ctrl+A**) and the action will apply to all of them at once.
 
 ![](docs/icon.svg) **Line Status Gutter:**
 
@@ -163,6 +169,8 @@ Plugin settings are available under **Settings → Tools → Git Scope**:
 |-------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **Separate Git Scope and IDE gutter rendering** | When enabled, Git Scope gutter markers are rendered in a dedicated column to the left of the line numbers, separate from the IDE's native markers. When disabled (default), both sets of markers share the same gutter column. |
 | **Color files based on Git Scope**              | When enabled (default), file colors in the project tree and editor tabs reflect the active Git Scope status. Disable to use the IDE's default HEAD-based file coloring.                                                        |
+| **Show untracked files**                        | When enabled, untracked (unversioned) files appear in the Git Scope view. Disabled by default.                                                                                                                                 |
+| **Show deleted files**                          | When enabled, locally deleted files appear in the Git Scope view. Disabled by default.                                                                                                                                         |
 
 ## Shortcuts (Added by this Plugin)
 
