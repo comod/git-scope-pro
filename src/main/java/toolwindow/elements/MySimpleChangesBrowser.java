@@ -45,6 +45,8 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
     private AnAction selectOpenedFileAction;
     private AnAction showInProjectAction;
     private AnAction rollbackAction;
+    private AnAction createPatchAction;
+    private AnAction copyAsPatchAction;
     private List<AnAction> toolbarActions;
 
     private void initializeActions() {
@@ -52,6 +54,8 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
             selectOpenedFileAction = new VcsTreeActions.SelectOpenedFileAction();
             showInProjectAction = new VcsTreeActions.ShowInProjectAction();
             rollbackAction = new VcsTreeActions.RollbackAction();
+            createPatchAction = new VcsTreeActions.CreatePatchAction();
+            copyAsPatchAction = new VcsTreeActions.CopyAsPatchAction();
             toolbarActions = Collections.singletonList(selectOpenedFileAction);
         }
     }
@@ -76,6 +80,8 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
         // Include parent actions (which provide diff functionality) plus our custom actions
         List<AnAction> actions = new ArrayList<>(super.createPopupMenuActions());
         actions.add(showInProjectAction);
+        actions.add(createPatchAction);
+        actions.add(copyAsPatchAction);
         actions.add(rollbackAction);
         return actions;
     }

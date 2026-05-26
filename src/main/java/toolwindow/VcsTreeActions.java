@@ -6,6 +6,7 @@ import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.VcsDataKeys;
 import com.intellij.openapi.vcs.changes.Change;
+import com.intellij.openapi.vcs.changes.actions.CreatePatchFromChangesAction;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ide.projectView.ProjectView;
 import model.MyModel;
@@ -14,10 +15,13 @@ import service.ToolWindowServiceInterface;
 import service.ViewService;
 import utils.CustomRollback;
 
+import java.util.Arrays;
+import java.util.List;
+
 public class VcsTreeActions {
     public static class ShowInProjectAction extends AnAction {
         public ShowInProjectAction() {
-            super("Show in Project");
+            super("Show in Project", "Locate file in the Project view", AllIcons.General.Locate);
         }
 
         @Override
@@ -55,7 +59,7 @@ public class VcsTreeActions {
 
     public static class RollbackAction extends AnAction {
         public RollbackAction() {
-            super("Rollback...");
+            super("Rollback...", "Rollback selected changes", AllIcons.Actions.Rollback);
         }
 
         @Override
@@ -79,6 +83,56 @@ public class VcsTreeActions {
         public void update(@NotNull AnActionEvent e) {
             Change[] changes = e.getData(VcsDataKeys.CHANGES);
             e.getPresentation().setEnabled(changes != null && changes.length > 0);
+        }
+    }
+
+    public static class CreatePatchAction extends AnAction {
+        public CreatePatchAction() {
+            super("Create Patch...", "Create a patch file from selected changes", AllIcons.Vcs.Patch);
+        }
+
+        @Override
+        public @NotNull ActionUpdateThread getActionUpdateThread() {
+            return ActionUpdateThread.EDT;
+        }
+
+        @Override
+        public void actionPerformed(@NotNull AnActionEvent e) {
+            Project project = e.getProject();
+            Change[] changes = e.getData(VcsDataKeys.CHANGES);
+            if (project == null || changes == null || changes.length == 0) return;
+            CreatePatchFromChangesAction.createPatch(project, null, Arrays.asList(changes));
+        }
+
+        @Override
+        public void update(@NotNull AnActionEvent e) {
+            Change[] changes = e.getData(VcsDataKeys.CHANGES);
+            e.getPresentation().setEnabledAndVisible(changes != null && changes.length > 0);
+        }
+    }
+
+    public static class CopyAsPatchAction extends AnAction {
+        public CopyAsPatchAction() {
+            super("Copy as Patch to Clipboard", "Copy selected changes as a patch to the clipboard", null);
+        }
+
+        @Override
+        public @NotNull ActionUpdateThread getActionUpdateThread() {
+            return ActionUpdateThread.EDT;
+        }
+
+        @Override
+        public void actionPerformed(@NotNull AnActionEvent e) {
+            Project project = e.getProject();
+            Change[] changes = e.getData(VcsDataKeys.CHANGES);
+            if (project == null || changes == null || changes.length == 0) return;
+            CreatePatchFromChangesAction.createPatch(project, null, Arrays.asList(changes), true);
+        }
+
+        @Override
+        public void update(@NotNull AnActionEvent e) {
+            Change[] changes = e.getData(VcsDataKeys.CHANGES);
+            e.getPresentation().setEnabledAndVisible(changes != null && changes.length > 0);
         }
     }
 
