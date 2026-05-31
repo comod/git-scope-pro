@@ -1,0 +1,81 @@
+<idea-plugin>
+    <dependencies>
+        <module name="intellij.platform.backend"/>
+        <module name="intellij.platform.kernel.backend"/>
+        <module name="gitscope.shared"/>
+        <plugin id="Git4Idea"/>
+    </dependencies>
+
+    <applicationListeners>
+        <listener class="listener.MyBulkFileListener" topic="com.intellij.openapi.vfs.newvfs.BulkFileListener"/>
+        <listener class="listener.MyDynamicPluginListener" topic="com.intellij.ide.plugins.DynamicPluginListener"/>
+    </applicationListeners>
+
+    <projectListeners>
+        <listener class="listener.MyToolWindowListener" topic="com.intellij.openapi.wm.ex.ToolWindowManagerListener"/>
+        <listener class="listener.VcsStartup" topic="com.intellij.openapi.vcs.VcsMappingListener"/>
+        <listener class="listener.MyChangeListListener" topic="com.intellij.openapi.vcs.changes.ChangeListListener"/>
+        <listener class="listener.MyGitRepositoryChangeListener" topic="git4idea.repo.GitRepository$GIT_REPO_CHANGE"/>
+        <listener class="listener.MyFileEditorManagerListener"
+                  topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"/>
+    </projectListeners>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <statusBarWidgetFactory
+                implementation="statusBar.MyStatusBarWidgetFactory" id="GitScopeStatusBar"/>
+        <toolWindow
+                id="Git Scope"
+                secondary="true"
+                icon="AllIcons.Actions.Diff"
+                anchor="left"
+                factoryClass="toolwindow.ToolWindowUIFactory"
+                canCloseContents="true"
+        />
+        <selectInTarget implementation="implementation.scope.MyScopeInTarget"/>
+
+        <!-- Settings -->
+        <applicationConfigurable
+                parentId="tools"
+                instance="settings.GitScopeSettingsConfigurable"
+                id="settings.GitScopeSettingsConfigurable"
+                displayName="Git Scope"/>
+
+        <postStartupActivity implementation="listener.BackendStartupActivity"/>
+
+        <projectService serviceImplementation="state.State"/>
+        <projectService serviceImplementation="service.StatusBarService"/>
+        <projectService serviceImplementation="service.GitService"/>
+        <projectService serviceImplementation="service.ViewService"/>
+        <projectService serviceImplementation="service.TargetBranchService"/>
+        <projectService serviceImplementation="implementation.compare.ChangesService"/>
+        <projectService
+                serviceInterface="service.ToolWindowServiceInterface"
+                serviceImplementation="service.ToolWindowService"/>
+        <vcs.fileStatusProvider implementation="implementation.fileStatus.GitScopeFileStatusProvider"/>
+        <platform.rpc.backend.remoteApiProvider implementation="rpc.BackendGutterRpcProvider"/>
+    </extensions>
+
+    <actions>
+        <action id="ToggleHead" class="listener.ToggleHeadAction" text="GitScope: Toggle Head" description="ToggleHead">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="alt H"/>
+        </action>
+        <action id="listener.VcsContextMenuAction" class="listener.VcsContextMenuAction" text="Use Commit as Git Scope" icon="AllIcons.Actions.Diff">
+            <add-to-group group-id="Vcs.Log.ContextMenu" anchor="after"
+                          relative-to-action="Vcs.CopyRevisionNumberAction"/>
+        </action>
+
+        <action id="GitScope.MoveTabLeft" class="toolwindow.actions.TabMoveActions$MoveTabLeft" text="Move Tab Left">
+            <add-to-group group-id="ToolWindowContextMenu" anchor="first"/>
+        </action>
+        <action id="GitScope.MoveTabRight" class="toolwindow.actions.TabMoveActions$MoveTabRight" text="Move Tab Right">
+            <add-to-group group-id="ToolWindowContextMenu" anchor="after" relative-to-action="GitScope.MoveTabLeft"/>
+        </action>
+        <action id="GitScope.RenameTab" class="toolwindow.actions.RenameTabAction" text="Rename Tab">
+            <add-to-group group-id="ToolWindowContextMenu" anchor="after" relative-to-action="GitScope.MoveTabRight"/>
+        </action>
+        <action id="GitScope.ResetTabName" class="toolwindow.actions.ResetTabNameAction" text="Reset Tab Name">
+            <add-to-group group-id="ToolWindowContextMenu" anchor="after" relative-to-action="GitScope.RenameTab"/>
+        </action>
+    </actions>
+</idea-plugin>

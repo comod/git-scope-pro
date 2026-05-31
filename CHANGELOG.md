@@ -1,3 +1,9 @@
+## [2026.2]
+
+### Added
+
+- Added [support for remote development](https://github.com/comod/git-scope-pro/issues/91)
+
 ## [2026.1.4]
 
 ### Added
