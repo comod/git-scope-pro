@@ -35,19 +35,38 @@ public class VcsTreeActions {
             Change[] changes = e.getData(VcsDataKeys.CHANGES);
 
             if (project != null && changes != null && changes.length > 0) {
-                Change change = changes[0];
                 VirtualFile file = null;
 
-                if (change.getAfterRevision() != null && change.getAfterRevision().getFile().getVirtualFile() != null) {
-                    file = change.getAfterRevision().getFile().getVirtualFile();
-                } else if (change.getBeforeRevision() != null && change.getBeforeRevision().getFile().getVirtualFile() != null) {
-                    file = change.getBeforeRevision().getFile().getVirtualFile();
+                // Check if the selected tree node is a directory
+                com.intellij.openapi.vcs.changes.ui.ChangesBrowserBase browser =
+                        e.getData(com.intellij.openapi.vcs.changes.ui.ChangesBrowserBase.DATA_KEY);
+                if (browser != null) {
+                    Object node = browser.getViewer().getLastSelectedPathComponent();
+                    if (node instanceof com.intellij.openapi.vcs.changes.ui.ChangesBrowserNode<?> cbn) {
+                        Object userObject = cbn.getUserObject();
+                        if (userObject instanceof com.intellij.openapi.vcs.FilePath fp && fp.isDirectory() && fp.getVirtualFile() != null) {
+                            file = fp.getVirtualFile();
+                        }
+                    }
+                }
+
+                if (file == null) {
+                    file = getFileFromChange(changes[0]);
                 }
 
                 if (file != null) {
-                    ProjectView.getInstance(project).select(null, file, true);
+                    project.getService(rpc.NavigationCommandService.class).selectInProject(file.getPath());
                 }
             }
+        }
+
+        private VirtualFile getFileFromChange(Change change) {
+            if (change.getAfterRevision() != null && change.getAfterRevision().getFile().getVirtualFile() != null) {
+                return change.getAfterRevision().getFile().getVirtualFile();
+            } else if (change.getBeforeRevision() != null && change.getBeforeRevision().getFile().getVirtualFile() != null) {
+                return change.getBeforeRevision().getFile().getVirtualFile();
+            }
+            return null;
         }
 
         @Override

@@ -9,5 +9,6 @@
         <projectService serviceImplementation="rpc.FrontendGutterSubscriptions"/>
         <postStartupActivity implementation="gitscope.frontend.GutterRenderingStartup"/>
         <postStartupActivity implementation="rpc.FrontendGutterSubscriptionsStartup"/>
+        <postStartupActivity implementation="rpc.FrontendUtilSubscriptionsStartup"/>
     </extensions>
 </idea-plugin>

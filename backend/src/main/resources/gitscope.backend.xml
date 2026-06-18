@@ -47,12 +47,14 @@
         <projectService serviceImplementation="service.GitService"/>
         <projectService serviceImplementation="service.ViewService"/>
         <projectService serviceImplementation="service.TargetBranchService"/>
+        <projectService serviceImplementation="rpc.NavigationCommandService"/>
         <projectService serviceImplementation="implementation.compare.ChangesService"/>
         <projectService
                 serviceInterface="service.ToolWindowServiceInterface"
                 serviceImplementation="service.ToolWindowService"/>
         <vcs.fileStatusProvider implementation="implementation.fileStatus.GitScopeFileStatusProvider"/>
         <platform.rpc.backend.remoteApiProvider implementation="rpc.BackendGutterRpcProvider"/>
+        <platform.rpc.backend.remoteApiProvider implementation="rpc.BackendUtilRpcProvider"/>
     </extensions>
 
     <actions>

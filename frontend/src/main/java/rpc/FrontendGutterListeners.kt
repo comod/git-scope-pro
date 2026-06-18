@@ -18,8 +18,9 @@ class FrontendGutterSubscriptions(
     private val coroutineScope: CoroutineScope
 ) {
     init {
-        // Only subscribe via RPC in split mode — in monolithic mode,
-        // GutterRenderingService listens to GutterDataService directly.
+        // Only subscribe to gutter updates via RPC in split mode — in monolith,
+        // the frontend GutterDataService IS the backend GutterDataService (same instance),
+        // so re-publishing would cause an infinite loop.
         if (!com.intellij.platform.ide.productMode.IdeProductMode.isMonolith) {
             coroutineScope.launch {
                 durable {
