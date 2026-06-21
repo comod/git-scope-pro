@@ -47,7 +47,7 @@
         <projectService serviceImplementation="service.GitService"/>
         <projectService serviceImplementation="service.ViewService"/>
         <projectService serviceImplementation="service.TargetBranchService"/>
-        <projectService serviceImplementation="rpc.NavigationCommandService"/>
+        <projectService serviceImplementation="rpc.UtilCommandService"/>
         <projectService serviceImplementation="implementation.compare.ChangesService"/>
         <projectService
                 serviceInterface="service.ToolWindowServiceInterface"

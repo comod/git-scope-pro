@@ -9,9 +9,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 
 class BackendUtilRpcImpl : UtilRpcApi {
-    override suspend fun getNavigationCommands(projectId: ProjectId): Flow<NavigationCommand> {
+    override suspend fun getCommands(projectId: ProjectId): Flow<UtilCommand> {
         val project = projectId.findProjectOrNull() ?: return emptyFlow()
-        return project.service<NavigationCommandService>().commands
+        return project.service<UtilCommandService>().commands
     }
 }
 

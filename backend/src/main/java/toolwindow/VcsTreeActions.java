@@ -55,7 +55,7 @@ public class VcsTreeActions {
                 }
 
                 if (file != null) {
-                    project.getService(rpc.NavigationCommandService.class).selectInProject(file.getPath());
+                    project.getService(rpc.UtilCommandService.class).selectInProject(file.getUrl());
                 }
             }
         }

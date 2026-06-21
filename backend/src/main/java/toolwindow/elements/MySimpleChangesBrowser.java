@@ -30,7 +30,6 @@ import toolwindow.VcsTreeActions;
 import javax.swing.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import utils.PlatformApiReflection;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -117,7 +116,8 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
 
                     Change[] selectedChanges = getSelectedChanges().toArray(new Change[0]);
 
-                    if (!uiSettings.getOpenInPreviewTabIfPossible()) {
+                    if (!uiSettings.getOpenInPreviewTabIfPossible()
+                            && com.intellij.platform.ide.productMode.IdeProductMode.isMonolith()) {
                         return;
                     }
 
@@ -135,7 +135,7 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
     }
 
     private void openInPreviewTab(Project project, VirtualFile file) {
-        PlatformApiReflection.openInPreviewTab(project, file);
+        project.getService(rpc.UtilCommandService.class).openPreviewTab(file.getUrl(), -1);
     }
 
     /**
@@ -182,38 +182,25 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
      * @param isPreview Whether to open in preview tab
      */
     public void openAndScrollToChanges(Project project, VirtualFile file, int line, boolean isPreview) {
-        ApplicationManager.getApplication().invokeLater(() -> {
-            if (project.isDisposed()) return;
+        if (isPreview) {
+            project.getService(rpc.UtilCommandService.class).openPreviewTab(file.getUrl(), line);
+        } else {
+            ApplicationManager.getApplication().invokeLater(() -> {
+                if (project.isDisposed()) return;
+                FileEditor[] editors = FileEditorManager.getInstance(project).openFile(file, true);
 
-            FileEditor[] editors;
-
-            if (isPreview) {
-                // For preview, we don't have a reliable fallback, so just use the reflection method
-                // which we already call in openInPreviewTab. Here we'll just use standard API.
-                editors = FileEditorManager.getInstance(project).openFile(file, true);
-                LOG.debug("Opened file (fallback to regular tab): " + file.getName());
-            } else {
-                // Use standard API for regular tabs
-                editors = FileEditorManager.getInstance(project).openFile(file, true);
-                LOG.debug("Opened file in regular tab: " + file.getName());
-            }
-
-            // Scroll to specific line if provided
-            for (FileEditor fileEditor : editors) {
-                if (fileEditor instanceof TextEditor) {
-                    Editor editor = ((TextEditor) fileEditor).getEditor();
-
-                    // Move caret to the specific line if needed
-                    if (line > 0) {
-                        LogicalPosition pos = new LogicalPosition(line - 1, 0);
-                        editor.getCaretModel().moveToLogicalPosition(pos);
+                for (FileEditor fileEditor : editors) {
+                    if (fileEditor instanceof TextEditor) {
+                        Editor editor = ((TextEditor) fileEditor).getEditor();
+                        if (line > 0) {
+                            LogicalPosition pos = new LogicalPosition(line - 1, 0);
+                            editor.getCaretModel().moveToLogicalPosition(pos);
+                        }
+                        editor.getScrollingModel().scrollToCaret(ScrollType.CENTER);
                     }
-
-                    // Center the view on caret
-                    editor.getScrollingModel().scrollToCaret(ScrollType.CENTER);
                 }
-            }
-        });
+            });
+        }
     }
 
     /**

@@ -7,6 +7,7 @@
     <extensions defaultExtensionNs="com.intellij">
         <projectService serviceImplementation="gitscope.frontend.GutterRenderingService"/>
         <projectService serviceImplementation="rpc.FrontendGutterSubscriptions"/>
+        <projectService serviceImplementation="rpc.FrontendUtilSubscriptions"/>
         <postStartupActivity implementation="gitscope.frontend.GutterRenderingStartup"/>
         <postStartupActivity implementation="rpc.FrontendGutterSubscriptionsStartup"/>
         <postStartupActivity implementation="rpc.FrontendUtilSubscriptionsStartup"/>
