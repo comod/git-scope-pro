@@ -55,7 +55,7 @@ changelog {
     version.set(properties("pluginVersion"))
     groups.set(emptyList())
     headerParserRegex.set("""(\d{4}\.\d+(?:\.\d+)?)""".toRegex())
-    keepUnreleasedSection.set(true)
+    keepUnreleasedSection.set(false)
 }
 
 dependencies {
