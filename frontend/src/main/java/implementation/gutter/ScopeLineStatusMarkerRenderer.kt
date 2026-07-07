@@ -144,7 +144,7 @@ class ScopeLineStatusMarkerRenderer(
         val gitScopeSettings = settings.GitScopeSettings.getInstance()
         val gutterArea = getGutterArea(editor)
         val areaWidth = gutterArea.second - gutterArea.first
-        val hoverExpansion = maxOf(areaWidth - JBUI.scale(1), JBUI.scale(1))
+        val hoverExpansion = JBUI.scale(3)
         val inMarkerArea: Boolean
 
         if (gitScopeSettings.isSeparateGutterRendering) {

@@ -8,9 +8,12 @@ import com.intellij.openapi.editor.LogicalPosition
 import com.intellij.openapi.editor.colors.EditorColors
 import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.openapi.editor.ex.EditorGutterComponentEx
+import com.intellij.openapi.editor.impl.EditorImpl
 import com.intellij.openapi.editor.markup.ActiveGutterRenderer
 import com.intellij.openapi.editor.markup.LineMarkerRendererEx
 import com.intellij.ui.JBColor
+import com.intellij.ui.paint.PaintUtil
+import com.intellij.ui.scale.JBUIScale
 import com.intellij.util.ui.JBUI
 import settings.GitScopeSettings
 import java.awt.Graphics
@@ -31,7 +34,8 @@ internal fun getGutterArea(editor: EditorEx): Pair<Int, Int> {
 
     // Fallback: derive from public APIs (new UI only — old UI was removed in 2024.1)
     val gutter = editor.gutterComponentEx
-    val areaWidth = JBUI.scale(4)
+    val editorScale = if (editor is EditorImpl) editor.scale else 1.0f
+    val areaWidth = PaintUtil.RoundingMode.ROUND.round(JBUIScale.scale(4).toDouble() * editorScale)
     val endX = gutter.whitespaceSeparatorOffset
     return Pair(endX - areaWidth, endX)
 }
@@ -74,7 +78,7 @@ abstract class LineStatusGutterMarkerRenderer : LineMarkerRendererEx, ActiveGutt
         paintDefault(editor as EditorEx, g, ranges)
     }
 
-    override fun getPosition() = LineMarkerRendererEx.Position.LEFT
+    override fun getPosition() = LineMarkerRendererEx.Position.CUSTOM
 
     /**
      * Default painting logic for line status markers.
@@ -113,8 +117,9 @@ abstract class LineStatusGutterMarkerRenderer : LineMarkerRendererEx, ActiveGutt
         // (correct on both Windows and Linux without hardcoded pixel guesses).
         val gutterArea = getGutterArea(editor)
         val areaWidth = gutterArea.second - gutterArea.first
-        // Hover expands by (areaWidth - 1 px), matching the IDE's own VCS marker behaviour.
-        val hoverExpansion = maxOf(areaWidth - JBUI.scale(1), JBUI.scale(1))
+        // Hover expands by a fixed JBUI.scale(3), matching the IDE's own VCS marker behaviour
+        // (see LineStatusMarkerDrawUtil.getHoveredMarkerExtraWidth()).
+        val hoverExpansion = JBUI.scale(3)
 
         val x: Int
         val width: Int
@@ -134,11 +139,9 @@ abstract class LineStatusGutterMarkerRenderer : LineMarkerRendererEx, ActiveGutt
             width = gutterArea.second - x
         }
 
-        // Arc size for rounded corners
-        // Use larger arc for hovered state to make it more visually distinct
-        val normalArcSize = JBUI.scale(5)
-        val hoveredArcSize = JBUI.scale(7)  // More rounded when hovered
-        val arcSize = if (isHovered) hoveredArcSize else normalArcSize
+        // Corner radius matches the IDE's RectanglePainter2D approach: use the marker width
+        // as the arc, producing a pill shape that scales naturally with the marker size.
+        val arcSize = width
 
         val bounds = rangeYBounds(editor, range)
         g2d.fillRoundRect(x, bounds.first, width, bounds.last - bounds.first, arcSize, arcSize)
@@ -183,7 +186,7 @@ abstract class LineStatusGutterMarkerRenderer : LineMarkerRendererEx, ActiveGutt
         val settings = GitScopeSettings.getInstance()
         val gutterArea = getGutterArea(editorEx)
         val areaWidth = gutterArea.second - gutterArea.first
-        val hoverExpansion = maxOf(areaWidth - JBUI.scale(1), JBUI.scale(1))
+        val hoverExpansion = JBUI.scale(3)
 
         if (settings.isSeparateGutterRendering) {
             val markerX = maxOf(gutter.annotationsAreaOffset, gutter.annotationsAreaOffset + gutter.annotationsAreaWidth - areaWidth)
