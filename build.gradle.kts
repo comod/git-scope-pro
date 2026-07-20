@@ -10,8 +10,8 @@ val platformType = properties("platformType")
 plugins {
     application
     id("java")
-    id("org.jetbrains.intellij.platform") version "2.16.0"
-    id("org.jetbrains.intellij.platform.module") version "2.16.0" apply false
+    id("org.jetbrains.intellij.platform") version "2.18.1"
+    id("org.jetbrains.intellij.platform.module") version "2.18.1" apply false
     id("org.jetbrains.changelog") version "2.5.0"
     id("org.jetbrains.kotlin.jvm") version "2.3.20" apply false
     id("org.jetbrains.kotlin.plugin.serialization") version "2.3.20" apply false
@@ -21,15 +21,26 @@ plugins {
 group = properties("pluginGroup")
 version = properties("pluginVersion")
 
-subprojects {
+allprojects {
+
+    // Set the Java toolchain to 25 for every project (including the root aggregator, which does
+    // not apply the Kotlin plugin). This drives the org.gradle.jvm.version attribute so the root
+    // can consume the JVM-25 subprojects.
+    plugins.withType<JavaBasePlugin>().configureEach {
+        extensions.configure<JavaPluginExtension> {
+            toolchain {
+                languageVersion.set(JavaLanguageVersion.of(25))
+            }
+        }
+    }
 
     afterEvaluate {
-        extensions.findByType<KotlinJvmProjectExtension>()?.jvmToolchain(21)
+        extensions.findByType<KotlinJvmProjectExtension>()?.jvmToolchain(25)
     }
 
     tasks.withType<JavaCompile> {
-        sourceCompatibility = "21"
-        targetCompatibility = "21"
+        sourceCompatibility = "25"
+        targetCompatibility = "25"
     }
 }
 
@@ -124,15 +135,16 @@ intellijPlatform {
 }
 
 // Split Mode run task — launches frontend + backend processes locally for remote dev testing.
-// Usage: ./gradlew runIdeSplitMode
-val runIdeSplitMode by intellijPlatformTesting.runIde.registering {
-    splitMode = true
-    pluginInstallationTarget = PluginInstallationTarget.BOTH
-}
+// Named to avoid colliding with the plugin's own auto-registered runIdeSplitMode task.
+// Usage: ./gradlew runSplitMode
+//val runSplitMode = intellijPlatformTesting.runIde.register("runSplitMode") {
+//    splitMode = true
+//    pluginInstallationTarget = PluginInstallationTarget.BOTH
+//}
 
 // Monolith run task — single-process mode for everyday development.
-// Usage: ./gradlew runIdeMonolith
-val runIdeMonolith by intellijPlatformTesting.runIde.registering {
+// Usage: ./gradlew runMonolith
+val runMonolith = intellijPlatformTesting.runIde.register("runMonolith") {
     splitMode = false
 }
 

@@ -22,5 +22,5 @@ dependencies {
     }
 
     implementation(project(":shared"))
-    compileOnly("com.google.code.gson:gson:2.13.2")
+    compileOnly("com.google.code.gson:gson:2.14.0")
 }
