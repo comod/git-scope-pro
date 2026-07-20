@@ -19,6 +19,14 @@ dependencies {
         bundledModule("intellij.platform.backend")
         bundledModule("intellij.platform.kernel.backend")
         bundledModule("intellij.platform.rpc.backend")
+        // 2026.2 split VCS APIs into finer content modules that are no longer pulled in
+        // transitively via the Git4Idea plugin, so declare them explicitly.
+        bundledModule("intellij.platform.vcs.impl")
+        bundledModule("intellij.platform.vcs.impl.shared")
+        bundledModule("intellij.platform.vcs.dvcs")
+        bundledModule("intellij.platform.vcs.dvcs.impl")
+        bundledModule("intellij.platform.vcs.dvcs.impl.shared")
+        bundledModule("intellij.platform.vcs.log.impl")
     }
 
     implementation(project(":shared"))
