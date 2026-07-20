@@ -13,6 +13,11 @@ class BackendUtilRpcImpl : UtilRpcApi {
         val project = projectId.findProjectOrNull() ?: return emptyFlow()
         return project.service<UtilCommandService>().commands
     }
+
+    override suspend fun setPreviewTabEnabled(projectId: ProjectId, enabled: Boolean) {
+        val project = projectId.findProjectOrNull() ?: return
+        project.service<UtilCommandService>().setPreviewTabEnabled(enabled)
+    }
 }
 
 class BackendUtilRpcProvider : RemoteApiProvider {

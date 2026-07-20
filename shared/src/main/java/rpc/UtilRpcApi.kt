@@ -12,14 +12,19 @@ import kotlinx.serialization.Serializable
 sealed class UtilCommand {
     @Serializable
     data class SelectInProject(val filePath: String) : UtilCommand()
-
-    @Serializable
-    data class OpenPreviewTab(val filePath: String, val line: Int = -1) : UtilCommand()
 }
 
 @Rpc
 interface UtilRpcApi : RemoteApi<Unit> {
     suspend fun getCommands(projectId: ProjectId): Flow<UtilCommand>
+
+    /**
+     * Reports the frontend's "Enable preview tab" (UISettings.openInPreviewTabIfPossible) value to
+     * the backend. In split/remote mode the backend's own UISettings is not synced with the
+     * frontend, so the backend caches this pushed value to decide whether single-click should open
+     * a file.
+     */
+    suspend fun setPreviewTabEnabled(projectId: ProjectId, enabled: Boolean)
 
     companion object {
         suspend fun getInstance(): UtilRpcApi {

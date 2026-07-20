@@ -1,14 +1,16 @@
 package toolwindow.elements;
 
-import com.intellij.ide.ui.UISettings;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.ide.ui.UISettings;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.LogicalPosition;
 import com.intellij.openapi.editor.ScrollType;
 import com.intellij.openapi.fileEditor.FileEditor;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.TextEditor;
+import com.intellij.openapi.fileEditor.ex.FileEditorManagerEx;
+import com.intellij.openapi.fileEditor.ex.FileEditorOpenRequest;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.FilePath;
 import com.intellij.openapi.vcs.VcsException;
@@ -37,7 +39,6 @@ import java.util.concurrent.*;
 public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
     private static final com.intellij.openapi.diagnostic.Logger LOG = Defs.getLogger(MySimpleChangesBrowser.class);
     private final Project myProject;
-    UISettings uiSettings = UISettings.getInstance();
 
     // Instance-level actions to avoid static references that prevent plugin unloading
     // Use lazy initialization since super() constructor may call createToolbarActions() before field initialization
@@ -116,16 +117,10 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
 
                     Change[] selectedChanges = getSelectedChanges().toArray(new Change[0]);
 
-                    if (!uiSettings.getOpenInPreviewTabIfPossible()
-                            && com.intellij.platform.ide.productMode.IdeProductMode.isMonolith()) {
-                        return;
-                    }
-
                     if (selectedChanges.length > 0) {
                         Change selectedChange = selectedChanges[0];
                         VirtualFile file = selectedChange.getVirtualFile();
-                        if (file != null) {
-                            // Single click: try to open in preview tab, do nothing if it fails
+                        if (file != null && isPreviewTabEnabled(myProject)) {
                             openInPreviewTab(myProject, file);
                         }
                     }
@@ -134,8 +129,64 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
         });
     }
 
+    /**
+     * Whether single-click should open a file, based on the "Enable preview tab" setting.
+     *
+     * In monolith mode the backend's UISettings is the real user setting, so we read it directly.
+     * In split/remote mode the backend's UISettings is not synced with the frontend, so we use the
+     * value the frontend pushes over RPC (see FrontendUtilSubscriptions). If the frontend has not
+     * reported yet, we fall back to the backend's own setting as a best-effort default.
+     */
+    private boolean isPreviewTabEnabled(Project project) {
+        if (com.intellij.platform.ide.productMode.IdeProductMode.isMonolith()) {
+            return UISettings.getInstance().getOpenInPreviewTabIfPossible();
+        }
+        Boolean fromFrontend = project.getService(rpc.UtilCommandService.class).getPreviewTabEnabled();
+        if (fromFrontend != null) {
+            return fromFrontend;
+        }
+        return UISettings.getInstance().getOpenInPreviewTabIfPossible();
+    }
+
     private void openInPreviewTab(Project project, VirtualFile file) {
-        project.getService(rpc.UtilCommandService.class).openPreviewTab(file.getUrl(), -1);
+        openInPreviewTab(project, file, -1);
+    }
+
+    /**
+     * Opens the file through the platform's canonical FileEditorManager path.
+     *
+     * The Git Scope tool window runs on the backend under the connected client's ClientId (not
+     * local), so FileEditorManagerEx.openFile delegates to the same per-client FileEditorManager
+     * that Project View uses. This gives full editor initialization (Java/language parsing), the
+     * IDE VCS gutter and the plugin's own scope gutter (the backend fileOpened listener fires), and
+     * reuses the existing tab instead of creating a duplicate.
+     *
+     * usePreviewTab is requested for forward compatibility: in the current IDE, preview is decided
+     * by EditorWindow.shouldReservePreview(), whose first gate reads the backend's app-level
+     * UISettings.openInPreviewTabIfPossible (false, not synced from the frontend), so the tab is not
+     * a preview tab today. If a future IDE honors the flag over the client channel or consults the
+     * per-client setting, preview will start working with no code change here.
+     */
+    private void openInPreviewTab(Project project, VirtualFile file, int line) {
+        ApplicationManager.getApplication().invokeLater(() -> {
+            if (project.isDisposed() || !file.isValid()) return;
+            FileEditorOpenRequest request = new FileEditorOpenRequest()
+                    .withUsePreviewTab(true)
+                    .withReuseOpen(true)
+                    .withRequestFocus(false);
+            var composite = FileEditorManagerEx.getInstanceEx(project).openFile(file, request);
+
+            if (line > 0) {
+                for (FileEditor fileEditor : composite.getAllEditors()) {
+                    if (fileEditor instanceof TextEditor) {
+                        Editor editor = ((TextEditor) fileEditor).getEditor();
+                        LogicalPosition pos = new LogicalPosition(line - 1, 0);
+                        editor.getCaretModel().moveToLogicalPosition(pos);
+                        editor.getScrollingModel().scrollToCaret(ScrollType.CENTER);
+                    }
+                }
+            }
+        });
     }
 
     /**
@@ -183,7 +234,7 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
      */
     public void openAndScrollToChanges(Project project, VirtualFile file, int line, boolean isPreview) {
         if (isPreview) {
-            project.getService(rpc.UtilCommandService.class).openPreviewTab(file.getUrl(), line);
+            openInPreviewTab(project, file, line);
         } else {
             ApplicationManager.getApplication().invokeLater(() -> {
                 if (project.isDisposed()) return;
