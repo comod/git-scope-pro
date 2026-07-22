@@ -119,12 +119,12 @@ Scope"):
 
 | Action                               | Suggested shortcut | Description                                                                                                   |
 |--------------------------------------|--------------------|---------------------------------------------------------------------------------------------------------------|
-| **Git Scope: Next Change**           | `Alt+Down`         | Jump to the next change. At the last change in a file, moves on to the first change of the next changed file. |
-| **Git Scope: Previous Change**       | `Alt+Up`           | Jump to the previous change. At the first change in a file, moves to the last change of the previous file.    |
-| **Git Scope: Next Changed File**     | `Alt+Shift+Down`   | Jump straight to the first change of the next changed file.                                                   |
-| **Git Scope: Previous Changed File** | `Alt+Shift+Up`     | Jump straight to the first change of the previous changed file.                                               |
-| **Git Scope: Show Diff**             | `Alt+D`            | Open the scope diff (`<selected-scope>..working tree`) for the current file in an editor tab.                 |
-| **Git Scope: Close Diff**            | `Alt+Shift+D`      | Close the active diff editor tab and return to the code.                                                      |
+| **Next Change**      | `Alt+Down`         | Jump to the next change. At the last change in a file, moves on to the first change of the next changed file. |
+| **Previous Change**  | `Alt+Up`           | Jump to the previous change. At the first change in a file, moves to the last change of the previous file.    |
+| **Next Changed File**| `Alt+Shift+Down`   | Jump straight to the first change of the next changed file.                                                   |
+| **Previous Changed File** | `Alt+Shift+Up` | Jump straight to the first change of the previous changed file.                                               |
+| **Show Diff**        | `Alt+D`            | Open the scope diff (`<selected-scope>..working tree`) for the current file in an editor tab.                 |
+| **Close Diff**       | `Alt+Shift+D`      | Close the active diff editor tab and return to the code.                                                      |
 
 ![](docs/keymap_review.png)
 
@@ -226,12 +226,12 @@ The following review-navigation actions are also added, but ship **without** def
 
 | Action                           | Description                                                        |
 |----------------------------------|--------------------------------------------------------------------|
-| Git Scope: Next Change           | Next change; crosses into the next changed file at a file's end    |
-| Git Scope: Previous Change       | Previous change; crosses into the previous changed file at the top |
-| Git Scope: Next Changed File     | First change of the next changed file                              |
-| Git Scope: Previous Changed File | First change of the previous changed file                          |
-| Git Scope: Show Diff             | Open the scope diff for the current file in an editor tab          |
-| Git Scope: Close Diff            | Close the active diff editor tab                                   |
+| Next Change           | Next change; crosses into the next changed file at a file's end    |
+| Previous Change       | Previous change; crosses into the previous changed file at the top |
+| Next Changed File     | First change of the next changed file                              |
+| Previous Changed File | First change of the previous changed file                          |
+| Show Diff             | Open the scope diff for the current file in an editor tab          |
+| Close Diff            | Close the active diff editor tab                                   |
 
 ## More Useful Shortcuts
 

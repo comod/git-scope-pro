@@ -17,27 +17,27 @@
     <actions>
         <action id="GitScope.NextChange"
                 class="gitscope.frontend.actions.NextChangeAction"
-                text="Git Scope: Next Change"
+                text="Next Change"
                 description="Move to the next Git Scope change; wraps to the next changed file at the end of a file"/>
         <action id="GitScope.PreviousChange"
                 class="gitscope.frontend.actions.PreviousChangeAction"
-                text="Git Scope: Previous Change"
+                text="Previous Change"
                 description="Move to the previous Git Scope change; wraps to the previous changed file at the start of a file"/>
         <action id="GitScope.NextChangedFile"
                 class="gitscope.frontend.actions.NextChangedFileAction"
-                text="Git Scope: Next Changed File"
+                text="Next Changed File"
                 description="Cycle to the first change of the next changed file"/>
         <action id="GitScope.PreviousChangedFile"
                 class="gitscope.frontend.actions.PreviousChangedFileAction"
-                text="Git Scope: Previous Changed File"
+                text="Previous Changed File"
                 description="Cycle to the first change of the previous changed file"/>
         <action id="GitScope.ShowDiff"
                 class="gitscope.frontend.actions.ShowDiffAction"
-                text="Git Scope: Show Diff"
+                text="Show Diff"
                 description="Show the Git Scope diff for the current file in an editor tab"/>
         <action id="GitScope.CloseDiff"
                 class="gitscope.frontend.actions.CloseDiffAction"
-                text="Git Scope: Close Diff"
+                text="Close Diff"
                 description="Close the active diff editor tab"/>
     </actions>
 </idea-plugin>

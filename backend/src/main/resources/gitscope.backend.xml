@@ -59,7 +59,7 @@
     </extensions>
 
     <actions>
-        <action id="ToggleHead" class="listener.ToggleHeadAction" text="GitScope: Toggle Head" description="ToggleHead">
+        <action id="ToggleHead" class="listener.ToggleHeadAction" text="Toggle Head" description="ToggleHead">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
             <keyboard-shortcut keymap="$default" first-keystroke="alt H"/>
         </action>
