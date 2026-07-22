@@ -14,6 +14,15 @@ sealed class UtilCommand {
     data class SelectInProject(val filePath: String) : UtilCommand()
 }
 
+/** Direction for change/file navigation actions. */
+@Serializable
+enum class ChangeNavDirection {
+    NEXT_CHANGE,
+    PREVIOUS_CHANGE,
+    NEXT_FILE,
+    PREVIOUS_FILE
+}
+
 @Rpc
 interface UtilRpcApi : RemoteApi<Unit> {
     suspend fun getCommands(projectId: ProjectId): Flow<UtilCommand>
@@ -25,6 +34,25 @@ interface UtilRpcApi : RemoteApi<Unit> {
      * a file.
      */
     suspend fun setPreviewTabEnabled(projectId: ProjectId, enabled: Boolean)
+
+    /**
+     * Navigates to the next/previous change or changed file, relative to the given caret position
+     * in the currently focused editor. Runs on the backend, which holds the authoritative scope
+     * change set and performs the canonical file open + caret placement (honoring the preview-tab
+     * setting). [currentFilePath] is null when no editor is focused; [caretLine] is 0-based.
+     */
+    suspend fun navigateChange(
+        projectId: ProjectId,
+        currentFilePath: String?,
+        caretLine: Int,
+        direction: ChangeNavDirection
+    )
+
+    /**
+     * Shows the Git Scope diff for the focused file as an editor tab (same diff as the tool
+     * window's right-click "Show Diff"). Runs on the backend, which holds the scope change set.
+     */
+    suspend fun showDiff(projectId: ProjectId, currentFilePath: String?)
 
     companion object {
         suspend fun getInstance(): UtilRpcApi {

@@ -46,6 +46,7 @@
         <projectService serviceImplementation="service.StatusBarService"/>
         <projectService serviceImplementation="service.GitService"/>
         <projectService serviceImplementation="service.ViewService"/>
+        <projectService serviceImplementation="service.ChangeNavigationService"/>
         <projectService serviceImplementation="service.TargetBranchService"/>
         <projectService serviceImplementation="rpc.UtilCommandService"/>
         <projectService serviceImplementation="implementation.compare.ChangesService"/>

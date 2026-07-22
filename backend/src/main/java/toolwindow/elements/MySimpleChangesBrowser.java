@@ -2,15 +2,12 @@ package toolwindow.elements;
 
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.ide.ui.UISettings;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.LogicalPosition;
 import com.intellij.openapi.editor.ScrollType;
 import com.intellij.openapi.fileEditor.FileEditor;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.TextEditor;
-import com.intellij.openapi.fileEditor.ex.FileEditorManagerEx;
-import com.intellij.openapi.fileEditor.ex.FileEditorOpenRequest;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.FilePath;
 import com.intellij.openapi.vcs.VcsException;
@@ -131,21 +128,12 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
 
     /**
      * Whether single-click should open a file, based on the "Enable preview tab" setting.
-     *
-     * In monolith mode the backend's UISettings is the real user setting, so we read it directly.
-     * In split/remote mode the backend's UISettings is not synced with the frontend, so we use the
-     * value the frontend pushes over RPC (see FrontendUtilSubscriptions). If the frontend has not
-     * reported yet, we fall back to the backend's own setting as a best-effort default.
+     * Delegates to {@link utils.FileOpener#isPreviewTabEnabled(Boolean)} with the frontend-reported
+     * value (used in split mode, where the backend UISettings is not synced).
      */
     private boolean isPreviewTabEnabled(Project project) {
-        if (com.intellij.platform.ide.productMode.IdeProductMode.isMonolith()) {
-            return UISettings.getInstance().getOpenInPreviewTabIfPossible();
-        }
         Boolean fromFrontend = project.getService(rpc.UtilCommandService.class).getPreviewTabEnabled();
-        if (fromFrontend != null) {
-            return fromFrontend;
-        }
-        return UISettings.getInstance().getOpenInPreviewTabIfPossible();
+        return utils.FileOpener.isPreviewTabEnabled(fromFrontend);
     }
 
     private void openInPreviewTab(Project project, VirtualFile file) {
@@ -153,40 +141,13 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
     }
 
     /**
-     * Opens the file through the platform's canonical FileEditorManager path.
-     *
-     * The Git Scope tool window runs on the backend under the connected client's ClientId (not
-     * local), so FileEditorManagerEx.openFile delegates to the same per-client FileEditorManager
-     * that Project View uses. This gives full editor initialization (Java/language parsing), the
-     * IDE VCS gutter and the plugin's own scope gutter (the backend fileOpened listener fires), and
-     * reuses the existing tab instead of creating a duplicate.
-     *
-     * usePreviewTab is requested for forward compatibility: in the current IDE, preview is decided
-     * by EditorWindow.shouldReservePreview(), whose first gate reads the backend's app-level
-     * UISettings.openInPreviewTabIfPossible (false, not synced from the frontend), so the tab is not
-     * a preview tab today. If a future IDE honors the flag over the client channel or consults the
-     * per-client setting, preview will start working with no code change here.
+     * Opens the file through the platform's canonical FileEditorManager path (see
+     * {@link utils.FileOpener}). {@code line} is 1-based here (historical call sites); -1 means no
+     * caret move.
      */
     private void openInPreviewTab(Project project, VirtualFile file, int line) {
-        ApplicationManager.getApplication().invokeLater(() -> {
-            if (project.isDisposed() || !file.isValid()) return;
-            FileEditorOpenRequest request = new FileEditorOpenRequest()
-                    .withUsePreviewTab(true)
-                    .withReuseOpen(true)
-                    .withRequestFocus(false);
-            var composite = FileEditorManagerEx.getInstanceEx(project).openFile(file, request);
-
-            if (line > 0) {
-                for (FileEditor fileEditor : composite.getAllEditors()) {
-                    if (fileEditor instanceof TextEditor) {
-                        Editor editor = ((TextEditor) fileEditor).getEditor();
-                        LogicalPosition pos = new LogicalPosition(line - 1, 0);
-                        editor.getCaretModel().moveToLogicalPosition(pos);
-                        editor.getScrollingModel().scrollToCaret(ScrollType.CENTER);
-                    }
-                }
-            }
-        });
+        int zeroBasedLine = line > 0 ? line - 1 : -1;
+        utils.FileOpener.openAndGoToLine(project, file, zeroBasedLine);
     }
 
     /**
@@ -263,17 +224,10 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
     @Override
     protected @Nullable ChangeDiffRequestChain.Producer getDiffRequestProducer(@NotNull Object userObject) {
         if (userObject instanceof Change change) {
-            // Replace afterRevision with CurrentContentRevision to show working tree content
-            FilePath filePath = ChangesUtil.getAfterPath(change);
-            if (filePath == null) {
-                filePath = ChangesUtil.getBeforePath(change);
-            }
-            if (filePath != null && filePath.getVirtualFile() != null) {
-                Change modifiedChange = new Change(
-                    withScopeName(change.getBeforeRevision(), getScopeDisplayName()),
-                    new CurrentContentRevision(filePath)
-                );
-                return ChangeDiffRequestProducer.create(myProject, modifiedChange);
+            ChangeDiffRequestChain.Producer producer =
+                    utils.ScopeDiff.buildProducer(myProject, change, getScopeDisplayName());
+            if (producer != null) {
+                return producer;
             }
         }
         return super.getDiffRequestProducer(userObject);
@@ -288,22 +242,6 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
             }
         } catch (Exception ignored) {}
         return "";
-    }
-
-    @Nullable
-    private static ContentRevision withScopeName(@Nullable ContentRevision original, @NotNull String scopeName) {
-        if (original == null || scopeName.isEmpty()) return original;
-        return new ContentRevision() {
-            @Override public @Nullable String getContent() throws VcsException { return original.getContent(); }
-            @Override public @NotNull FilePath getFile() { return original.getFile(); }
-            @Override public @NotNull VcsRevisionNumber getRevisionNumber() {
-                VcsRevisionNumber base = original.getRevisionNumber();
-                return new VcsRevisionNumber() {
-                    @Override public @NotNull String asString() { return base.asString() + " (" + scopeName + ")"; }
-                    @Override public int compareTo(@NotNull VcsRevisionNumber o) { return base.compareTo(o); }
-                };
-            }
-        };
     }
 
     @Override

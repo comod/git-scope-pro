@@ -18,6 +18,22 @@ class BackendUtilRpcImpl : UtilRpcApi {
         val project = projectId.findProjectOrNull() ?: return
         project.service<UtilCommandService>().setPreviewTabEnabled(enabled)
     }
+
+    override suspend fun navigateChange(
+        projectId: ProjectId,
+        currentFilePath: String?,
+        caretLine: Int,
+        direction: ChangeNavDirection
+    ) {
+        val project = projectId.findProjectOrNull() ?: return
+        project.service<service.ChangeNavigationService>()
+            .navigate(currentFilePath, caretLine, direction)
+    }
+
+    override suspend fun showDiff(projectId: ProjectId, currentFilePath: String?) {
+        val project = projectId.findProjectOrNull() ?: return
+        project.service<service.ChangeNavigationService>().showDiff(currentFilePath)
+    }
 }
 
 class BackendUtilRpcProvider : RemoteApiProvider {
