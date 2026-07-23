@@ -1,10 +1,7 @@
 package utils;
 
 import com.intellij.openapi.diagnostic.Logger;
-import com.intellij.openapi.fileEditor.FileEditorManager;
-import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.changes.Change;
-import com.intellij.openapi.vfs.VirtualFile;
 import git4idea.GitCommit;
 import git4idea.GitReference;
 import git4idea.repo.GitRepository;
@@ -15,7 +12,6 @@ import system.Defs;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.Collection;
 import java.util.Collections;
@@ -38,10 +34,6 @@ import java.util.Map;
  *       {@code @ApiStatus.Experimental} annotation</li>
  *   <li>{@link #findTagByName} — tag lookup via the newer {@code getTagsHolder()}
  *       (2026.1+) or legacy {@code getTagHolder()} (older IDEs)</li>
- *   <li>{@link #openInPreviewTab} — open a file using {@code FileEditorOpenRequest}
- *       via the {@code @ApiStatus.Experimental} {@code FileEditorManagerEx.openFile}
- *       overload (the older {@code FileEditorOpenOptions} overload is {@code @Internal}
- *       in 2026.1+ and JetBrains directs external plugins to the Request overload)</li>
  * </ul>
  *
  * <p>See also {@link utils.SharedReflection} for shared-module bridges (gutter area,
@@ -66,17 +58,6 @@ public final class PlatformApiReflection {
     private static final @Nullable MethodHandle REPO_GET_TAG_HOLDER;
     private static final @Nullable MethodHandle TAG_HOLDER_GET_TAG;  // (Object, Object name) -> Object
 
-    // ── Preview tab (FileEditorOpenRequest, @ApiStatus.Experimental) ──────────
-    // The old (Editor, FileEditorOpenOptions) path is @ApiStatus.Internal in 2026.1;
-    // JetBrains directs external plugins to the FileEditorOpenRequest overload instead
-    // (see FileEditorManagerEx.openFile javadoc). That overload is @ApiStatus.Experimental,
-    // so we still route through reflection to keep verifyPlugin clean.
-    // Primary constructor: (EditorWindow?, FileEditorOpenMode?, selectAsCurrent, reuseOpen,
-    //                       usePreviewTab, requestFocus, pin)
-    private static final @Nullable MethodHandle OPEN_REQUEST_CTOR;
-    // FileEditorManagerEx.openFile(VirtualFile, FileEditorOpenRequest) -> FileEditorComposite
-    private static final @Nullable MethodHandle OPEN_FILE_WITH_REQUEST;
-
     static {
         // ── GitCommit.getChanges() ─────────────────────────────────────────
         COMMIT_GET_CHANGES = resolvePublicVirtual(GitCommit.class, "getChanges");
@@ -93,28 +74,6 @@ public final class PlatformApiReflection {
         // ── Legacy tag path ────────────────────────────────────────────────
         REPO_GET_TAG_HOLDER = resolvePublicVirtual(GitRepository.class, "getTagHolder");
         TAG_HOLDER_GET_TAG  = resolveByClassName("git4idea.repo.GitTagHolder", "getTag", String.class);
-
-        // ── Preview tab (FileEditorOpenRequest + FileEditorManagerEx.openFile) ─
-        MethodHandle openReqCtor = null;
-        MethodHandle openFileWithReq = null;
-        try {
-            Class<?> editorWindowClass = Class.forName("com.intellij.openapi.fileEditor.impl.EditorWindow");
-            Class<?> openModeClass = Class.forName("com.intellij.openapi.fileEditor.ex.FileEditorOpenMode");
-            Class<?> openRequestClass = Class.forName("com.intellij.openapi.fileEditor.ex.FileEditorOpenRequest");
-            Class<?> femExClass = Class.forName("com.intellij.openapi.fileEditor.ex.FileEditorManagerEx");
-
-            Constructor<?> c = openRequestClass.getDeclaredConstructor(
-                    editorWindowClass, openModeClass,
-                    boolean.class, boolean.class, boolean.class, boolean.class, boolean.class);
-            openReqCtor = MethodHandles.publicLookup().unreflectConstructor(c);
-
-            Method m = femExClass.getMethod("openFile", VirtualFile.class, openRequestClass);
-            openFileWithReq = MethodHandles.publicLookup().unreflect(m);
-        } catch (Exception e) {
-            LOG.debug("PlatformApiReflection: FileEditorOpenRequest API not available — " + e.getMessage());
-        }
-        OPEN_REQUEST_CTOR = openReqCtor;
-        OPEN_FILE_WITH_REQUEST = openFileWithReq;
     }
 
     private PlatformApiReflection() {}
@@ -230,25 +189,5 @@ public final class PlatformApiReflection {
             }
         }
         return null;
-    }
-
-    /**
-     * Opens a file in the editor's preview tab via the {@code @ApiStatus.Experimental}
-     * {@code FileEditorManagerEx.openFile(VirtualFile, FileEditorOpenRequest)} overload.
-     * Does nothing if the API is unavailable.
-     *
-     * @param project the current project
-     * @param file    the file to open
-     */
-    public static void openInPreviewTab(@NotNull Project project, @NotNull VirtualFile file) {
-        if (OPEN_REQUEST_CTOR == null || OPEN_FILE_WITH_REQUEST == null) return;
-        try {
-            // (targetWindow=null, openMode=null, selectAsCurrent=true, reuseOpen=true,
-            //  usePreviewTab=true, requestFocus=true, pin=false)
-            Object request = OPEN_REQUEST_CTOR.invoke(null, null, true, true, true, true, false);
-            OPEN_FILE_WITH_REQUEST.invoke(FileEditorManager.getInstance(project), file, request);
-        } catch (Throwable t) {
-            LOG.debug("PlatformApiReflection: openInPreviewTab failed", t);
-        }
     }
 }
