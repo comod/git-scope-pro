@@ -106,17 +106,19 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
                 }
 
                 if (e.getClickCount() == 1) {
-                    
+
                     // Check if Shift or Ctrl is pressed - if so, skip opening file
                     if (e.isShiftDown() || e.isControlDown()) {
                         return; // Let the default selection behavior handle it
                     }
 
-                    Change[] selectedChanges = getSelectedChanges().toArray(new Change[0]);
-
-                    if (selectedChanges.length > 0) {
-                        Change selectedChange = selectedChanges[0];
-                        VirtualFile file = selectedChange.getVirtualFile();
+                    // Only open when the clicked node is an actual file/change leaf. Clicking a
+                    // directory (or any grouping node) must not open a file: getSelectedChanges()
+                    // aggregates all changes under a directory, so using it here would open the
+                    // directory's first file. Resolve the node under the click point instead.
+                    Change clickedChange = getClickedChange(e);
+                    if (clickedChange != null) {
+                        VirtualFile file = clickedChange.getVirtualFile();
                         if (file != null && isPreviewTabEnabled(myProject)) {
                             openInPreviewTab(myProject, file);
                         }
@@ -124,6 +126,25 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
                 }
             }
         });
+    }
+
+    /**
+     * Returns the {@link Change} for the tree node directly under the click point, but only when
+     * that node is a file/change leaf. Returns null for directory or grouping nodes (whose user
+     * object is not a Change), so clicking a directory does not open a file.
+     */
+    private @Nullable Change getClickedChange(MouseEvent e) {
+        if (!(getViewer() instanceof javax.swing.JTree tree)) return null;
+        javax.swing.tree.TreePath path = tree.getPathForLocation(e.getX(), e.getY());
+        if (path == null) return null;
+        Object node = path.getLastPathComponent();
+        if (node instanceof com.intellij.openapi.vcs.changes.ui.ChangesBrowserNode<?> cbn) {
+            Object userObject = cbn.getUserObject();
+            if (userObject instanceof Change change) {
+                return change;
+            }
+        }
+        return null;
     }
 
     /**
@@ -246,15 +267,32 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
 
     @Override
     protected void onDoubleClick() {
-        // Handle double-click to open in regular/permanent tab
-        Change[] selectedChanges = getSelectedChanges().toArray(new Change[0]);
-        if (selectedChanges.length > 0) {
-            Change selectedChange = selectedChanges[0];
-            VirtualFile file = selectedChange.getVirtualFile();
+        if (!(getViewer() instanceof javax.swing.JTree tree)) return;
+        javax.swing.tree.TreePath path = tree.getSelectionPath();
+        if (path == null) return;
+
+        Object node = path.getLastPathComponent();
+        Change change = null;
+        if (node instanceof com.intellij.openapi.vcs.changes.ui.ChangesBrowserNode<?> cbn
+                && cbn.getUserObject() instanceof Change c) {
+            change = c;
+        }
+
+        if (change != null) {
+            // File/change leaf: open in a regular (permanent) tab.
+            VirtualFile file = change.getVirtualFile();
             if (file != null) {
-                // Double-click: open in regular (permanent) tab
                 openAndScrollToChanges(myProject, file, -1, false);
                 LOG.debug("Double-click: opened in permanent tab: " + file.getName());
+            }
+        } else {
+            // Directory / grouping node: toggle expand/collapse. The platform's double-click
+            // handler always reports the event as handled, which suppresses the tree's default
+            // expand/collapse, so we do it explicitly here.
+            if (tree.isExpanded(path)) {
+                tree.collapsePath(path);
+            } else {
+                tree.expandPath(path);
             }
         }
     }
