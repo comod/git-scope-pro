@@ -124,7 +124,6 @@ Scope"):
 | **Next Changed File**| `Alt+Shift+Down`   | Jump straight to the first change of the next changed file.                                                   |
 | **Previous Changed File** | `Alt+Shift+Up` | Jump straight to the first change of the previous changed file.                                               |
 | **Show Diff**        | `Alt+D`            | Open the scope diff (`<selected-scope>..working tree`) for the current file in an editor tab.                 |
-| **Close Diff**       | `Alt+Shift+D`      | Close the active diff editor tab and return to the code.                                                      |
 
 ![](docs/keymap_review.png)
 
@@ -135,7 +134,7 @@ A typical review flow:
    automatically opened, the caret lands on each change, and the file is highlighted in the Git Scope tool window so you
    always know where you are.
 3. When the gutter markers aren't enough to understand a change, press **Show Diff** to open the full side-by-side scope
-   diff for that file, then **Close Diff** to jump back and keep moving.
+   diff for that file. Close it with the standard Close Tab / Close Editor shortcut to jump back and keep moving.
 4. Use **Next/Previous Changed File** to skip whole files when you only want a per-file overview.
 
 ![](docs/review_navigation.png)
@@ -231,7 +230,6 @@ The following review-navigation actions are also added, but ship **without** def
 | Next Changed File     | First change of the next changed file                              |
 | Previous Changed File | First change of the previous changed file                          |
 | Show Diff             | Open the scope diff for the current file in an editor tab          |
-| Close Diff            | Close the active diff editor tab                                   |
 
 ## More Useful Shortcuts
 

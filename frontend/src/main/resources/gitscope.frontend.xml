@@ -35,9 +35,5 @@
                 class="gitscope.frontend.actions.ShowDiffAction"
                 text="Show Diff"
                 description="Show the Git Scope diff for the current file in an editor tab"/>
-        <action id="GitScope.CloseDiff"
-                class="gitscope.frontend.actions.CloseDiffAction"
-                text="Close Diff"
-                description="Close the active diff editor tab"/>
     </actions>
 </idea-plugin>

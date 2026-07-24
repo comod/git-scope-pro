@@ -100,31 +100,6 @@ class ShowDiffAction : AnAction(), DumbAware {
 }
 
 /**
- * Closes the active diff editor tab (only when the currently selected editor is a diff), leaving
- * other diff tabs untouched. Runs entirely on the frontend, where the editor tabs live.
- */
-class CloseDiffAction : AnAction(), DumbAware {
-    override fun actionPerformed(e: AnActionEvent) {
-        val project = e.project ?: return
-        val fem = com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project)
-        val selected = fem.selectedEditor?.file ?: return
-        if (selected is com.intellij.diff.editor.DiffContentVirtualFile) {
-            fem.closeFile(selected)
-        }
-    }
-
-    override fun update(e: AnActionEvent) {
-        val project = e.project
-        val enabled = project != null &&
-            com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project)
-                .selectedEditor?.file is com.intellij.diff.editor.DiffContentVirtualFile
-        e.presentation.isEnabled = enabled
-    }
-
-    override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
-}
-
-/**
  * Project-level coroutine scope holder for firing the navigation RPC off the EDT. The platform
  * injects a scope tied to the project/plugin lifecycle.
  */
