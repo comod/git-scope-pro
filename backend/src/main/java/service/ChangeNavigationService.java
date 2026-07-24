@@ -73,14 +73,21 @@ public final class ChangeNavigationService {
         if (viewService == null) return;
 
         Map<String, Change> scopeChanges = viewService.getScopeChangesMap();
-        if (scopeChanges == null || scopeChanges.isEmpty()) {
-            LOG.debug("ChangeNavigation: no scope changes");
+        Map<String, Change> localChanges = viewService.getLocalChangesTowardsHeadMap();
+        if (scopeChanges == null) scopeChanges = Collections.emptyMap();
+        if (localChanges == null) localChanges = Collections.emptyMap();
+        if (scopeChanges.isEmpty() && localChanges.isEmpty()) {
+            LOG.debug("ChangeNavigation: no scope or local changes");
             return;
         }
 
-        // Ordered, stable list of changed files (path order, matching what the user scans).
-        List<String> files = new ArrayList<>(scopeChanges.keySet());
-        Collections.sort(files);
+        // Ordered, stable list of changed files: the union of scope changes and local (working-tree
+        // vs HEAD) changes, so navigation visits every file that shows a gutter marker — both the
+        // scope markers we paint and the local markers the IDE paints.
+        java.util.TreeSet<String> fileSet = new java.util.TreeSet<>();
+        fileSet.addAll(scopeChanges.keySet());
+        fileSet.addAll(localChanges.keySet());
+        List<String> files = new ArrayList<>(fileSet);
 
         // Fall back to our last navigated position when the frontend has no focused editor
         // (or the focused editor isn't one of the changed files). This keeps sequential
@@ -95,10 +102,10 @@ public final class ChangeNavigationService {
         }
 
         switch (direction) {
-            case NEXT_CHANGE -> navigateChange(files, scopeChanges, fromFile, fromLine, true);
-            case PREVIOUS_CHANGE -> navigateChange(files, scopeChanges, fromFile, fromLine, false);
-            case NEXT_FILE -> navigateFile(files, scopeChanges, fromFile, true);
-            case PREVIOUS_FILE -> navigateFile(files, scopeChanges, fromFile, false);
+            case NEXT_CHANGE -> navigateChange(files, scopeChanges, localChanges, fromFile, fromLine, true);
+            case PREVIOUS_CHANGE -> navigateChange(files, scopeChanges, localChanges, fromFile, fromLine, false);
+            case NEXT_FILE -> navigateFile(files, scopeChanges, localChanges, fromFile, true);
+            case PREVIOUS_FILE -> navigateFile(files, scopeChanges, localChanges, fromFile, false);
         }
     }
 
@@ -201,11 +208,13 @@ public final class ChangeNavigationService {
     // --- Change-level navigation (within a file, crossing file boundaries at the ends) ---
 
     private void navigateChange(List<String> files, Map<String, Change> scopeChanges,
+                                Map<String, Change> localChanges,
                                 @Nullable String currentFilePath, int caretLine, boolean forward) {
         int fileIdx = currentFilePath == null ? -1 : files.indexOf(currentFilePath);
 
         if (fileIdx >= 0) {
-            List<Integer> lines = changeStartLines(currentFilePath, scopeChanges.get(currentFilePath));
+            List<Integer> lines = changeStartLines(currentFilePath, scopeChanges.get(currentFilePath),
+                    localChanges.get(currentFilePath));
             Integer target = forward ? firstLineAfter(lines, caretLine) : firstLineBefore(lines, caretLine);
             if (target != null) {
                 open(currentFilePath, target);
@@ -213,18 +222,19 @@ public final class ChangeNavigationService {
             }
             // Past the last/first change of this file -> move to the adjacent file.
             int nextIdx = wrapIndex(fileIdx + (forward ? 1 : -1), files.size());
-            openFileAtEdge(files, scopeChanges, nextIdx, forward);
+            openFileAtEdge(files, scopeChanges, localChanges, nextIdx, forward);
             return;
         }
 
         // No current file (or caret not in a changed file): jump to the first/last change overall.
         int startIdx = forward ? 0 : files.size() - 1;
-        openFileAtEdge(files, scopeChanges, startIdx, forward);
+        openFileAtEdge(files, scopeChanges, localChanges, startIdx, forward);
     }
 
     // --- File-level navigation (cycle between changed files) ---
 
     private void navigateFile(List<String> files, Map<String, Change> scopeChanges,
+                              Map<String, Change> localChanges,
                               @Nullable String currentFilePath, boolean forward) {
         int fileIdx = currentFilePath == null ? -1 : files.indexOf(currentFilePath);
         int targetIdx;
@@ -234,7 +244,7 @@ public final class ChangeNavigationService {
             targetIdx = wrapIndex(fileIdx + (forward ? 1 : -1), files.size());
         }
         // Always land on the first change of the target file when cycling files.
-        openFileAtEdge(files, scopeChanges, targetIdx, true);
+        openFileAtEdge(files, scopeChanges, localChanges, targetIdx, true);
     }
 
     /**
@@ -242,10 +252,11 @@ public final class ChangeNavigationService {
      * forward) or last change (when moving backward). Falls back to line 0 if ranges can't be
      * computed.
      */
-    private void openFileAtEdge(List<String> files, Map<String, Change> scopeChanges, int idx, boolean firstChange) {
+    private void openFileAtEdge(List<String> files, Map<String, Change> scopeChanges,
+                                Map<String, Change> localChanges, int idx, boolean firstChange) {
         if (idx < 0 || idx >= files.size()) return;
         String path = files.get(idx);
-        List<Integer> lines = changeStartLines(path, scopeChanges.get(path));
+        List<Integer> lines = changeStartLines(path, scopeChanges.get(path), localChanges.get(path));
         int line = 0;
         if (!lines.isEmpty()) {
             line = firstChange ? lines.get(0) : lines.get(lines.size() - 1);
@@ -280,39 +291,51 @@ public final class ChangeNavigationService {
     // --- Range helpers ---
 
     /**
-     * Returns the sorted 0-based start lines of all changes in the given file.
+     * Returns the sorted, de-duplicated 0-based start lines of all changes in the given file —
+     * the union of scope changes and local (working-tree vs HEAD) changes, so navigation stops on
+     * every visible gutter marker.
      *
      * <p>Prefers the ranges already cached by the gutter pipeline (exact match with the visible
-     * markers) for open files; otherwise computes base-vs-current ranges on demand so navigation
-     * works for files that have not been opened yet.
+     * markers) for open files: {@code cached.ranges} are the scope markers and
+     * {@code cached.localRanges} are the local markers, both in current-document space. For files
+     * with no cached data (not opened yet) it computes both range sets on demand.
      */
-    private List<Integer> changeStartLines(String path, @Nullable Change change) {
-        GutterDataService gds = project.getService(GutterDataService.class);
-        if (gds != null) {
-            GutterDataService.GutterFileData cached = gds.getData(path);
-            if (cached != null && cached.ranges != null && !cached.ranges.isEmpty()) {
-                return sortedStartLines(cached.ranges);
-            }
-        }
-        List<Range> computed = computeRanges(path, change);
-        return sortedStartLines(computed);
-    }
+    private List<Integer> changeStartLines(String path, @Nullable Change scopeChange, @Nullable Change localChange) {
+        java.util.TreeSet<Integer> lines = new java.util.TreeSet<>();
 
-    private static List<Integer> sortedStartLines(List<Range> ranges) {
-        List<Integer> lines = new ArrayList<>(ranges.size());
-        for (Range r : ranges) lines.add(r.getLine1());
-        Collections.sort(lines);
-        return lines;
+        GutterDataService gds = project.getService(GutterDataService.class);
+        GutterDataService.GutterFileData cached = gds != null ? gds.getData(path) : null;
+        if (cached != null) {
+            if (cached.ranges != null) {
+                for (Range r : cached.ranges) lines.add(r.getLine1());
+            }
+            if (cached.localRanges != null) {
+                for (Range r : cached.localRanges) lines.add(r.getLine1());
+            }
+            if (!lines.isEmpty()) return new ArrayList<>(lines);
+        }
+
+        // No cached gutter data (file not open): compute scope and local ranges on demand.
+        VirtualFile file = LocalFileSystem.getInstance().findFileByPath(path);
+        String currentContent = file == null ? null : ApplicationManager.getApplication().runReadAction(
+                (Computable<String>) () -> {
+                    Document doc = FileDocumentManager.getInstance().getDocument(file);
+                    return doc != null ? doc.getImmutableCharSequence().toString() : null;
+                });
+        if (currentContent == null) return new ArrayList<>(lines);
+        String normalizedCurrent = StringUtil.convertLineSeparators(currentContent);
+
+        for (Range r : computeRanges(path, scopeChange, normalizedCurrent)) lines.add(r.getLine1());
+        for (Range r : computeRanges(path, localChange, normalizedCurrent)) lines.add(r.getLine1());
+        return new ArrayList<>(lines);
     }
 
     /**
-     * Computes base-vs-current change ranges for a file not covered by cached gutter data.
-     * Runs off the EDT concerns by reading content under a read action.
+     * Computes change ranges (before-revision vs. current content) for a file not covered by cached
+     * gutter data. Returns ranges in current-document coordinate space (line1/line2 are current-side).
      */
-    private List<Range> computeRanges(String path, @Nullable Change change) {
+    private List<Range> computeRanges(String path, @Nullable Change change, String normalizedCurrent) {
         if (change == null || change.getBeforeRevision() == null) return Collections.emptyList();
-        VirtualFile file = LocalFileSystem.getInstance().findFileByPath(path);
-        if (file == null) return Collections.emptyList();
 
         String baseContent;
         try {
@@ -323,14 +346,7 @@ public final class ChangeNavigationService {
         }
         if (baseContent == null) return Collections.emptyList();
 
-        String currentContent = ApplicationManager.getApplication().runReadAction((Computable<String>) () -> {
-            Document doc = FileDocumentManager.getInstance().getDocument(file);
-            return doc != null ? doc.getImmutableCharSequence().toString() : null;
-        });
-        if (currentContent == null) return Collections.emptyList();
-
         String normalizedBase = StringUtil.convertLineSeparators(baseContent);
-        String normalizedCurrent = StringUtil.convertLineSeparators(currentContent);
         try {
             return RangesBuilder.INSTANCE.createRanges(normalizedCurrent, normalizedBase);
         } catch (Exception e) {

@@ -155,14 +155,16 @@ public class MyLineStatusTrackerImpl implements Disposable {
         final String headContent;
         final List<Range> precomputedRanges;
         final List<Range> scopeRanges;
+        final List<Range> localRanges;
 
         UpdateInfo(String filePath, String baseContent, String headContent,
-                   List<Range> ranges, List<Range> scopeRanges) {
+                   List<Range> ranges, List<Range> scopeRanges, List<Range> localRanges) {
             this.filePath = filePath;
             this.baseContent = baseContent;
             this.headContent = headContent;
             this.precomputedRanges = ranges;
             this.scopeRanges = scopeRanges;
+            this.localRanges = localRanges;
         }
     }
 
@@ -233,10 +235,15 @@ public class MyLineStatusTrackerImpl implements Disposable {
 
         List<Range> ranges;
         List<Range> scopeRanges = null;
+        List<Range> localRanges = null;
         try {
             if (headContent != null) {
                 ranges = computeScopeRangesInCurrentSpace(headContent, normalizedBase, normalizedCurrent, filePath);
                 scopeRanges = RangesBuilder.INSTANCE.createRanges(headContent, normalizedBase);
+                // Local changes = current document vs. HEAD, in current-document space. These are the
+                // markers the IDE paints in its own gutter (we exclude them from our scope painting);
+                // publish them so change navigation can also stop on them.
+                localRanges = RangesBuilder.INSTANCE.createRanges(normalizedCurrent, headContent);
             } else {
                 ranges = RangesBuilder.INSTANCE.createRanges(normalizedCurrent, normalizedBase);
             }
@@ -251,14 +258,15 @@ public class MyLineStatusTrackerImpl implements Disposable {
             ranges = Collections.emptyList();
         }
 
-        return new UpdateInfo(filePath, normalizedBase, headContent, ranges, scopeRanges);
+        return new UpdateInfo(filePath, normalizedBase, headContent, ranges, scopeRanges, localRanges);
     }
 
     private void publishBatchedUpdates(List<UpdateInfo> updates) {
         for (UpdateInfo update : updates) {
             if (disposing.get()) break;
             GutterDataService.GutterFileData data = new GutterDataService.GutterFileData(
-                    update.precomputedRanges, update.baseContent, update.headContent, update.scopeRanges);
+                    update.precomputedRanges, update.baseContent, update.headContent,
+                    update.scopeRanges, update.localRanges);
             gutterDataService.publish(update.filePath, data);
             publishedFiles.add(update.filePath);
         }

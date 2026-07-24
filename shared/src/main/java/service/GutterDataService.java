@@ -33,15 +33,32 @@ public class GutterDataService implements Disposable {
         public final @NotNull String baseContent;
         public final @Nullable String headContent;
         public final @Nullable List<Range> scopeRanges;
+        /**
+         * Local-change ranges (current document vs. HEAD) in current-document coordinate space —
+         * i.e. the changes the IDE paints in its own gutter, which we deliberately exclude from our
+         * scope painting. Published so change navigation can also stop on local changes. May be
+         * null when there are no local changes or when the data was reconstructed on the frontend
+         * (navigation runs on the backend, so the frontend does not need this field).
+         */
+        public final @Nullable List<Range> localRanges;
 
         public GutterFileData(@NotNull List<Range> ranges,
                               @NotNull String baseContent,
                               @Nullable String headContent,
                               @Nullable List<Range> scopeRanges) {
+            this(ranges, baseContent, headContent, scopeRanges, null);
+        }
+
+        public GutterFileData(@NotNull List<Range> ranges,
+                              @NotNull String baseContent,
+                              @Nullable String headContent,
+                              @Nullable List<Range> scopeRanges,
+                              @Nullable List<Range> localRanges) {
             this.ranges = ranges;
             this.baseContent = baseContent;
             this.headContent = headContent;
             this.scopeRanges = scopeRanges;
+            this.localRanges = localRanges;
         }
     }
 
