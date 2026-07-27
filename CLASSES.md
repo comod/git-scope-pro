@@ -3,25 +3,31 @@
 This document lists all plugin classes to search for when analyzing heap dumps to identify memory leaks after plugin
 unload. All classes should have **count = 0** after successful plugin unload.
 
-## Services
+Classes are organized by module: **backend**, **frontend**, and **shared**.
+
+---
+
+## Backend Module
+
+### Services
 
 *Expected: 1 instance per project, or 0 after unload*
 
 - `service.ViewService`
 - `service.ToolWindowService`
-- `service.ToolWindowServiceInterface` *(interface - unlikely to leak but check if implemented by plugin classes)*
+- `service.ToolWindowServiceInterface` *(interface)*
 - `service.StatusBarService`
 - `service.GitService`
 - `service.TargetBranchService`
 - `implementation.compare.ChangesService`
 
-## State/Persistence
+### State/Persistence
 
 - `state.State`
 - `state.MyModelConverter`
 - `state.WindowPositionTracker`
 
-## Listeners
+### Listeners
 
 *Expected: 0 after unload*
 
@@ -37,9 +43,9 @@ unload. All classes should have **count = 0** after successful plugin unload.
 - `listener.ToggleHeadAction`
 - `listener.VcsContextMenuAction`
 
-## UI Components
+### UI Components
 
-### Main Components
+#### Main Components
 
 - `toolwindow.ToolWindowView`
 - `toolwindow.ToolWindowUIFactory`
@@ -48,13 +54,14 @@ unload. All classes should have **count = 0** after successful plugin unload.
 - `toolwindow.VcsTreeActions`
 
 #### Actions
+
 - `toolwindow.actions.TabMoveActions`
 - `toolwindow.actions.TabMoveActions$MoveTabLeft`
 - `toolwindow.actions.TabMoveActions$MoveTabRight`
 - `toolwindow.actions.RenameTabAction`
 - `toolwindow.actions.ResetTabNameAction`
 
-### UI Elements
+#### UI Elements
 
 - `toolwindow.elements.VcsTree`
 - `toolwindow.elements.BranchTree`
@@ -63,71 +70,125 @@ unload. All classes should have **count = 0** after successful plugin unload.
 - `toolwindow.elements.CurrentBranch`
 - `toolwindow.elements.TargetBranch`
 
-## Status Bar
+### Status Bar
 
 - `statusBar.MyStatusBarWidget`
 - `statusBar.MyStatusBarWidgetFactory`
 - `statusBar.MyStatusBarPanel`
 
-## Models
+### Models
 
 - `model.MyModel`
-- `model.MyModel$field` *(enum - check for RxJava subscription leaks)*
+- `model.MyModel$field` *(enum)*
 - `model.MyModelBase`
 - `model.TargetBranchMap`
 - `model.Debounce`
 
-## Implementation Classes
+### Implementation Classes
 
-### Line Status Tracker
+#### Line Status Tracker
 
 - `implementation.lineStatusTracker.MyLineStatusTrackerImpl`
 
-### Gutter Rendering
-
-- `implementation.gutter.Range`
-- `implementation.gutter.RangesBuilder`
-- `implementation.gutter.LineStatusGutterMarkerRenderer`
-- `implementation.gutter.ScopeLineStatusMarkerRenderer`
-- `implementation.gutter.ScopeOverviewMarkerRenderer`
-- `implementation.gutter.ScopeDiffViewer`
-
-### Scope
+#### Scope
 
 - `implementation.scope.MyScope`
 - `implementation.scope.MyPackageSet` *(registered with NamedScopeManager - critical leak if not unregistered)*
 - `implementation.scope.MyScopeInTarget`
 - `implementation.scope.MyScopeNameSupplier`
 
-### File Status
+#### File Status
 
 - `implementation.fileStatus.GitScopeFileStatusProvider`
 
-## Settings
+### Settings (Backend UI)
 
-- `settings.GitScopeSettings`
 - `settings.GitScopeSettingsComponent`
 - `settings.GitScopeSettingsConfigurable`
 
-## Utility Classes
+### RPC
+
+- `rpc.BackendGutterRpcImpl`
+- `rpc.BackendGutterRpcProvider`
+
+### Utility Classes
 
 - `utils.CustomRollback`
 - `utils.GitUtil`
-- `utils.Notification`
 - `utils.PlatformApiReflection`
+
+---
+
+## Frontend Module
+
+### Services
+
+- `gitscope.frontend.GutterRenderingService`
+- `gitscope.frontend.GutterRenderingStartup`
+
+### Gutter Rendering
+
+- `implementation.gutter.LineStatusGutterMarkerRenderer`
+- `implementation.gutter.ScopeLineStatusMarkerRenderer`
+- `implementation.gutter.ScopeDiffViewer`
+- `implementation.gutter.ScopeGutterHighlighterManager`
+- `implementation.gutter.ScopeGutterPopupPanel`
+
+### RPC
+
+- `rpc.FrontendGutterSubscriptions`
+- `rpc.FrontendGutterSubscriptionsStartup`
+
+---
+
+## Shared Module
+
+### Services
+
+- `service.GutterDataService`
+- `service.GutterDataService$GutterFileData`
+- `service.GutterDataService$Listener` *(interface)*
+
+### Gutter Data Model
+
+- `implementation.gutter.Range`
+- `implementation.gutter.RangesBuilder`
+
+### RPC Interface & DTOs
+
+- `rpc.GutterRpcApi`
+- `rpc.GutterUpdateEvent`
+- `rpc.GutterUpdateEvent$DataUpdated`
+- `rpc.GutterUpdateEvent$DataCleared`
+- `rpc.GutterUpdateEvent$AllCleared`
+- `rpc.GutterFileDataDto`
+- `rpc.GutterRangeDto`
+
+### Settings
+
+- `settings.GitScopeSettings`
+
+### System
+
 - `system.Defs`
+
+### Utility Classes
+
+- `utils.SharedReflection`
+- `utils.Notification`
+
+---
 
 ## Anonymous/Inner Classes to Look For
 
 *These are patterns - search for classes matching these names:*
 
-- `TabOperations$1` *(rename action)*
-- `TabOperations$2` *(reset action)*
-- `TabOperations$3` *(move left action)*
-- `TabOperations$4` *(move right action)*
-- `VcsTree$$Lambda` *(any lambda from VcsTree)*
+- `ToolWindowView$listener` *(Consumer<MyModel.field> stored as field)*
+- `ViewService$modelListeners` *(HashMap of model → Consumer listeners)*
 - `MyLineStatusTrackerImpl$$Lambda` *(lambdas from line status tracker)*
 - `ScopeLineStatusMarkerRenderer$$Lambda` *(lambdas from gutter renderer)*
+- `GutterRenderingService$$Lambda` *(lambdas from rendering service)*
+- `BackendGutterRpcImpl$$Lambda` *(callbackFlow listener)*
 - `MySimpleChangesBrowser$1` *(anonymous MouseAdapter)*
 - `BranchTree$MyColoredTreeCellRenderer`
 - Any class ending with `$$Lambda$...`
@@ -149,6 +210,9 @@ Filter the HPROF classes view using these prefixes:
 - `statusBar.`
 - `settings.`
 - `utils.`
+- `rpc.`
+- `gitscope.frontend.`
+- `system.`
 
 ### 2. Filter the Classes View
 
@@ -161,12 +225,15 @@ Filter the HPROF classes view using these prefixes:
 *Most likely to leak:*
 
 1. **All listeners** - Must be unregistered
-2. **TabOperations and its anonymous classes** - Actions must be unregistered
-3. **ToolWindowView** - UI components must be disposed
-4. **ViewService** - RxJava subscriptions must be disposed
-5. **MyLineStatusTrackerImpl** - Background tasks must be cancelled
-6. **ScopeLineStatusMarkerRenderer** - Highlighters and mouse listeners must be removed
-7. **Any class with `$` in the name** - Anonymous/inner classes often capture outer references
+2. **ToolWindowView** - UI components must be disposed, model listener removed
+3. **ViewService** - Model listeners must be removed in dispose()
+4. **MyLineStatusTrackerImpl** - Background tasks must be cancelled
+5. **ScopeLineStatusMarkerRenderer** - Highlighters and mouse listeners must be removed
+6. **GutterRenderingService** - Must remove itself from GutterDataService listeners
+7. **BackendGutterRpcImpl** - callbackFlow listener removed on awaitClose
+8. **FrontendGutterSubscriptions** - Coroutine scope cancelled on service dispose
+9. **GutterDataService** - Listener list and file data map cleared on dispose
+10. **Any class with `$` in the name** - Anonymous/inner classes often capture outer references
 
 ---
 

@@ -1,0 +1,299 @@
+package toolwindow.elements;
+
+import com.intellij.openapi.actionSystem.AnAction;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.editor.LogicalPosition;
+import com.intellij.openapi.editor.ScrollType;
+import com.intellij.openapi.fileEditor.FileEditor;
+import com.intellij.openapi.fileEditor.FileEditorManager;
+import com.intellij.openapi.fileEditor.TextEditor;
+import com.intellij.openapi.project.Project;
+import com.intellij.openapi.vcs.FilePath;
+import com.intellij.openapi.vcs.VcsException;
+import com.intellij.openapi.vcs.history.VcsRevisionNumber;
+import com.intellij.openapi.vcs.changes.ChangesUtil;
+import com.intellij.openapi.vcs.changes.ContentRevision;
+import com.intellij.openapi.vcs.changes.Change;
+import com.intellij.openapi.vcs.changes.CurrentContentRevision;
+import service.ViewService;
+import com.intellij.openapi.vcs.changes.actions.diff.ChangeDiffRequestProducer;
+import com.intellij.openapi.vcs.changes.ui.ChangeDiffRequestChain;
+import com.intellij.openapi.vcs.changes.ui.SimpleAsyncChangesBrowser;
+import com.intellij.openapi.vfs.VirtualFile;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import system.Defs;
+import toolwindow.VcsTreeActions;
+
+import javax.swing.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+
+import java.util.*;
+import java.util.concurrent.*;
+
+public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
+    private static final com.intellij.openapi.diagnostic.Logger LOG = Defs.getLogger(MySimpleChangesBrowser.class);
+    private final Project myProject;
+
+    // Instance-level actions to avoid static references that prevent plugin unloading
+    // Use lazy initialization since super() constructor may call createToolbarActions() before field initialization
+    private AnAction selectOpenedFileAction;
+    private AnAction showInProjectAction;
+    private AnAction rollbackAction;
+    private AnAction createPatchAction;
+    private AnAction copyAsPatchAction;
+    private List<AnAction> toolbarActions;
+
+    private void initializeActions() {
+        if (selectOpenedFileAction == null) {
+            selectOpenedFileAction = new VcsTreeActions.SelectOpenedFileAction();
+            showInProjectAction = new VcsTreeActions.ShowInProjectAction();
+            rollbackAction = new VcsTreeActions.RollbackAction();
+            createPatchAction = new VcsTreeActions.CreatePatchAction();
+            copyAsPatchAction = new VcsTreeActions.CopyAsPatchAction();
+            toolbarActions = Collections.singletonList(selectOpenedFileAction);
+        }
+    }
+
+    /**
+     * Constructor for MySimpleChangesBrowser.
+     * This MUST be called from the EDT, but only AFTER all slow operations
+     * have been completed in background threads.
+     */
+    private MySimpleChangesBrowser(@NotNull Project project, @NotNull Collection<? extends Change> preparedChanges) {
+        super(project, false, true);
+        this.myProject = project;
+        setChangesToDisplay(preparedChanges);
+
+        // Add mouse listener for single-click preview functionality
+        addSingleClickPreviewSupport();
+    }
+
+    @Override
+    protected @NotNull List<AnAction> createPopupMenuActions() {
+        initializeActions();
+        // Include parent actions (which provide diff functionality) plus our custom actions
+        List<AnAction> actions = new ArrayList<>(super.createPopupMenuActions());
+        actions.add(showInProjectAction);
+        actions.add(createPatchAction);
+        actions.add(copyAsPatchAction);
+        actions.add(rollbackAction);
+        return actions;
+    }
+
+    @Override
+    protected @NotNull List<AnAction> createToolbarActions() {
+        initializeActions();
+        // Include parent actions first (on the left), then add our custom action (on the right)
+        List<AnAction> actions = new ArrayList<>(super.createToolbarActions());
+        actions.add(selectOpenedFileAction);
+        return actions;
+    }
+
+    /**
+     * Adds mouse listener to support single-click preview functionality
+     */
+    private void addSingleClickPreviewSupport() {
+        // Get the changes viewer component (usually a JTree or JList)
+        JComponent viewerComponent = getViewer();
+        viewerComponent.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getButton() != MouseEvent.BUTTON1) {
+                    return; // Only handle left clicks
+                }
+
+                if (e.getClickCount() == 1) {
+
+                    // Check if Shift or Ctrl is pressed - if so, skip opening file
+                    if (e.isShiftDown() || e.isControlDown()) {
+                        return; // Let the default selection behavior handle it
+                    }
+
+                    // Only open when the clicked node is an actual file/change leaf. Clicking a
+                    // directory (or any grouping node) must not open a file: getSelectedChanges()
+                    // aggregates all changes under a directory, so using it here would open the
+                    // directory's first file. Resolve the node under the click point instead.
+                    Change clickedChange = getClickedChange(e);
+                    if (clickedChange != null) {
+                        VirtualFile file = clickedChange.getVirtualFile();
+                        if (file != null && isPreviewTabEnabled(myProject)) {
+                            openInPreviewTab(myProject, file);
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    /**
+     * Returns the {@link Change} for the tree node directly under the click point, but only when
+     * that node is a file/change leaf. Returns null for directory or grouping nodes (whose user
+     * object is not a Change), so clicking a directory does not open a file.
+     */
+    private @Nullable Change getClickedChange(MouseEvent e) {
+        if (!(getViewer() instanceof javax.swing.JTree tree)) return null;
+        javax.swing.tree.TreePath path = tree.getPathForLocation(e.getX(), e.getY());
+        if (path == null) return null;
+        Object node = path.getLastPathComponent();
+        if (node instanceof com.intellij.openapi.vcs.changes.ui.ChangesBrowserNode<?> cbn) {
+            Object userObject = cbn.getUserObject();
+            if (userObject instanceof Change change) {
+                return change;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Whether single-click should open a file, based on the "Enable preview tab" setting.
+     * Delegates to {@link utils.FileOpener#isPreviewTabEnabled(Boolean)} with the frontend-reported
+     * value (used in split mode, where the backend UISettings is not synced).
+     */
+    private boolean isPreviewTabEnabled(Project project) {
+        Boolean fromFrontend = project.getService(rpc.UtilCommandService.class).getPreviewTabEnabled();
+        return utils.FileOpener.isPreviewTabEnabled(fromFrontend);
+    }
+
+    private void openInPreviewTab(Project project, VirtualFile file) {
+        openInPreviewTab(project, file, -1);
+    }
+
+    /**
+     * Opens the file through the platform's canonical FileEditorManager path (see
+     * {@link utils.FileOpener}). {@code line} is 1-based here (historical call sites); -1 means no
+     * caret move.
+     */
+    private void openInPreviewTab(Project project, VirtualFile file, int line) {
+        int zeroBasedLine = line > 0 ? line - 1 : -1;
+        utils.FileOpener.openAndGoToLine(project, file, zeroBasedLine);
+    }
+
+    /**
+     * Factory method that creates a MySimpleChangesBrowser instance asynchronously.
+     * This properly handles slow operations by performing them in a background thread
+     * before safely creating the component on the EDT.
+     *
+     * @param project The project
+     * @param changes The changes to display
+     * @return A CompletableFuture that will complete with the created browser component
+     */
+    public static CompletableFuture<MySimpleChangesBrowser> createAsync(@NotNull Project project,
+                                                                        @NotNull VcsTree vcsTree,
+                                                                        @NotNull Collection<? extends Change> changes) {
+        CompletableFuture<MySimpleChangesBrowser> future = new CompletableFuture<>();
+        if (project.isDisposed()) {
+            future.completeExceptionally(new IllegalStateException("Project disposed"));
+            return future;
+        }
+
+        ApplicationManager.getApplication().invokeLater(() -> {
+            try {
+                if (project.isDisposed()) {
+                    future.completeExceptionally(new IllegalStateException("Project disposed"));
+                    return;
+                }
+                // No pre-processing: SimpleAsyncChangesBrowser will handle async work internally
+                MySimpleChangesBrowser browser = new MySimpleChangesBrowser(project, changes);
+                future.complete(browser);
+            } catch (Throwable t) {
+                future.completeExceptionally(t);
+            }
+        });
+
+        return future;
+    }
+
+    /**
+     * Opens a file and scrolls to the specified line, with option for preview tab
+     *
+     * @param project The project
+     * @param file The file to open
+     * @param line The line number to scroll to (-1 for no specific line)
+     * @param isPreview Whether to open in preview tab
+     */
+    public void openAndScrollToChanges(Project project, VirtualFile file, int line, boolean isPreview) {
+        if (isPreview) {
+            openInPreviewTab(project, file, line);
+        } else {
+            ApplicationManager.getApplication().invokeLater(() -> {
+                if (project.isDisposed()) return;
+                FileEditor[] editors = FileEditorManager.getInstance(project).openFile(file, true);
+
+                for (FileEditor fileEditor : editors) {
+                    if (fileEditor instanceof TextEditor) {
+                        Editor editor = ((TextEditor) fileEditor).getEditor();
+                        if (line > 0) {
+                            LogicalPosition pos = new LogicalPosition(line - 1, 0);
+                            editor.getCaretModel().moveToLogicalPosition(pos);
+                        }
+                        editor.getScrollingModel().scrollToCaret(ScrollType.CENTER);
+                    }
+                }
+            });
+        }
+    }
+
+    /**
+     * Override diff request production so the right side of the diff shows the current
+     * working directory content (HEAD + local edits) instead of the pure HEAD revision.
+     * The left-side revision number is decorated with the active scope name so the diff
+     * panel header reads e.g. "abc1234 (master) | MyFile.kt".
+     */
+    @Override
+    protected @Nullable ChangeDiffRequestChain.Producer getDiffRequestProducer(@NotNull Object userObject) {
+        if (userObject instanceof Change change) {
+            ChangeDiffRequestChain.Producer producer =
+                    utils.ScopeDiff.buildProducer(myProject, change, getScopeDisplayName());
+            if (producer != null) {
+                return producer;
+            }
+        }
+        return super.getDiffRequestProducer(userObject);
+    }
+
+    private String getScopeDisplayName() {
+        try {
+            ViewService vs = myProject.getService(ViewService.class);
+            if (vs != null) {
+                model.MyModel m = vs.getCurrent();
+                if (m != null) return m.getDisplayName();
+            }
+        } catch (Exception ignored) {}
+        return "";
+    }
+
+    @Override
+    protected void onDoubleClick() {
+        if (!(getViewer() instanceof javax.swing.JTree tree)) return;
+        javax.swing.tree.TreePath path = tree.getSelectionPath();
+        if (path == null) return;
+
+        Object node = path.getLastPathComponent();
+        Change change = null;
+        if (node instanceof com.intellij.openapi.vcs.changes.ui.ChangesBrowserNode<?> cbn
+                && cbn.getUserObject() instanceof Change c) {
+            change = c;
+        }
+
+        if (change != null) {
+            // File/change leaf: open in a regular (permanent) tab.
+            VirtualFile file = change.getVirtualFile();
+            if (file != null) {
+                openAndScrollToChanges(myProject, file, -1, false);
+                LOG.debug("Double-click: opened in permanent tab: " + file.getName());
+            }
+        } else {
+            // Directory / grouping node: toggle expand/collapse. The platform's double-click
+            // handler always reports the event as handled, which suppresses the tree's default
+            // expand/collapse, so we do it explicitly here.
+            if (tree.isExpanded(path)) {
+                tree.collapsePath(path);
+            } else {
+                tree.expandPath(path);
+            }
+        }
+    }
+}

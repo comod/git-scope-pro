@@ -42,8 +42,7 @@ In the "New*" tab you get a few different options to define the scope:
 1. Select either a local or remote branch in the current repo. If the repo contains sub-repos, all repos will be listed
    with the main repo being the first repo in the list.
 2. Alternatively, you can manually type the branch, tag or git reference and press Enter. A git reference can be any
-   valid
-   git reference such as `HEAD~2`, `<long hash>`, `<short hash>`, ...
+   valid git reference such as `HEAD~2`, `<long hash>`, `<short hash>`, ...
 3. If you want to bind the scope to the common ancestor for `HEAD` and the current selected scope reference, you can
    check the common ancestor checkbox. This makes it possible to for example select `master` and your scope will be
    compared to the common ancestor of `master` and `HEAD`. And you are free to pull new changes onto `master` without
@@ -62,51 +61,93 @@ Right click on any file will present a number of actions:
 
 ![](docs/context_menu.png)
 
-- **Show Diff**: Opens a diff window showing the diff of the selected file(s) `<selected-scope>..HEAD`
+- **Show Diff**: Opens a diff window showing the diff of the selected file (s) `<selected-scope>..HEAD`
 - **Show in Project**: Highlight this file in the Project tool window
-- **Create Patch...**: Opens a dialog to save the selected file(s) scope diff as a `.patch` file
-- **Copy as Patch to Clipboard**: Copies the selected file(s) scope diff as a unified patch directly to the clipboard
-- **Rollback...**: Rollback the selected files(s) to `<selected-scope>` version. Note that this will checkout the
-  selected scope version of the file(s), and will in many cases leave you with a modified file that no longer show up in
-  the Git Scope window since it is identical to the version pointed to by the scope. Commit the files using the
+- **Create Patch...**: Opens a dialog to save the selected file (s) scope diff as a `.patch` file
+- **Copy as Patch to Clipboard**: Copies the selected file (s) scope diff as a unified patch directly to the clipboard
+- **Rollback...**: Rollback the selected files (s) to `<selected-scope>` version. Note that this will checkout the
+  selected scope version of the file (s), and will in many cases leave you with a modified file that no longer show up
+  in the Git Scope window since it is identical to the version pointed to by the scope. Commit the files using the
   standard Commit tool window.
 
-**Create Patch...**, **Copy as Patch to Clipboard**, and **Rollback...** all apply to the current selection,
-so you can select multiple files (or all files via **Ctrl+A**) and the action will apply to all of them at once.
+**Create Patch...**, **Copy as Patch to Clipboard**, and **Rollback...** all apply to the current selection, so you can
+select multiple files (or all files via **Ctrl+A**) and the action will apply to all of them at once.
 
 ![](docs/icon.svg) **Line Status Gutter:**
 
-Git Scope uses its own plugin-native gutter rendering system to show scope-aware diff markers directly
-in the editor. This avoids the side-effects and interference with native IDE functionality that earlier
-versions of the plugin experienced when hooking into the IDE's own gutter system.
+Git Scope uses its own plugin-native gutter rendering system to show scope-aware diff markers directly in the editor.
+This avoids the side-effects and interference with native IDE functionality that earlier versions of the plugin
+experienced when hooking into the IDE's own gutter system.
 
 > **Note:** The Git Scope gutter markers are only visible when the IDE setting
 > **Version Control → Confirmation → Highlight modified lines in gutter** is enabled.
 
-Each changed line is marked with a colored bar — inserted, modified, and deleted lines each get their
-own dedicated color as defined by the active IDE theme — relative to the selected Git Scope target.
-Clicking any marker opens a popup with the following actions:
+Each changed line is marked with a colored bar — inserted, modified, and deleted lines each get their own dedicated
+color as defined by the active IDE theme — relative to the selected Git Scope target. Clicking any marker opens a popup
+with the following actions:
 
 - **↑ / ↓** — Navigate to the previous or next change
 - **↺** — Rollback this change to the scope base version
 - **Diff** — Open an inline diff showing exactly what changed
 - **Copy** — Copy the original scope-base content to the clipboard
 
-An overview stripe on the right-hand scrollbar provides a full-file summary of scope changes,
-making it easy to spot hotspots without scrolling.
+An overview stripe on the right-hand scrollbar provides a full-file summary of scope changes, making it easy to spot
+hotspots without scrolling.
 
 The gutter markers can be positioned in two ways, controlled via **Settings → Tools → Git Scope**:
 
-**Merged mode** (default) — Scope markers appear inline with the IDE's native gutter markers.
-Both sets of markers are visible at the same time:
+**Merged mode** (default) — Scope markers appear inline with the IDE's native gutter markers. Both sets of markers are
+visible at the same time:
 
 ![](docs/merged_gutter.png)
 
-**Separate mode** — Scope markers are rendered in a dedicated column to the left of the line
-numbers. This makes it immediately clear which changes are relative to the Git Scope target and
-which are uncommitted local changes shown by the IDE's native HEAD diff markers:
+**Separate mode** — Scope markers are rendered in a dedicated column to the left of the line numbers. This makes it
+immediately clear which changes are relative to the Git Scope target and which are uncommitted local changes shown by
+the IDE's native HEAD diff markers:
 
 ![](docs/separate_gutter.png)
+
+![](docs/icon.svg) **Reviewing a Scope (Keyboard Navigation):**
+
+Git Scope is well suited for *reviewing* an entire scope — walking through every change on a branch, tag or commit range
+the same way you would review a pull request, but directly in the editor with full language support (syntax
+highlighting, navigation, inspections).
+
+To make this fast and mouse-free, the plugin adds four navigation actions plus two diff actions. They ship **without
+default shortcuts** so they never clash with your keymap — assign your own under **Settings → Keymap** (search for "Git
+Scope"):
+
+| Action                               | Suggested shortcut | Description                                                                                                   |
+|--------------------------------------|--------------------|---------------------------------------------------------------------------------------------------------------|
+| **Next Change**      | `Alt+Down`         | Jump to the next change. At the last change in a file, moves on to the first change of the next changed file. |
+| **Previous Change**  | `Alt+Up`           | Jump to the previous change. At the first change in a file, moves to the last change of the previous file.    |
+| **Next Changed File**| `Alt+Shift+Down`   | Jump straight to the first change of the next changed file.                                                   |
+| **Previous Changed File** | `Alt+Shift+Up` | Jump straight to the first change of the previous changed file.                                               |
+| **Show Diff**        | `Alt+D`            | Open the scope diff (`<selected-scope>..working tree`) for the current file in an editor tab.                 |
+
+![](docs/keymap_review.png)
+
+A typical review flow:
+
+1. Select the scope you want to review in the **Git Scope** tool window.
+2. Press **Next Change** repeatedly to step through every change, across all files, in order. The file being reviewed is
+   automatically opened, the caret lands on each change, and the file is highlighted in the Git Scope tool window so you
+   always know where you are.
+3. When the gutter markers aren't enough to understand a change, press **Show Diff** to open the full side-by-side scope
+   diff for that file. Close it with the standard Close Tab / Close Editor shortcut to jump back and keep moving.
+4. Use **Next/Previous Changed File** to skip whole files when you only want a per-file overview.
+
+![](docs/review_navigation.png)
+
+> **Tip — enable the "Preview tab" feature to reduce tab clutter.** When reviewing, each file you
+> step into would normally open a new editor tab. If you enable IntelliJ's preview-tab feature
+> (**Settings → Editor → General → Editor Tabs → "Enable preview tab"**, or the "Open declaration
+> source in the same tab" / preview toggle in the editor tabs settings), Git Scope opens each file
+> in a single reused **preview tab** instead — so navigating through dozens of changed files leaves
+> you with just one tab rather than dozens. Git Scope respects this setting: with it off, files open
+> as normal (permanent) tabs; with it on, navigation reuses the preview tab.
+
+![](docs/preview_tab_setting.png)
 
 ![](docs/icon.svg) **Scope:**
 
@@ -134,8 +175,8 @@ and selecting "Reset Tab Name".
 
 ![](docs/icon.svg) **Use Commit as Git Scope**
 
-In the Git panel, you can right-click on any commit and select "Use Commit as Git Scope" to automatically add the
-commit as a new Git Scope.
+In the Git panel, you can right-click on any commit and select "Use Commit as Git Scope" to automatically add the commit
+as a new Git Scope.
 
 ![](docs/usescope.png)
 
@@ -177,6 +218,18 @@ Plugin settings are available under **Settings → Tools → Git Scope**:
 | Shortcut | Description                                      |
 |----------|--------------------------------------------------|
 | Alt+H    | Toggle between HEAD and last Git Scope selection |
+
+The following review-navigation actions are also added, but ship **without** default shortcuts — assign your own under
+**Settings → Keymap** (search for "Git Scope"). See
+[Reviewing a Scope](#) above for the recommended workflow:
+
+| Action                           | Description                                                        |
+|----------------------------------|--------------------------------------------------------------------|
+| Next Change           | Next change; crosses into the next changed file at a file's end    |
+| Previous Change       | Previous change; crosses into the previous changed file at the top |
+| Next Changed File     | First change of the next changed file                              |
+| Previous Changed File | First change of the previous changed file                          |
+| Show Diff             | Open the scope diff for the current file in an editor tab          |
 
 ## More Useful Shortcuts
 

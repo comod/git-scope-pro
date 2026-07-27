@@ -1,3 +1,6 @@
+import org.jetbrains.changelog.Changelog.OutputType
+import org.jetbrains.intellij.platform.gradle.tasks.aware.SplitModeAware.PluginInstallationTarget
+import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 
 fun properties(key: String) = project.findProperty(key).toString()
 
@@ -5,28 +8,54 @@ val platformVersion = properties("platformVersion")
 val platformType = properties("platformType")
 
 plugins {
+    application
     id("java")
-    id("org.jetbrains.kotlin.jvm") version "2.3.20"
-    id("org.jetbrains.intellij.platform") version "2.16.0"
+    id("org.jetbrains.intellij.platform") version "2.18.1"
+    id("org.jetbrains.intellij.platform.module") version "2.18.1" apply false
     id("org.jetbrains.changelog") version "2.5.0"
+    id("org.jetbrains.kotlin.jvm") version "2.3.20" apply false
+    id("org.jetbrains.kotlin.plugin.serialization") version "2.3.20" apply false
+    id("rpc") version "2.3.20-0.1" apply false
 }
 
 group = properties("pluginGroup")
 version = properties("pluginVersion")
 
+allprojects {
+
+    // Set the Java toolchain to 25 for every project (including the root aggregator, which does
+    // not apply the Kotlin plugin). This drives the org.gradle.jvm.version attribute so the root
+    // can consume the JVM-25 subprojects.
+    plugins.withType<JavaBasePlugin>().configureEach {
+        extensions.configure<JavaPluginExtension> {
+            toolchain {
+                languageVersion.set(JavaLanguageVersion.of(25))
+            }
+        }
+    }
+
+    afterEvaluate {
+        extensions.findByType<KotlinJvmProjectExtension>()?.jvmToolchain(25)
+    }
+
+    tasks.withType<JavaCompile> {
+        sourceCompatibility = "25"
+        targetCompatibility = "25"
+    }
+}
+
+allprojects {
+    repositories {
+        mavenCentral()
+    }
+}
+
 repositories {
-    mavenCentral()
     intellijPlatform {
         defaultRepositories()
     }
 }
 
-kotlin {
-    jvmToolchain(21)
-    compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
-    }
-}
 
 fun getMajorVersion(version: String): String {
     val parts = version.split(".")
@@ -36,9 +65,8 @@ fun getMajorVersion(version: String): String {
 changelog {
     version.set(properties("pluginVersion"))
     groups.set(emptyList())
-    // Configure to accept your version format (YYYY.N or YYYY.N.N)
     headerParserRegex.set("""(\d{4}\.\d+(?:\.\d+)?)""".toRegex())
-    keepUnreleasedSection.set(true)
+    keepUnreleasedSection.set(false)
 }
 
 dependencies {
@@ -46,15 +74,22 @@ dependencies {
         val type: String = providers.gradleProperty("platformType").get()
         val version: String = providers.gradleProperty("platformVersion").get()
 
-
         create(type, version) {
             useInstaller = !version.endsWith("EAP-SNAPSHOT")
         }
         bundledPlugins(providers.gradleProperty("platformBundledPlugins").map { it.split(',') })
+
+        pluginModule(implementation(project(":shared")))
+        pluginModule(implementation(project(":backend")))
+        pluginModule(implementation(project(":frontend")))
     }
 }
 
 intellijPlatform {
+
+    splitMode = true
+    pluginInstallationTarget = PluginInstallationTarget.BOTH
+
     signing {
         certificateChainFile = providers.environmentVariable("CERTIFICATE_CHAIN_FILE")
             .map { File(it) }
@@ -77,19 +112,17 @@ intellijPlatform {
         changeNotes.set(provider {
             val majorVersion = getMajorVersion(project.version.toString())
 
-            // Get all changelog entries that start with the major version
             val matchingEntries = changelog.getAll().values
                 .filter { it.version.startsWith(majorVersion) }
             if (matchingEntries.isNotEmpty()) {
                 matchingEntries.joinToString("\n\n") {
-                    changelog.renderItem(it, org.jetbrains.changelog.Changelog.OutputType.HTML)
+                    changelog.renderItem(it, OutputType.HTML)
                 }
             } else {
-                // Fallback to current version only
                 changelog.renderItem(
                     changelog.getOrNull(properties("pluginVersion"))
                         ?: changelog.getLatest(),
-                    org.jetbrains.changelog.Changelog.OutputType.HTML
+                    OutputType.HTML
                 )
             }
         })
@@ -99,6 +132,20 @@ intellijPlatform {
         }
     }
 
+}
+
+// Split Mode run task — launches frontend + backend processes locally for remote dev testing.
+// Named to avoid colliding with the plugin's own auto-registered runIdeSplitMode task.
+// Usage: ./gradlew runSplitMode
+//val runSplitMode = intellijPlatformTesting.runIde.register("runSplitMode") {
+//    splitMode = true
+//    pluginInstallationTarget = PluginInstallationTarget.BOTH
+//}
+
+// Monolith run task — single-process mode for everyday development.
+// Usage: ./gradlew runMonolith
+val runMonolith = intellijPlatformTesting.runIde.register("runMonolith") {
+    splitMode = false
 }
 
 gradle.taskGraph.whenReady {
@@ -115,7 +162,7 @@ tasks {
     }
 
     register<DefaultTask>("verifyWrapperVersion") {
-        // Wire expected version as a declared input so the action doesn't capture Project
+        description = "Verifies that the Gradle Wrapper version matches the gradleVersion property."
         val expectedVersion = providers.gradleProperty("gradleVersion").orElse("")
         inputs.property("expectedGradleVersion", expectedVersion)
 
@@ -132,22 +179,11 @@ tasks {
             }
         }
     }
-    // Set the JVM compatibility versions
-    withType<JavaCompile> {
-        sourceCompatibility = "21"
-        targetCompatibility = "21"
-    }
 }
 
-
-// Verify that we have the expected version of the Gradle wrapper
 listOf("build", "buildPlugin").forEach { taskName ->
     tasks.matching { it.name == taskName }.configureEach {
         dependsOn(tasks.named("verifyWrapperVersion"))
     }
 }
 
-dependencies {
-    implementation("com.google.code.gson:gson:2.14.0")
-    implementation("io.reactivex.rxjava3:rxjava:3.1.12")
-}

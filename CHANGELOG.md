@@ -1,3 +1,24 @@
+## [2026.2]
+
+Remote Development support, built on a split of the plugin into separate frontend and backend modules. Local IDE
+behavior, scope tabs and settings are unchanged. Given the size of the refactoring,
+please [report any regression](https://github.com/comod/git-scope-pro/issues) with your IDE version and whether you run
+locally or over Remote Development.
+
+### Added
+
+- Added [support for remote development](https://github.com/comod/git-scope-pro/issues/91)
+    - Git access, scope resolution and change collection run on the host; the client handles gutter markers, the diff
+      popup and change navigation.
+    - Only the computed line ranges cross the network, so gutter markers stay responsive, and the client re-syncs
+      automatically after a dropped connection.
+- Added [actions/shortcuts to step between files and scope](https://github.com/comod/git-scope-pro/issues/99)
+
+### Fixes
+
+- Fixed [Right-click -> Show in Project doesn't switch to Project window](https://github.com/comod/git-scope-pro/issues/100)
+- Fixed [Right-click -> Show in Project for folder selects the first changed file rather than the folder](https://github.com/comod/git-scope-pro/issues/101)
+
 ## [2026.1.4]
 
 ### Added
@@ -27,12 +48,11 @@
 
 ## [2026.1]
 
-This release replaces the previous approach of hooking into the IDE's native gutter system — which
-caused several unwanted side-effects and interfered with standard IDE functionality — with a
-fully plugin-native gutter rendering system. The new markers can be placed either to the left of
-the line numbers on their own, or inline with the IDE's native gutter markers, in which case both
-work side by side. Clicking a marker opens a popup with navigation (prev/next), inline diff,
-rollback, and copy actions.
+This release replaces the previous approach of hooking into the IDE's native gutter system — which caused several
+unwanted side-effects and interfered with standard IDE functionality — with a fully plugin-native gutter rendering
+system. The new markers can be placed either to the left of the line numbers on their own, or inline with the IDE's
+native gutter markers, in which case both work side by side. Clicking a marker opens a popup with navigation
+(prev/next), inline diff, rollback, and copy actions.
 
 ### Added
 
