@@ -15,14 +15,13 @@ import com.intellij.openapi.vcs.changes.ChangeListManager;
 import com.intellij.openapi.vcs.changes.ChangesUtil;
 import com.intellij.openapi.vcs.changes.CurrentContentRevision;
 import com.intellij.openapi.vfs.VirtualFile;
-import git4idea.GitCommit;
 import git4idea.GitReference;
 import git4idea.GitRevisionNumber;
 import git4idea.actions.GitCompareWithRefAction;
-import git4idea.history.GitHistoryUtils;
 import git4idea.repo.GitRepository;
 import model.TargetBranchMap;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import service.GitService;
 import settings.GitScopeSettings;
 import system.Defs;
@@ -290,19 +289,6 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
         return filtered;
     }
 
-    @NotNull
-    public Collection<Change> getChangesByHistory(Project project, GitRepository repo, String branchToCompare) throws VcsException {
-        List<GitCommit> commits = GitHistoryUtils.history(project, repo.getRoot(), branchToCompare);
-        Map<FilePath, Change> changeMap = new HashMap<>();
-        for (GitCommit commit : commits) {
-            for (Change change : PlatformApiReflection.getCommitChanges(commit)) {
-                FilePath path = ChangesUtil.getFilePath(change);
-                changeMap.put(path, change);
-            }
-        }
-        return new ArrayList<>(changeMap.values());
-    }
-
     /**
      * Collects local changes for HEAD (uncommitted changes) filtered by repository.
      *
@@ -357,8 +343,10 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
             }
 
             // Diff Changes - these are the pure scope changes
+            GitRevisionNumber revisionNumber;
             if (scopeRef.contains("..")) {
-                scopeChanges = getChangesByHistory(project, repo, scopeRef);
+                String selectedRef = getSelectedRef(scopeRef);
+                revisionNumber = selectedRef == null ? null : GitUtil.resolveMergeBase(repo, selectedRef);
             } else {
                 GitReference gitReference;
 
@@ -369,7 +357,6 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
                     gitReference = PlatformApiReflection.findTagByName(repo, scopeRef);
                 }
 
-                GitRevisionNumber revisionNumber;
                 if (gitReference == null) {
                     // Finally resort to try a generic reference (HEAD~2, <hash>, ...)
                     revisionNumber = GitUtil.resolveGitReference(repo, scopeRef);
@@ -378,15 +365,17 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
                     revisionNumber = new GitRevisionNumber(gitReference.getFullName());
                 }
 
-                if (revisionNumber != null) {
-                    // We have a valid GitReference
-                    scopeChanges = GitUtil.getDiffChanges(repo, file, revisionNumber);
-                    LOG.debug("ChangesService - Repository: " + repoPath + ", Scope: " + scopeRef + ", scopeChanges count: " + scopeChanges.size());
-                }
-                else {
-                    // We do not have a valid GitReference => return ERROR_STATE
-                    return new RepoChangesResult(ERROR_STATE, new ArrayList<>(), new ArrayList<>());
-                }
+            }
+
+            if (revisionNumber != null) {
+                // Compare one base tree to HEAD. Range scopes use their merge base so the
+                // result matches a pull-request diff instead of accumulating commit changes.
+                scopeChanges = GitUtil.getDiffChanges(repo, file, revisionNumber);
+                LOG.debug("ChangesService - Repository: " + repoPath + ", Scope: " + scopeRef + ", base: " + revisionNumber.asString() + ", scopeChanges count: " + scopeChanges.size());
+            }
+            else {
+                // We do not have a valid GitReference => return ERROR_STATE
+                return new RepoChangesResult(ERROR_STATE, new ArrayList<>(), new ArrayList<>());
             }
 
             // Log what we collected
@@ -415,6 +404,21 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
         }
 
         return new RepoChangesResult(mergedChanges, scopeChanges, repoLocalChanges);
+    }
+
+    /**
+     * Returns the selected side of a Git range such as {@code main..HEAD}.
+     * Git ref names cannot contain two consecutive dots, so the first separator is unambiguous.
+     */
+    @Nullable
+    static String getSelectedRef(String scopeRef) {
+        int separator = scopeRef.indexOf("..");
+        if (separator <= 0) {
+            return null;
+        }
+
+        String selectedRef = scopeRef.substring(0, separator).trim();
+        return selectedRef.isEmpty() ? null : selectedRef;
     }
 
 }

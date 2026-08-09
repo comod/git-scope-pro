@@ -69,6 +69,33 @@ public class GitUtil {
         return null;
     }
 
+    /**
+     * Resolves the common ancestor of the selected ref and the repository's current HEAD.
+     * This is the base Git hosting providers use for pull-request-style diffs.
+     */
+    @Nullable
+    public static GitRevisionNumber resolveMergeBase(@NotNull GitRepository repository,
+                                                      @NotNull String selectedRef) {
+        Project project = repository.getProject();
+        GitLineHandler handler = new GitLineHandler(project, repository.getRoot(), GitCommand.MERGE_BASE);
+        handler.addParameters(selectedRef, "HEAD");
+
+        try {
+            String hash = Git.getInstance().runCommand(handler)
+                    .getOutputOrThrow()
+                    .trim();
+            if (!hash.isEmpty()) {
+                return new GitRevisionNumber(hash);
+            }
+        } catch (VcsException e) {
+            LOG.debug("Failed to resolve merge base for '" + selectedRef + "' and HEAD: " + e.getMessage());
+        } catch (Exception e) {
+            LOG.warn("Unexpected error resolving merge base for '" + selectedRef + "' in repository " + repository.getRoot().getPath(), e);
+        }
+
+        return null;
+    }
+
     public static @NotNull Collection<Change> getDiffChanges(@NotNull GitRepository repository,
                                                              @NotNull VirtualFile file,
                                                              @NotNull GitRevisionNumber revisionNumber) throws VcsException {

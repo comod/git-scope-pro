@@ -18,6 +18,7 @@ locally or over Remote Development.
 
 - Fixed [Right-click -> Show in Project doesn't switch to Project window](https://github.com/comod/git-scope-pro/issues/100)
 - Fixed [Right-click -> Show in Project for folder selects the first changed file rather than the folder](https://github.com/comod/git-scope-pro/issues/101)
+- Fixed common-ancestor scopes to show the pull-request-style diff instead of accumulating changes from every commit
 
 ## [2026.1.4]
 
