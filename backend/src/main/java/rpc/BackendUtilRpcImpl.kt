@@ -50,12 +50,12 @@ class BackendUtilRpcImpl : UtilRpcApi {
         project.service<service.TabActionService>().moveTab(tabIndex, direction)
     }
 
-    override suspend fun getCustomNamedTabs(projectId: ProjectId): Flow<List<Int>> {
+    override suspend fun getRenamedTabs(projectId: ProjectId): Flow<Map<Int, String>> {
         val project = projectId.findProjectOrNull() ?: return emptyFlow()
         // Publish the current state before the subscriber starts collecting, so a frontend that
         // connects after the tabs were restored still gets the truth rather than the initial empty.
-        project.service<service.TabActionService>().publishCustomNamedTabs()
-        return project.service<UtilCommandService>().customNamedTabs
+        project.service<service.TabActionService>().publishRenamedTabs()
+        return project.service<UtilCommandService>().renamedTabs
     }
 }
 

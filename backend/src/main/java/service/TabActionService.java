@@ -11,8 +11,10 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import system.Defs;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Backend-side tab operations addressed by tab index: rename, reset name, move.
@@ -57,7 +59,7 @@ public class TabActionService {
             if (model != null) {
                 project.getService(ToolWindowServiceInterface.class).setupTabTooltip(model);
             }
-            publishCustomNamedTabs();
+            publishRenamedTabs();
         });
     }
 
@@ -94,7 +96,7 @@ public class TabActionService {
                         content.setDisplayName(branchName);
                         content.setDescription(null);
                     }));
-            publishCustomNamedTabs();
+            publishRenamedTabs();
         });
     }
 
@@ -132,16 +134,21 @@ public class TabActionService {
                 }
             }
             // Indices shifted, so the previously published set no longer addresses the same tabs.
-            publishCustomNamedTabs();
+            publishRenamedTabs();
         });
     }
 
     /**
-     * Republishes which tabs carry a custom name, so the frontend can disable "Reset Tab Name" where
-     * there is nothing to reset. Called after every operation that can change the answer, and once
-     * when a frontend subscribes.
+     * Republishes the renamed tabs as index -> branch-based name, which the frontend uses both to
+     * decide whether "Reset Tab Name" has anything to reset and to show the original name as the
+     * tab's tooltip.
+     *
+     * <p>Called after every operation that can change the answer, when a frontend subscribes, and
+     * after a change collection — the branch names cannot be resolved until repositories are
+     * registered, which is why a tab renamed in a previous session had no tooltip right after boot.
+     * Publishing an unchanged map is free: the state flow conflates equal values.
      */
-    public void publishCustomNamedTabs() {
+    public void publishRenamedTabs() {
         ApplicationManager.getApplication().invokeLater(() -> {
             if (project.isDisposed()) return;
 
@@ -149,17 +156,43 @@ public class TabActionService {
             ViewService viewService = project.getService(ViewService.class);
             if (contentManager == null || viewService == null) return;
 
-            List<Integer> indices = new ArrayList<>();
+            Map<Integer, MyModel> renamed = new LinkedHashMap<>();
             for (int index = 1; index < contentManager.getContentCount(); index++) {
                 if (!isRenameableTab(contentManager, index)) continue;
                 MyModel model = getModelForTab(viewService, index);
                 if (model != null && model.getCustomTabName() != null && !model.getCustomTabName().isEmpty()) {
-                    indices.add(index);
+                    renamed.put(index, model);
                 }
             }
-            LOG.debug("publishCustomNamedTabs: " + indices);
-            project.getService(rpc.UtilCommandService.class).setCustomNamedTabs(indices);
+
+            if (renamed.isEmpty()) {
+                publish(Map.of());
+                return;
+            }
+
+            // One async branch-name resolution per renamed tab; publish once they have all answered.
+            TargetBranchService targetBranchService = project.getService(TargetBranchService.class);
+            Map<Integer, String> resolved = new ConcurrentHashMap<>();
+            AtomicInteger pending = new AtomicInteger(renamed.size());
+            for (Map.Entry<Integer, MyModel> entry : renamed.entrySet()) {
+                targetBranchService.getTargetBranchDisplayAsync(entry.getValue().getTargetBranchMap(), branchName -> {
+                    // Empty means repositories are not resolvable yet; leave the tab out rather than
+                    // publish a blank tooltip, and a later collection will republish with the name.
+                    if (branchName != null && !branchName.isEmpty()) {
+                        resolved.put(entry.getKey(), branchName);
+                    }
+                    if (pending.decrementAndGet() == 0) {
+                        publish(Map.copyOf(resolved));
+                    }
+                });
+            }
         });
+    }
+
+    private void publish(@NotNull Map<Integer, String> renamedTabs) {
+        if (project.isDisposed()) return;
+        LOG.debug("publishRenamedTabs: " + renamedTabs);
+        project.getService(rpc.UtilCommandService.class).setRenamedTabs(renamedTabs);
     }
 
     // --- rules, shared by every caller ---

@@ -412,6 +412,9 @@ public class ViewService implements Disposable {
                 }
             }
 
+            // Publish tooltips for tabs restored with a custom name.
+            project.getService(TabActionService.class).publishRenamedTabs();
+
             // Step 4: Add the listener after all tabs are initialized
             toolWindowService.addListener();
 
@@ -723,6 +726,10 @@ public class ViewService implements Disposable {
                                 LOG.debug("Scope statuses changed for generation " + gen + ", refreshing file colors");
                                 refreshFileColors();
                             }
+
+                            // Repositories are resolvable by now, so tab tooltips that could not be
+                            // built at boot (empty branch name) can finally be published.
+                            project.getService(TabActionService.class).publishRenamedTabs();
                         } else {
                             LOG.debug("Discarding changes for generation " + gen + " (current generation is " + currentGen + ")");
                         }

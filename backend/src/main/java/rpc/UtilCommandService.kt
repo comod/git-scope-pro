@@ -20,15 +20,15 @@ class UtilCommandService {
     private val previewTabEnabled = AtomicReference<Boolean?>(null)
 
     /**
-     * Indices of tabs carrying a custom name. A StateFlow rather than a command, so the frontend can
-     * read the current value at any time — including right after it subscribes — to decide whether
-     * "Reset Tab Name" has anything to reset.
+     * Renamed tabs: tab index -> the branch-based name it would revert to. A StateFlow rather than a
+     * command, so the frontend can read the current value at any time — including right after it
+     * subscribes — and so republishing an unchanged map costs subscribers nothing.
      */
-    private val _customNamedTabs = MutableStateFlow<List<Int>>(emptyList())
-    val customNamedTabs = _customNamedTabs.asStateFlow()
+    private val _renamedTabs = MutableStateFlow<Map<Int, String>>(emptyMap())
+    val renamedTabs = _renamedTabs.asStateFlow()
 
-    fun setCustomNamedTabs(indices: List<Int>) {
-        _customNamedTabs.value = indices
+    fun setRenamedTabs(tabs: Map<Int, String>) {
+        _renamedTabs.value = tabs
     }
 
     fun selectInProject(filePath: String) {

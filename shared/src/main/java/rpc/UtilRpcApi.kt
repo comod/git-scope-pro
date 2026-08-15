@@ -77,14 +77,17 @@ interface UtilRpcApi : RemoteApi<Unit> {
     suspend fun moveTab(projectId: ProjectId, tabIndex: Int, direction: TabMoveDirection)
 
     /**
-     * Indices of tabs that currently carry a custom name, so "Reset Tab Name" can be disabled for
-     * tabs that have nothing to reset. Whether a tab was renamed is model state the frontend cannot
-     * see, and action update() cannot suspend, so the backend pushes it instead.
+     * Renamed tabs, as tab index -> the branch-based name the tab would revert to. Only tabs with a
+     * custom name appear, so presence answers "can this be reset?" and the value is the tooltip to
+     * show on the renamed tab.
      *
-     * <p>A [kotlinx.coroutines.flow.StateFlow] on the backend: a new subscriber immediately receives
-     * the current set, and every rename, reset, reorder or tab load republishes it.
+     * <p>Both are backend model state the frontend cannot reach, and action update() cannot suspend,
+     * so the backend pushes them. A [kotlinx.coroutines.flow.StateFlow]: a new subscriber
+     * immediately receives the current map, and it is republished whenever it can have changed --
+     * after a rename, reset or move, and after a change collection, which is when repositories
+     * first become resolvable and the branch names stop being empty.
      */
-    suspend fun getCustomNamedTabs(projectId: ProjectId): Flow<List<Int>>
+    suspend fun getRenamedTabs(projectId: ProjectId): Flow<Map<Int, String>>
 
     companion object {
         suspend fun getInstance(): UtilRpcApi {
