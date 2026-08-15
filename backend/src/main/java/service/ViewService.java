@@ -708,9 +708,21 @@ public class ViewService implements Disposable {
                         long currentGen = applyGeneration.get();
                         if (!project.isDisposed() && !token.disposed && currentGen == gen) {
                             LOG.debug("Applying changes for generation " + gen);
+                            Map<String, Change> previousScopeMap = model.getScopeChangesMap();
                             model.setChangesWithMap(result.mergedChanges(), mergedChangesMap);
                             model.setScopeChangesWithMap(result.scopeChanges(), scopeChangesMap);
                             model.setLocalChangesWithMap(result.localChanges(), localChangesMap);
+
+                            // GitScopeFileStatusProvider answers from the scope map, but the
+                            // platform caches its answers until fileStatusesChanged() -- which
+                            // previously only tab switches triggered, so Project-view colors kept
+                            // showing the pre-collection scope (e.g. conflict-era statuses after a
+                            // rebase). Refresh when the statuses materially changed; the guard
+                            // avoids the LST-disturbing refresh on the common no-change apply.
+                            if (model.isActive() && !sameScopeStatuses(previousScopeMap, scopeChangesMap)) {
+                                LOG.debug("Scope statuses changed for generation " + gen + ", refreshing file colors");
+                                refreshFileColors();
+                            }
                         } else {
                             LOG.debug("Discarding changes for generation " + gen + " (current generation is " + currentGen + ")");
                         }
@@ -720,6 +732,23 @@ public class ViewService implements Disposable {
                 }, ModalityState.any(), __ -> token.disposed);
             }, checkFs);
         });
+    }
+
+    /**
+     * Whether two scope maps would produce the same file colors: same files, same statuses.
+     * Used to skip the file-status refresh on the common apply where nothing changed.
+     */
+    private static boolean sameScopeStatuses(Map<String, Change> previous, Map<String, Change> current) {
+        if (previous == current) return true;
+        if (previous == null || current == null) return false;
+        if (previous.size() != current.size()) return false;
+        for (Map.Entry<String, Change> entry : previous.entrySet()) {
+            Change other = current.get(entry.getKey());
+            if (other == null || !entry.getValue().getFileStatus().equals(other.getFileStatus())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     // helper to enqueue UI work strictly after the currently queued collections
