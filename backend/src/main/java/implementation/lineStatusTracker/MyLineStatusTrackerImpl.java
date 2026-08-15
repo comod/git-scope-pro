@@ -89,13 +89,21 @@ public class MyLineStatusTrackerImpl implements Disposable {
      * Computes ranges on background threads and publishes results to GutterDataService.
      */
     public void update(Map<String, Change> scopeChangesMap, Map<String, Change> localChangesMap) {
-        if (scopeChangesMap == null || disposing.get()) return;
+        if (scopeChangesMap == null || disposing.get()) {
+            LOG.debug("Gutter update skipped (scopeChangesMap=" + (scopeChangesMap == null ? "null" : "present")
+                    + ", disposing=" + disposing.get() + ")");
+            return;
+        }
 
         final DisposalToken token = this.disposalToken;
         final long gen = updateGeneration.incrementAndGet();
 
         updateExecutor.execute(() -> {
-            if (token.disposed || updateGeneration.get() != gen) return;
+            if (token.disposed || updateGeneration.get() != gen) {
+                LOG.debug("Gutter update " + gen + " superseded before start (latest="
+                        + updateGeneration.get() + ")");
+                return;
+            }
 
             Editor[] editors = EditorFactory.getInstance().getAllEditors();
 
@@ -111,7 +119,13 @@ public class MyLineStatusTrackerImpl implements Disposable {
                 }
             }
 
-            if (editorsToUpdate.isEmpty()) return;
+            if (editorsToUpdate.isEmpty()) {
+                // No open editor matches the scope, so nothing is published and the gutter keeps
+                // whatever it last showed.
+                LOG.debug("Gutter update " + gen + ": none of the " + editors.length
+                        + " open editor(s) are in scope (" + scopeChangesMap.size() + " changed file(s))");
+                return;
+            }
 
             Map<String, UpdateInfo> updates = new ConcurrentHashMap<>();
             CountDownLatch latch = new CountDownLatch(editorsToUpdate.size());
@@ -184,15 +198,17 @@ public class MyLineStatusTrackerImpl implements Disposable {
         String currentContent;
 
         if (changeForFile != null && changeForFile.getBeforeRevision() != null) {
-            LOG.debug("MyLineStatusTrackerImpl - File: " + filePath + ", beforeRevision: " +
-                    (changeForFile.getBeforeRevision() != null ? changeForFile.getBeforeRevision().getRevisionNumber() : "null") +
-                    ", afterRevision: " +
-                    (changeForFile.getAfterRevision() != null ? changeForFile.getAfterRevision().getRevisionNumber() : "null"));
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("MyLineStatusTrackerImpl - File: " + filePath + ", beforeRevision: " +
+                        changeForFile.getBeforeRevision().getRevisionNumber() +
+                        ", afterRevision: " +
+                        (changeForFile.getAfterRevision() != null ? changeForFile.getAfterRevision().getRevisionNumber() : "null"));
+            }
 
             try {
                 baseContent = changeForFile.getBeforeRevision().getContent();
             } catch (VcsException e) {
-                LOG.warn("Error getting content for revision: " + filePath, e);
+                LOG.debug("Error getting content for revision: " + filePath, e);
                 baseContent = null;
             }
 
@@ -213,10 +229,13 @@ public class MyLineStatusTrackerImpl implements Disposable {
         String normalizedBase = StringUtil.convertLineSeparators(baseContent);
         String normalizedCurrent = StringUtil.convertLineSeparators(currentContent);
 
-        LOG.debug("MyLineStatusTrackerImpl - File: " + filePath +
-                ", normalizedBase lines: " + normalizedBase.split("\n").length +
-                ", normalizedCurrent lines: " + normalizedCurrent.split("\n").length +
-                ", hasLocalChanges: " + hasLocalChanges);
+        if (LOG.isDebugEnabled()) {
+            // split() on whole file contents: only pay for it when the log is actually on
+            LOG.debug("MyLineStatusTrackerImpl - File: " + filePath +
+                    ", normalizedBase lines: " + normalizedBase.split("\n").length +
+                    ", normalizedCurrent lines: " + normalizedCurrent.split("\n").length +
+                    ", hasLocalChanges: " + hasLocalChanges);
+        }
 
         String headContent = null;
         if (hasLocalChanges) {
@@ -228,7 +247,7 @@ public class MyLineStatusTrackerImpl implements Disposable {
                         headContent = StringUtil.convertLineSeparators(headContent);
                     }
                 } catch (VcsException e) {
-                    LOG.warn("MyLineStatusTrackerImpl - Error caching HEAD content: " + e.getMessage());
+                    LOG.debug("MyLineStatusTrackerImpl - Error caching HEAD content: " + e.getMessage());
                 }
             }
         }
@@ -248,13 +267,15 @@ public class MyLineStatusTrackerImpl implements Disposable {
                 ranges = RangesBuilder.INSTANCE.createRanges(normalizedCurrent, normalizedBase);
             }
 
-            LOG.debug("MyLineStatusTrackerImpl - File: " + filePath + ", final ranges: " + ranges.size());
-            for (Range range : ranges) {
-                LOG.debug("MyLineStatusTrackerImpl - Range: line1=" + range.getLine1() + ", line2=" + range.getLine2() +
-                        ", vcsLine1=" + range.getVcsLine1() + ", vcsLine2=" + range.getVcsLine2() + ", type=" + range.getType());
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("MyLineStatusTrackerImpl - File: " + filePath + ", final ranges: " + ranges.size());
+                for (Range range : ranges) {
+                    LOG.debug("MyLineStatusTrackerImpl - Range: line1=" + range.getLine1() + ", line2=" + range.getLine2() +
+                            ", vcsLine1=" + range.getVcsLine1() + ", vcsLine2=" + range.getVcsLine2() + ", type=" + range.getType());
+                }
             }
         } catch (Exception e) {
-            LOG.error("Error precomputing ranges for: " + filePath, e);
+            LOG.warn("Error precomputing ranges for: " + filePath, e);
             ranges = Collections.emptyList();
         }
 

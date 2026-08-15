@@ -656,6 +656,7 @@ public class ViewService implements Disposable {
     public CompletableFuture<Void> collectChanges(MyModel model, boolean checkFs) {
         CompletableFuture<Void> done = new CompletableFuture<>();
         if (model == null) {
+            LOG.debug("collectChanges skipped: no current model");
             done.complete(null);
             return done;
         }
@@ -664,6 +665,9 @@ public class ViewService implements Disposable {
         ensureHeadTabInitializedAsync(model, () -> {
             TargetBranchMap targetBranchMap = model.getTargetBranchMap();
             if (targetBranchMap == null) {
+                // Repositories not registered yet, or the tab has no target branch: nothing can be
+                // collected and no later event necessarily retries, so the scope stays as it was.
+                LOG.debug("collectChanges skipped for tab '" + model.getDisplayName() + "': no target branch map");
                 done.complete(null);
                 return;
             }
@@ -863,7 +867,7 @@ public class ViewService implements Disposable {
                 if (model != null && !model.isHeadTab()) {
                     newCollection.add(model);
                 } else {
-                    LOG.warn("Model not found for tab at index " + i + ": " + content.getTabName());
+                    LOG.debug("Model not found for tab at index " + i + ": " + content.getTabName());
                 }
             }
         }

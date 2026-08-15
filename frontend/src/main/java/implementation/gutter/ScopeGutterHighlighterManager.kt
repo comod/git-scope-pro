@@ -60,7 +60,7 @@ internal class ScopeGutterHighlighterManager(
             try {
                 if (highlighter.isValid) markupModel?.removeHighlighter(highlighter)
             } catch (e: Exception) {
-                LOG.warn("Error removing highlighter", e)
+                LOG.debug("Error removing highlighter", e)
             }
         }
         gutterHighlighter = null
@@ -68,7 +68,7 @@ internal class ScopeGutterHighlighterManager(
             try {
                 if (highlighter.isValid) markupModel?.removeHighlighter(highlighter)
             } catch (e: Exception) {
-                LOG.warn("Error removing error stripe highlighter", e)
+                LOG.debug("Error removing error stripe highlighter", e)
             }
         }
         errorStripeHighlighters.clear()
@@ -81,7 +81,7 @@ internal class ScopeGutterHighlighterManager(
                 if (editor is EditorEx) editor.gutterComponentEx.repaint()
             }
         } catch (e: Exception) {
-            LOG.warn("Error repainting gutter", e)
+            LOG.debug("Error repainting gutter", e)
         }
     }
 
@@ -94,7 +94,7 @@ internal class ScopeGutterHighlighterManager(
                         ?.removeHighlighter(old)
                 }
             } catch (e: Exception) {
-                LOG.warn("Error removing old highlighter", e)
+                LOG.debug("Error removing old highlighter", e)
             }
         }
         try {
@@ -109,7 +109,7 @@ internal class ScopeGutterHighlighterManager(
                 rh.editorFilter = MarkupEditorFilterFactory.createIsNotDiffFilter()
             }
         } catch (e: Exception) {
-            LOG.error("Error creating gutter highlighter", e)
+            LOG.warn("Error creating gutter highlighter", e)
         }
     }
 
@@ -160,7 +160,7 @@ internal class ScopeGutterHighlighterManager(
             try {
                 if (highlighter.isValid) markupModel.removeHighlighter(highlighter)
             } catch (e: Exception) {
-                LOG.warn("Error removing error stripe highlighter", e)
+                LOG.debug("Error removing error stripe highlighter", e)
             }
         }
         errorStripeHighlighters.clear()
@@ -190,7 +190,7 @@ internal class ScopeGutterHighlighterManager(
                 }
                 errorStripeHighlighters.add(highlighter)
             } catch (e: Exception) {
-                LOG.warn("Error creating error stripe highlighter for range $range", e)
+                LOG.debug("Error creating error stripe highlighter for range $range", e)
             }
         }
     }

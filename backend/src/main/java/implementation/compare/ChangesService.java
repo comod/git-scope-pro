@@ -101,8 +101,13 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
             public void run(@NotNull ProgressIndicator indicator) {
                 currentIndicator.set(indicator);
                 try {
-                // Early exit if disposing or superseded by a newer collection request
+                // Early exit if disposing or superseded by a newer collection request.
+                // Nothing is applied and no callback runs, so this is a silent no-update: worth a
+                // line when tracking down a scope that stopped refreshing.
                 if (disposing.get() || indicator.isCanceled() || collectionGeneration.get() != gen) {
+                    LOG.debug("Collection " + gen + " abandoned before start (disposing=" + disposing.get()
+                            + ", cancelled=" + indicator.isCanceled()
+                            + ", latestGeneration=" + collectionGeneration.get() + ")");
                     return;
                 }
 
@@ -112,6 +117,11 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
                 List<String> errorRepos = new ArrayList<>();
 
                 Collection<GitRepository> repositories = currentGitService.getRepositories();
+                if (repositories.isEmpty()) {
+                    // Happens before the VCS mapping is ready; the scope stays empty until some
+                    // later event triggers another collection.
+                    LOG.debug("Collection " + gen + ": no git repositories registered yet");
+                }
 
                 // Clear cache if checkFs is true (force fresh fetch)
                 if (checkFs) {
@@ -119,7 +129,12 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
                 }
 
                 repositories.forEach(repo -> {
-                    if (indicator.isCanceled() || collectionGeneration.get() != gen) return;
+                    if (indicator.isCanceled() || collectionGeneration.get() != gen) {
+                        LOG.debug("Collection " + gen + " interrupted at " + repo.getRoot().getPath()
+                                + " (cancelled=" + indicator.isCanceled()
+                                + ", latestGeneration=" + collectionGeneration.get() + ")");
+                        return;
+                    }
                     try {
                         String branchToCompare = getBranchToCompare(targetBranchByRepo, repo);
 
@@ -129,8 +144,10 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
                         RepoChangesResult repoResult;
 
                         if (!checkFs && changesCache.containsKey(cacheKey)) {
-                            // Use cached result (includes merged, scope, and local changes)
+                            // Use cached result (includes merged, scope, and local changes).
+                            // A cache hit means the filesystem was NOT re-read for this repository.
                             repoResult = changesCache.get(cacheKey);
+                            LOG.debug("Collection " + gen + ": cache hit for " + cacheKey);
                         } else {
                             // Fetch fresh changes
                             repoResult = doCollectChanges(currentProject, repo, branchToCompare);
@@ -185,8 +202,15 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
                 // Return ERROR_STATE only if ALL repositories failed (e.g. commit hash not found in any repo).
                 // Individual repo failures are expected in multi-repo setups where a commit exists in only one repo.
                 if (!errorRepos.isEmpty() && errorRepos.size() == repositories.size()) {
+                    LOG.debug("Collection " + gen + ": all " + errorRepos.size()
+                            + " repositories failed -> ERROR_STATE");
                     result = new ChangesResult(ERROR_STATE, new ArrayList<>(), new ArrayList<>());
                 } else {
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Collection " + gen + " finished: merged=" + _changes.size()
+                                + ", scope=" + _scopeChanges.size() + ", local=" + _localChanges.size()
+                                + ", failedRepos=" + errorRepos.size());
+                    }
                     result = new ChangesResult(_changes, _scopeChanges, _localChanges);
                 }
                 } finally {
@@ -201,12 +225,16 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
                     // Double-check the project is still valid
                     if (!currentProject.isDisposed() && callBack != null && this.result != null) {
                         callBack.accept(this.result);
+                    } else if (this.result == null) {
+                        // The run() above returned early; no update reaches the model from here.
+                        LOG.debug("Collection " + gen + " produced no result, nothing applied");
                     }
                 }, ModalityState.defaultModalityState(), __ -> disposing.get());
             }
 
             @Override
             public void onThrowable(@NotNull Throwable error) {
+                LOG.warn("Change collection " + gen + " failed, scope shows an error state", error);
                 ApplicationManager.getApplication().invokeLater(() -> {
                     if (!currentProject.isDisposed() && callBack != null) {
                         callBack.accept(new ChangesResult(ERROR_STATE, new ArrayList<>(), new ArrayList<>()));
@@ -377,6 +405,8 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
             }
             else {
                 // We do not have a valid GitReference => return ERROR_STATE
+                LOG.debug("ChangesService - Repository: " + repoPath + ", Scope: " + scopeRef
+                        + " could not be resolved to a revision -> ERROR_STATE");
                 return new RepoChangesResult(ERROR_STATE, new ArrayList<>(), new ArrayList<>());
             }
 

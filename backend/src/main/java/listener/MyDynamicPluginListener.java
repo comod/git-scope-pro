@@ -44,7 +44,7 @@ public class MyDynamicPluginListener implements DynamicPluginListener {
                     changesService.clearCache();
                 }
             } catch (Exception e) {
-                LOG.error("Error preparing project for plugin unload: " + project.getName(), e);
+                LOG.warn("Error preparing project for plugin unload: " + project.getName(), e);
             }
         }
     }

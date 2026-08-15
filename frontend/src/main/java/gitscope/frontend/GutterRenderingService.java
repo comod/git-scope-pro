@@ -61,7 +61,7 @@ public class GutterRenderingService implements Disposable, GutterDataService.Lis
     public GutterRenderingService(Project project) {
         this.project = project;
         this.gutterDataService = project.getService(GutterDataService.class);
-        LOG.info("GutterRenderingService created, registering as listener on GutterDataService");
+        LOG.debug("GutterRenderingService created, registering as listener on GutterDataService");
         this.gutterDataService.addListener(this);
 
         this.messageBusConnection = project.getMessageBus().connect();
@@ -102,7 +102,9 @@ public class GutterRenderingService implements Disposable, GutterDataService.Lis
     @Override
     public void onDataUpdated(@NotNull String filePath, @NotNull GutterDataService.GutterFileData data) {
         if (disposed.get()) return;
-        LOG.info("GutterRenderingService.onDataUpdated: file=" + filePath + ", ranges=" + data.ranges.size());
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("GutterRenderingService.onDataUpdated: file=" + filePath + ", ranges=" + data.ranges.size());
+        }
 
         ApplicationManager.getApplication().invokeLater(() -> {
             if (disposed.get()) return;
@@ -114,14 +116,15 @@ public class GutterRenderingService implements Disposable, GutterDataService.Lis
                 Document doc = editor.getDocument();
                 VirtualFile file = FileDocumentManager.getInstance().getFile(doc);
                 if (file != null && file.getPath().equals(filePath)) {
-                    LOG.info("GutterRenderingService: found editor for " + filePath + ", updating renderer");
+                    LOG.debug("GutterRenderingService: found editor for " + filePath + ", updating renderer");
                     updateRenderer(doc, file, data);
                     found = true;
                     break;
                 }
             }
             if (!found) {
-                LOG.info("GutterRenderingService: NO editor found for " + filePath);
+                // Routine: data is published for every changed file, most of which are not open.
+                LOG.debug("GutterRenderingService: NO editor found for " + filePath);
             }
         }, ModalityState.defaultModalityState(), __ -> disposed.get());
     }
@@ -160,7 +163,7 @@ public class GutterRenderingService implements Disposable, GutterDataService.Lis
 
         RendererInfo info = renderers.get(document);
         if (info == null) {
-            LOG.info("GutterRenderingService.updateRenderer: CREATING new renderer for " + file.getPath());
+            LOG.debug("GutterRenderingService.updateRenderer: CREATING new renderer for " + file.getPath());
             ScopeLineStatusMarkerRenderer renderer = new ScopeLineStatusMarkerRenderer(
                     project, document, file, this);
             info = new RendererInfo(renderer, data.baseContent);
@@ -177,7 +180,9 @@ public class GutterRenderingService implements Disposable, GutterDataService.Lis
         info.scopeRanges = data.scopeRanges;
         info.renderer.setVcsBaseContent(data.baseContent);
         info.renderer.updateRanges(data.ranges);
-        LOG.info("GutterRenderingService.updateRenderer: applied " + data.ranges.size() + " ranges to " + file.getPath());
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("GutterRenderingService.updateRenderer: applied " + data.ranges.size() + " ranges to " + file.getPath());
+        }
     }
 
     private DocumentListener createDocumentListener(@NotNull Document document, @NotNull RendererInfo info) {
@@ -229,7 +234,9 @@ public class GutterRenderingService implements Disposable, GutterDataService.Lis
                 }
             }, ModalityState.defaultModalityState());
         } catch (Exception e) {
-            LOG.error("Error recalculating ranges", e);
+            // Runs on every document change; a failure here costs one stale repaint, and the next
+            // keystroke retries. Not worth an error report.
+            LOG.debug("Error recalculating ranges", e);
         }
     }
 
@@ -342,16 +349,18 @@ public class GutterRenderingService implements Disposable, GutterDataService.Lis
         }
     }
 
+    // Teardown races with the platform disposing editors and documents underneath us, so failures
+    // here are expected and already recovered from by dropping the renderer.
     private synchronized void releaseRenderer(@NotNull Document document) {
         RendererInfo info = renderers.remove(document);
         if (info != null) {
             if (info.documentListener != null) {
                 try { document.removeDocumentListener(info.documentListener); }
-                catch (Exception e) { LOG.warn("Error removing document listener", e); }
+                catch (Exception e) { LOG.debug("Error removing document listener", e); }
             }
             if (info.renderer != null) {
                 try { info.renderer.dispose(); }
-                catch (Exception e) { LOG.warn("Error disposing renderer", e); }
+                catch (Exception e) { LOG.debug("Error disposing renderer", e); }
             }
         }
     }
@@ -361,7 +370,7 @@ public class GutterRenderingService implements Disposable, GutterDataService.Lis
             RendererInfo info = entry.getValue();
             if (info != null && info.renderer != null) {
                 try { info.renderer.dispose(); }
-                catch (Exception e) { LOG.warn("Error disposing renderer", e); }
+                catch (Exception e) { LOG.debug("Error disposing renderer", e); }
             }
         }
         renderers.clear();

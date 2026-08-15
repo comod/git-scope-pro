@@ -64,7 +64,7 @@ class ScopeDiffViewer(
             // Show diff in a dialog
             DiffManager.getInstance().showDiff(project, request)
         } catch (e: Exception) {
-            LOG.error("Error showing diff for range", e)
+            LOG.warn("Error showing diff for range", e)
         }
     }
 
@@ -83,7 +83,7 @@ class ScopeDiffViewer(
     fun getVcsContentForRange(range: Range, includeContext: Boolean = true): String {
         val baseContent = vcsBaseContent
         if (baseContent == null) {
-            if (range.type == Range.DELETED || range.type == Range.MODIFIED) LOG.warn("VCS base content not available")
+            if (range.type == Range.DELETED || range.type == Range.MODIFIED) LOG.debug("VCS base content not available")
             return ""
         }
         val lines = baseContent.split("\n")

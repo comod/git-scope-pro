@@ -89,7 +89,7 @@ public class VcsTree extends JPanel {
                     positionTracker.setScrollPositionRestored(true);
                 }
             } catch (Exception e) {
-                LOG.error("Error re-attaching scroll listeners after tab switch", e);
+                LOG.debug("Error re-attaching scroll listeners after tab switch", e);
                 positionTracker.setScrollPositionRestored(true);
             }
         });
@@ -124,7 +124,7 @@ public class VcsTree extends JPanel {
                 return project.getName() + "_tab_" + tabIndex;
             }
         } catch (Exception e) {
-            LOG.warn("Failed to get current tab ID", e);
+            LOG.debug("Failed to get current tab ID", e);
         }
         return project.getName() + "_default_tab";
     }
@@ -388,7 +388,7 @@ public class VcsTree extends JPanel {
             });
 
         } catch (Exception e) {
-            LOG.error("Error updating VcsTree component", e);
+            LOG.warn("Error updating VcsTree component", e);
             try {
                 this.removeAll();
                 this.add(component, BorderLayout.CENTER);

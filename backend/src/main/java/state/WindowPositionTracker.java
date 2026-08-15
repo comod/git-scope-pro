@@ -156,7 +156,7 @@ public class WindowPositionTracker {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Error attaching scroll listeners for tab " + currentTabId + ": " + e.getMessage());
                 }
-                LOG.warn("Error attaching scroll listeners", e);
+                LOG.debug("Error attaching scroll listeners", e);
             }
         });
     }
@@ -237,7 +237,7 @@ public class WindowPositionTracker {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Error attaching scroll listeners" + logPrefix + " for tab " + currentTabId + ": " + e.getMessage());
             }
-            LOG.warn("Error attaching scroll listeners", e);
+            LOG.debug("Error attaching scroll listeners", e);
         }
     }
 

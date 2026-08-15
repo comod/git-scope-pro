@@ -73,7 +73,7 @@ public class MyTabContentListener implements ContentManagerListener {
                         vcsTree.onTabSwitched();
                     }
                 } catch (Exception e) {
-                    LOG.error("MyTabContentListener: Error notifying VcsTree about tab switch: " + e.getMessage());
+                    LOG.warn("MyTabContentListener: Error notifying VcsTree about tab switch: " + e.getMessage());
                 }
             });
         }

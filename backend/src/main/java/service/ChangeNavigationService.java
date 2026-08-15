@@ -341,7 +341,7 @@ public final class ChangeNavigationService {
         try {
             baseContent = change.getBeforeRevision().getContent();
         } catch (VcsException e) {
-            LOG.warn("ChangeNavigation: error getting base content for " + path, e);
+            LOG.debug("ChangeNavigation: error getting base content for " + path, e);
             return Collections.emptyList();
         }
         if (baseContent == null) return Collections.emptyList();
@@ -350,7 +350,7 @@ public final class ChangeNavigationService {
         try {
             return RangesBuilder.INSTANCE.createRanges(normalizedCurrent, normalizedBase);
         } catch (Exception e) {
-            LOG.warn("ChangeNavigation: error computing ranges for " + path, e);
+            LOG.debug("ChangeNavigation: error computing ranges for " + path, e);
             return Collections.emptyList();
         }
     }

@@ -232,33 +232,33 @@ public class TabMoveActions {
     private static void moveTab(Project project, ContentManager contentManager, Content content, int oldIndex, int newIndex) {
         ViewService viewService = null;
         try {
-            LOG.info("Moving tab from index " + oldIndex + " to " + newIndex);
+            LOG.debug("Moving tab from index " + oldIndex + " to " + newIndex);
 
             // Additional validation to prevent moving + tab or moving to + tab position
             int lastIndex = contentManager.getContentCount() - 1;
 
             // Cannot move HEAD tab (index 0)
             if (oldIndex == 0) {
-                LOG.warn("Cannot move HEAD tab");
+                LOG.debug("Cannot move HEAD tab");
                 return;
             }
 
             // Cannot move + tab (last index)
             if (oldIndex == lastIndex || PLUS_TAB_LABEL.equals(content.getTabName())) {
-                LOG.warn("Cannot move + tab");
+                LOG.debug("Cannot move + tab");
                 return;
             }
 
             // Cannot move to position 0 (before HEAD) or to last position (where + tab is)
             if (newIndex < 1 || newIndex >= lastIndex) {
-                LOG.warn("Invalid target index: " + newIndex);
+                LOG.debug("Invalid target index: " + newIndex);
                 return;
             }
 
             // Verify the + tab is still at the last position
             Content lastContent = contentManager.getContent(lastIndex);
             if (lastContent == null || !PLUS_TAB_LABEL.equals(lastContent.getTabName())) {
-                LOG.error("+ tab is not at expected position!");
+                LOG.warn("+ tab is not at expected position!");
                 return;
             }
 
@@ -282,9 +282,9 @@ public class TabMoveActions {
                 viewService.onTabReordered(oldIndex, newIndex);
             }
 
-            LOG.info("Tab moved successfully");
+            LOG.debug("Tab moved successfully");
         } catch (Exception e) {
-            LOG.error("Error moving tab: " + e.getMessage(), e);
+            LOG.warn("Error moving tab: " + e.getMessage(), e);
         } finally {
             // Always clear the flag
             if (viewService != null) {
