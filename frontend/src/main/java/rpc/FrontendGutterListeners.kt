@@ -78,10 +78,34 @@ class FrontendGutterSubscriptions(
                 val dto = event.data
                 gds.scopeDisplayName = dto.scopeDisplayName
                 GitScopeSettings.getInstance().isSeparateGutterRendering = dto.separateGutterRendering
+
+                // Contents are omitted when unchanged since the backend's last message for this
+                // file; the previously published data then carries them.
+                val baseContent: String
+                val headContent: String?
+                if (dto.contentsIncluded) {
+                    baseContent = dto.baseContent
+                        ?: run {
+                            LOG.warn("Gutter update for ${dto.filePath} claims contents but carries none, skipping")
+                            return
+                        }
+                    headContent = dto.headContent
+                } else {
+                    val cached = gds.getData(dto.filePath)
+                    if (cached == null) {
+                        // Should not happen: the backend only omits contents it already sent within
+                        // this subscription, and clears that memory together with AllCleared.
+                        LOG.warn("Gutter update for ${dto.filePath} references cached contents that are missing, skipping")
+                        return
+                    }
+                    baseContent = cached.baseContent
+                    headContent = cached.headContent
+                }
+
                 val data = GutterDataService.GutterFileData(
                     dto.ranges.map { Range(it.line1, it.line2, it.vcsLine1, it.vcsLine2) },
-                    dto.baseContent,
-                    dto.headContent,
+                    baseContent,
+                    headContent,
                     dto.scopeRanges?.map { Range(it.line1, it.line2, it.vcsLine1, it.vcsLine2) }
                 )
                 gds.publish(dto.filePath, data)

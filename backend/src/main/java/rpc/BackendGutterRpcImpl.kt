@@ -35,6 +35,11 @@ class BackendGutterRpcImpl : GutterRpcApi {
         val gds = project.service<GutterDataService>()
 
         return flow {
+            // Contents last sent to THIS subscriber, per file. Contents dominate the message size,
+            // so they are resent only when they actually changed; a new subscription starts empty
+            // and therefore always sends contents on first contact with a file.
+            val lastSentContents = HashMap<String, Pair<String, String?>>()
+
             // Conflated: always accepts, coalesces repeated wake-ups; listeners never block or fail.
             val signal = Channel<Unit>(Channel.CONFLATED)
             val lock = Any()
@@ -84,16 +89,27 @@ class BackendGutterRpcImpl : GutterRpcApi {
                         if (!clearAll && paths.isEmpty()) break
 
                         if (clearAll) {
+                            // The frontend drops its cache on AllCleared, so nothing previously
+                            // sent may be referred to afterwards.
+                            lastSentContents.clear()
                             emit(GutterUpdateEvent.AllCleared)
                         }
                         for (path in paths) {
                             // Read the freshest snapshot at send time, not at event time. A file
                             // cleared while queued yields null and becomes a DataCleared.
                             val data = gds.getData(path)
-                            emit(
-                                if (data != null) GutterUpdateEvent.DataUpdated(data.toDto(path, gds.scopeDisplayName))
-                                else GutterUpdateEvent.DataCleared(path)
-                            )
+                            if (data == null) {
+                                lastSentContents.remove(path)
+                                emit(GutterUpdateEvent.DataCleared(path))
+                            } else {
+                                val contents = data.baseContent to data.headContent
+                                val includeContents = lastSentContents[path] != contents
+                                if (includeContents) {
+                                    lastSentContents[path] = contents
+                                }
+                                emit(GutterUpdateEvent.DataUpdated(
+                                    data.toDto(path, gds.scopeDisplayName, includeContents)))
+                            }
                         }
                     }
                 }
@@ -103,16 +119,20 @@ class BackendGutterRpcImpl : GutterRpcApi {
         }
     }
 
-    private fun GutterDataService.GutterFileData.toDto(filePath: String, scopeDisplayName: String) =
-        GutterFileDataDto(
-            filePath = filePath,
-            ranges = ranges.map { GutterRangeDto(it.line1, it.line2, it.vcsLine1, it.vcsLine2) },
-            baseContent = baseContent,
-            headContent = headContent,
-            scopeRanges = scopeRanges?.map { GutterRangeDto(it.line1, it.line2, it.vcsLine1, it.vcsLine2) },
-            scopeDisplayName = scopeDisplayName,
-            separateGutterRendering = GitScopeSettings.getInstance().isSeparateGutterRendering
-        )
+    private fun GutterDataService.GutterFileData.toDto(
+        filePath: String,
+        scopeDisplayName: String,
+        includeContents: Boolean,
+    ) = GutterFileDataDto(
+        filePath = filePath,
+        ranges = ranges.map { GutterRangeDto(it.line1, it.line2, it.vcsLine1, it.vcsLine2) },
+        baseContent = if (includeContents) baseContent else null,
+        headContent = if (includeContents) headContent else null,
+        scopeRanges = scopeRanges?.map { GutterRangeDto(it.line1, it.line2, it.vcsLine1, it.vcsLine2) },
+        scopeDisplayName = scopeDisplayName,
+        separateGutterRendering = GitScopeSettings.getInstance().isSeparateGutterRendering,
+        contentsIncluded = includeContents
+    )
 }
 
 class BackendGutterRpcProvider : RemoteApiProvider {
