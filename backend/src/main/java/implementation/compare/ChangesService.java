@@ -87,11 +87,28 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
     // Cache for storing changes per repository (stores RepoChangesResult to preserve scope/local separation)
     private final Map<String, RepoChangesResult> changesCache = new ConcurrentHashMap<>();
 
+    /**
+     * Collects changes and reports them to {@code callBack}.
+     *
+     * <p>The callback is <em>always</em> invoked exactly once (unless the project is disposed
+     * first): with the collected result, or with {@code null} when this collection was superseded
+     * or cancelled by a newer one. Callers chain UI work on the callback, so dropping it — as a
+     * cancelled {@code Task} used to — silently lost that work (e.g. the file-colors refresh
+     * after a tab switch).
+     */
     public void collectChangesWithCallback(TargetBranchMap targetBranchByRepo, Consumer<ChangesResult> callBack, boolean checkFs) {
         // Capture the current project reference to ensure consistency
         final Project currentProject = this.project;
         final GitService currentGitService = this.git;
         final long gen = collectionGeneration.incrementAndGet();
+
+        // Clear stale results at scheduling time, not inside run(): a task superseded before its
+        // run() started never reached the clear, so entries cached DURING a git operation
+        // (e.g. conflict-state changes mid-rebase) survived it and were served to the next
+        // cache-permitted collection (issue #78).
+        if (checkFs) {
+            changesCache.clear();
+        }
 
         task = new Task.Backgroundable(currentProject, "Collecting " + Defs.APPLICATION_NAME, true) {
 
@@ -121,11 +138,6 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
                     // Happens before the VCS mapping is ready; the scope stays empty until some
                     // later event triggers another collection.
                     LOG.debug("Collection " + gen + ": no git repositories registered yet");
-                }
-
-                // Clear cache if checkFs is true (force fresh fetch)
-                if (checkFs) {
-                    changesCache.clear();
                 }
 
                 repositories.forEach(repo -> {
@@ -223,12 +235,24 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
                 // Ensure result is accessed only on the UI thread to update the UI component
                 ApplicationManager.getApplication().invokeLater(() -> {
                     // Double-check the project is still valid
-                    if (!currentProject.isDisposed() && callBack != null && this.result != null) {
-                        callBack.accept(this.result);
-                    } else if (this.result == null) {
-                        // The run() above returned early; no update reaches the model from here.
-                        LOG.debug("Collection " + gen + " produced no result, nothing applied");
+                    if (currentProject.isDisposed() || callBack == null) return;
+                    if (this.result == null) {
+                        // The run() above returned early (superseded); a newer collection owns the
+                        // model. Complete the callback with null so chained work still runs.
+                        LOG.debug("Collection " + gen + " superseded, completing callback without data");
                     }
+                    callBack.accept(this.result);
+                }, ModalityState.defaultModalityState(), __ -> disposing.get());
+            }
+
+            @Override
+            public void onCancel() {
+                // Queueing a newer collection cancels this one's indicator; the platform then calls
+                // onCancel instead of onSuccess. The callback chain must still complete.
+                ApplicationManager.getApplication().invokeLater(() -> {
+                    if (currentProject.isDisposed() || callBack == null) return;
+                    LOG.debug("Collection " + gen + " cancelled, completing callback without data");
+                    callBack.accept(null);
                 }, ModalityState.defaultModalityState(), __ -> disposing.get());
             }
 

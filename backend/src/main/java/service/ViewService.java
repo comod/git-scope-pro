@@ -689,6 +689,15 @@ public class ViewService implements Disposable {
         final DisposalToken token = this.disposalToken;
         changesExecutor.execute(() -> {
             changesService.collectChangesWithCallback(finalTargetBranchMap, result -> {
+                if (result == null) {
+                    // Superseded or cancelled by a newer collection, which owns the model now.
+                    // Complete the future anyway so chained UI work (e.g. the file-colors refresh
+                    // after a tab switch) is never silently dropped.
+                    LOG.debug("Collection for generation " + gen + " superseded, completing without apply");
+                    done.complete(null);
+                    return;
+                }
+
                 // Build maps on background thread to avoid slow file system operations on EDT
                 Map<String, Change> mergedChangesMap = MyModel.buildChangesByPathMap(result.mergedChanges());
                 Map<String, Change> scopeChangesMap = MyModel.buildChangesByPathMap(result.scopeChanges());
