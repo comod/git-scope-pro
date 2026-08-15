@@ -1,8 +1,6 @@
 package utils;
 
 import com.intellij.openapi.diagnostic.Logger;
-import com.intellij.openapi.vcs.changes.Change;
-import git4idea.GitCommit;
 import git4idea.GitReference;
 import git4idea.repo.GitRepository;
 import org.jetbrains.annotations.NotNull;
@@ -13,8 +11,6 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.lang.reflect.Method;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.Map;
 
 /**
@@ -30,8 +26,6 @@ import java.util.Map;
  *
  * <h3>Bridges</h3>
  * <ul>
- *   <li>{@link #getCommitChanges} — {@code GitCommit.getChanges()} via its
- *       {@code @ApiStatus.Experimental} annotation</li>
  *   <li>{@link #findTagByName} — tag lookup via the newer {@code getTagsHolder()}
  *       (2026.1+) or legacy {@code getTagHolder()} (older IDEs)</li>
  * </ul>
@@ -42,10 +36,6 @@ import java.util.Map;
 public final class PlatformApiReflection {
 
     private static final Logger LOG = Defs.getLogger(PlatformApiReflection.class);
-
-    // ── GitCommit.getChanges() (@ApiStatus.Experimental) ────────────────────
-    // type after adaptation: (Object receiver) -> Object
-    private static final @Nullable MethodHandle COMMIT_GET_CHANGES;
 
     // ── Tag lookup (IDE 2026.1+): getTagsHolder() API ────────────────────────
     // Each handle: (Object receiver [, args]) -> Object
@@ -59,9 +49,6 @@ public final class PlatformApiReflection {
     private static final @Nullable MethodHandle TAG_HOLDER_GET_TAG;  // (Object, Object name) -> Object
 
     static {
-        // ── GitCommit.getChanges() ─────────────────────────────────────────
-        COMMIT_GET_CHANGES = resolvePublicVirtual(GitCommit.class, "getChanges");
-
         // ── New tag path ───────────────────────────────────────────────────
         REPO_GET_TAGS_HOLDER = resolvePublicVirtual(GitRepository.class, "getTagsHolder");
         TAGS_HOLDER_GET_STATE =
@@ -115,33 +102,6 @@ public final class PlatformApiReflection {
     }
 
     // ── Public API ────────────────────────────────────────────────────────────
-
-    /**
-     * Calls {@code commit.getChanges()} via a cached {@link MethodHandle}.
-     * The method is annotated {@code @ApiStatus.Experimental} and therefore accessed
-     * reflectively to avoid verifyPlugin warnings.
-     *
-     * @return the commit's changes, or an empty list when the handle is unavailable
-     */
-    @NotNull
-    @SuppressWarnings("unchecked")
-    public static Collection<Change> getCommitChanges(@NotNull GitCommit commit) {
-        if (COMMIT_GET_CHANGES == null) {
-            LOG.warn("PlatformApiReflection: getChanges handle unavailable");
-            return Collections.emptyList();
-        }
-        try {
-            Object result = COMMIT_GET_CHANGES.invoke(commit);
-            if (result instanceof Collection<?> c) {
-                return (Collection<Change>) c;
-            }
-            LOG.warn("PlatformApiReflection: getChanges returned unexpected type: "
-                             + (result == null ? "null" : result.getClass().getName()));
-        } catch (Throwable t) {
-            LOG.error("PlatformApiReflection: getCommitChanges invocation failed", t);
-        }
-        return Collections.emptyList();
-    }
 
     /**
      * Finds a Git tag by name on the given repository.

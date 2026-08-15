@@ -18,6 +18,9 @@ locally or over Remote Development.
 
 - Fixed [Right-click -> Show in Project doesn't switch to Project window](https://github.com/comod/git-scope-pro/issues/100)
 - Fixed [Right-click -> Show in Project for folder selects the first changed file rather than the folder](https://github.com/comod/git-scope-pro/issues/101)
+- Fixed ["Only Changes Since Common Ancestor" collected every commit in the range instead of the pull-request diff](https://github.com/comod/git-scope-pro/issues/104)
+    - The scope is now `git diff <selection>...HEAD`: files reverted within the range disappear, and each
+      file's diff, gutter markers and rollback use the merge base rather than a single intermediate commit.
 
 ## [2026.1.4]
 

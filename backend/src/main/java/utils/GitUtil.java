@@ -69,6 +69,41 @@ public class GitUtil {
         return null;
     }
 
+    /**
+     * Resolves the common ancestor of the given ref and the repository's current HEAD.
+     * This is the base Git hosting providers use for pull-request diffs, so diffing it against
+     * HEAD yields {@code git diff <selectedRef>...HEAD}.
+     *
+     * @param repository  the target GitRepository
+     * @param selectedRef the ref the scope compares against (branch, tag, hash, ...)
+     * @return the merge base, or null when it cannot be resolved (unknown ref, unrelated histories)
+     */
+    @Nullable
+    public static GitRevisionNumber resolveMergeBase(@NotNull GitRepository repository,
+                                                     @NotNull String selectedRef) {
+
+        Project project = repository.getProject();
+
+        GitLineHandler handler = new GitLineHandler(project, repository.getRoot(), GitCommand.MERGE_BASE);
+        handler.addParameters(selectedRef, "HEAD");
+        try {
+            String hash = Git.getInstance().runCommand(handler)
+                    .getOutputOrThrow()
+                    .trim();
+            if (!hash.isEmpty()) {
+                return new GitRevisionNumber(hash);
+            }
+        } catch (VcsException e) {
+            // Expected when the ref is unknown in this repository or histories are unrelated
+            LOG.debug("Failed to resolve merge base of '" + selectedRef + "' and HEAD: " + e.getMessage());
+        } catch (Exception e) {
+            LOG.warn("Unexpected error resolving merge base of '" + selectedRef + "' and HEAD in repository "
+                             + repository.getRoot().getPath(), e);
+        }
+
+        return null;
+    }
+
     public static @NotNull Collection<Change> getDiffChanges(@NotNull GitRepository repository,
                                                              @NotNull VirtualFile file,
                                                              @NotNull GitRevisionNumber revisionNumber) throws VcsException {

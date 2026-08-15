@@ -5,6 +5,7 @@ import com.intellij.openapi.vcs.changes.ChangesUtil;
 import git4idea.repo.GitRepository;
 import org.jetbrains.annotations.Nullable;
 import service.GitService;
+import utils.ScopeRefRange;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -79,15 +80,13 @@ public class MyModel extends MyModelBase {
     }
 
     /**
-     * Returns the scope reference similar to getName(), but strips the optional "..HEAD" suffix if present.
-     * Example: "feature/foo..HEAD" -> "feature/foo"
+     * Returns the scope reference similar to getName(), but strips the optional range suffix if present.
+     * Example: "feature/foo...HEAD" -> "feature/foo"
      */
     @Nullable
     public String getScopeRef() {
         String name = getName();
-        if (name == null) return null;
-        String suffix = ".." + GitService.BRANCH_HEAD;
-        return name.endsWith(suffix) ? name.substring(0, name.length() - suffix.length()) : name;
+        return name == null ? null : ScopeRefRange.stripRange(name);
     }
 
     // Getter and setter for custom tab name

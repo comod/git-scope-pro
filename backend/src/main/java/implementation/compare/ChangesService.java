@@ -15,11 +15,9 @@ import com.intellij.openapi.vcs.changes.ChangeListManager;
 import com.intellij.openapi.vcs.changes.ChangesUtil;
 import com.intellij.openapi.vcs.changes.CurrentContentRevision;
 import com.intellij.openapi.vfs.VirtualFile;
-import git4idea.GitCommit;
 import git4idea.GitReference;
 import git4idea.GitRevisionNumber;
 import git4idea.actions.GitCompareWithRefAction;
-import git4idea.history.GitHistoryUtils;
 import git4idea.repo.GitRepository;
 import model.TargetBranchMap;
 import org.jetbrains.annotations.NotNull;
@@ -28,6 +26,7 @@ import settings.GitScopeSettings;
 import system.Defs;
 import utils.PlatformApiReflection;
 import utils.GitUtil;
+import utils.ScopeRefRange;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -290,19 +289,6 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
         return filtered;
     }
 
-    @NotNull
-    public Collection<Change> getChangesByHistory(Project project, GitRepository repo, String branchToCompare) throws VcsException {
-        List<GitCommit> commits = GitHistoryUtils.history(project, repo.getRoot(), branchToCompare);
-        Map<FilePath, Change> changeMap = new HashMap<>();
-        for (GitCommit commit : commits) {
-            for (Change change : PlatformApiReflection.getCommitChanges(commit)) {
-                FilePath path = ChangesUtil.getFilePath(change);
-                changeMap.put(path, change);
-            }
-        }
-        return new ArrayList<>(changeMap.values());
-    }
-
     /**
      * Collects local changes for HEAD (uncommitted changes) filtered by repository.
      *
@@ -357,8 +343,13 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
             }
 
             // Diff Changes - these are the pure scope changes
-            if (scopeRef.contains("..")) {
-                scopeChanges = getChangesByHistory(project, repo, scopeRef);
+            GitRevisionNumber revisionNumber;
+            if (ScopeRefRange.isRange(scopeRef)) {
+                // A range scope ("main..HEAD") asks for everything on HEAD since it diverged from the
+                // selected ref, so the base is their merge base. An unsupported range yields no ref
+                // and falls through to ERROR_STATE rather than being misread as a different diff.
+                String selectedRef = ScopeRefRange.selectedRef(scopeRef);
+                revisionNumber = selectedRef == null ? null : GitUtil.resolveMergeBase(repo, selectedRef);
             } else {
                 GitReference gitReference;
 
@@ -369,7 +360,6 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
                     gitReference = PlatformApiReflection.findTagByName(repo, scopeRef);
                 }
 
-                GitRevisionNumber revisionNumber;
                 if (gitReference == null) {
                     // Finally resort to try a generic reference (HEAD~2, <hash>, ...)
                     revisionNumber = GitUtil.resolveGitReference(repo, scopeRef);
@@ -377,16 +367,17 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
                 else {
                     revisionNumber = new GitRevisionNumber(gitReference.getFullName());
                 }
+            }
 
-                if (revisionNumber != null) {
-                    // We have a valid GitReference
-                    scopeChanges = GitUtil.getDiffChanges(repo, file, revisionNumber);
-                    LOG.debug("ChangesService - Repository: " + repoPath + ", Scope: " + scopeRef + ", scopeChanges count: " + scopeChanges.size());
-                }
-                else {
-                    // We do not have a valid GitReference => return ERROR_STATE
-                    return new RepoChangesResult(ERROR_STATE, new ArrayList<>(), new ArrayList<>());
-                }
+            if (revisionNumber != null) {
+                // Diff a single base tree against HEAD. Range scopes pass their merge base, which makes
+                // the result the net pull-request diff instead of a union of every commit's changes.
+                scopeChanges = GitUtil.getDiffChanges(repo, file, revisionNumber);
+                LOG.debug("ChangesService - Repository: " + repoPath + ", Scope: " + scopeRef + ", base: " + revisionNumber.asString() + ", scopeChanges count: " + scopeChanges.size());
+            }
+            else {
+                // We do not have a valid GitReference => return ERROR_STATE
+                return new RepoChangesResult(ERROR_STATE, new ArrayList<>(), new ArrayList<>());
             }
 
             // Log what we collected
