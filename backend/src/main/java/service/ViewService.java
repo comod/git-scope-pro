@@ -882,6 +882,7 @@ public class ViewService implements Disposable {
         }
     }
 
+
     public void onTabReordered(int oldIndex, int newIndex) {
         // Note: The isProcessingTabReorder flag should already be set by the caller
         // before any UI changes are made, to prevent listener interference
@@ -892,6 +893,67 @@ public class ViewService implements Disposable {
 
         // Save the new order
         save();
+    }
+
+    /**
+     * Handles a tab reorder the plugin did not perform — the platform lets tabs be dragged in the
+     * tool window header (monolith only; split mode disables tab drag entirely). The drag ends by
+     * re-adding the content at a new index, which reaches us as a removal, so without this the
+     * model would be deleted while its tab stayed on screen.
+     *
+     * <p>HEAD and "+" are restored to the ends first: the drag helper cannot be told to leave them
+     * alone, so the invariant the popup actions enforce up front is enforced here after the fact.
+     */
+    public void onTabsDragged() {
+        if (isDisposed || toolWindowService == null) return;
+
+        ToolWindow toolWindow = toolWindowService.getToolWindow();
+        if (toolWindow == null) return;
+        ContentManager contentManager = toolWindow.getContentManager();
+
+        isProcessingTabReorder = true;
+        try {
+            restoreSpecialTabPositions(contentManager);
+            rebuildCollectionFromTabOrder();
+            save();
+        } finally {
+            isProcessingTabReorder = false;
+        }
+
+        // Indices changed, so tooltips and the "can be reset" set no longer address the same tabs.
+        project.getService(TabActionService.class).publishRenamedTabs();
+    }
+
+    /** Moves the HEAD tab back to the front and the "+" tab back to the end if a drag moved them. */
+    private void restoreSpecialTabPositions(@NotNull ContentManager contentManager) {
+        Content headContent = null;
+        Content plusContent = null;
+        for (int index = 0; index < contentManager.getContentCount(); index++) {
+            Content content = contentManager.getContent(index);
+            if (content == null) continue;
+            if (PLUS_TAB_LABEL.equals(content.getTabName())) {
+                plusContent = content;
+                continue;
+            }
+            MyModel model = toolWindowService.getModelForContent(content);
+            if (model != null && model.isHeadTab()) {
+                headContent = content;
+            }
+        }
+
+        moveContentTo(contentManager, headContent, 0);
+        moveContentTo(contentManager, plusContent, contentManager.getContentCount() - 1);
+    }
+
+    private void moveContentTo(@NotNull ContentManager contentManager, Content content, int targetIndex) {
+        if (content == null) return;
+        int currentIndex = contentManager.getIndexOfContent(content);
+        if (currentIndex < 0 || currentIndex == targetIndex) return;
+
+        LOG.debug("Restoring special tab '" + content.getTabName() + "' from index " + currentIndex
+                + " to " + targetIndex);
+        contentManager.removeContent(content, false);
+        contentManager.addContent(content, targetIndex);
     }
 
     /**
