@@ -23,6 +23,13 @@ enum class ChangeNavDirection {
     PREVIOUS_FILE
 }
 
+/** Direction for moving a scope tab within the tool window. */
+@Serializable
+enum class TabMoveDirection {
+    LEFT,
+    RIGHT
+}
+
 @Rpc
 interface UtilRpcApi : RemoteApi<Unit> {
     suspend fun getCommands(projectId: ProjectId): Flow<UtilCommand>
@@ -53,6 +60,31 @@ interface UtilRpcApi : RemoteApi<Unit> {
      * window's right-click "Show Diff"). Runs on the backend, which holds the scope change set.
      */
     suspend fun showDiff(projectId: ProjectId, currentFilePath: String?)
+
+    /**
+     * Tab operations for the tool window's tab context menu, addressed by tab index.
+     *
+     * <p>In split mode the tab strip is rendered by the frontend, so the context menu is built from
+     * the frontend's action registry — backend-registered actions never appear in it. The frontend
+     * actions therefore delegate here, because the tool window, its ContentManager and the scope
+     * models all live on the backend. All three are no-ops when the index does not address a
+     * renameable/movable tab, so the backend stays authoritative over the rules.
+     */
+    suspend fun renameTab(projectId: ProjectId, tabIndex: Int, newName: String)
+
+    suspend fun resetTabName(projectId: ProjectId, tabIndex: Int)
+
+    suspend fun moveTab(projectId: ProjectId, tabIndex: Int, direction: TabMoveDirection)
+
+    /**
+     * Indices of tabs that currently carry a custom name, so "Reset Tab Name" can be disabled for
+     * tabs that have nothing to reset. Whether a tab was renamed is model state the frontend cannot
+     * see, and action update() cannot suspend, so the backend pushes it instead.
+     *
+     * <p>A [kotlinx.coroutines.flow.StateFlow] on the backend: a new subscriber immediately receives
+     * the current set, and every rename, reset, reorder or tab load republishes it.
+     */
+    suspend fun getCustomNamedTabs(projectId: ProjectId): Flow<List<Int>>
 
     companion object {
         suspend fun getInstance(): UtilRpcApi {

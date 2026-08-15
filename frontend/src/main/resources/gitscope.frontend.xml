@@ -8,10 +8,12 @@
         <projectService serviceImplementation="gitscope.frontend.GutterRenderingService"/>
         <projectService serviceImplementation="rpc.FrontendGutterSubscriptions"/>
         <projectService serviceImplementation="rpc.FrontendUtilSubscriptions"/>
+        <projectService serviceImplementation="rpc.FrontendTabStateService"/>
         <projectService serviceImplementation="gitscope.frontend.actions.ChangeNavCoroutineScopeHolder"/>
         <postStartupActivity implementation="gitscope.frontend.GutterRenderingStartup"/>
         <postStartupActivity implementation="rpc.FrontendGutterSubscriptionsStartup"/>
         <postStartupActivity implementation="rpc.FrontendUtilSubscriptionsStartup"/>
+        <postStartupActivity implementation="rpc.FrontendTabStateStartup"/>
     </extensions>
 
     <actions>
@@ -35,5 +37,28 @@
                 class="gitscope.frontend.actions.ShowDiffAction"
                 text="Show Diff"
                 description="Show the Git Scope diff for the current file in an editor tab"/>
+
+        <!-- Tab context menu. In split mode the tab strip is rendered by the frontend, so its
+             context menu is built from this registry and the backend copies never appear; these
+             hide themselves in monolith, where the backend actions are shown instead. -->
+        <action id="GitScope.Frontend.MoveTabLeft"
+                class="gitscope.frontend.actions.FrontendMoveTabLeftAction" text="Move Tab Left">
+            <add-to-group group-id="ToolWindowContextMenu" anchor="first"/>
+        </action>
+        <action id="GitScope.Frontend.MoveTabRight"
+                class="gitscope.frontend.actions.FrontendMoveTabRightAction" text="Move Tab Right">
+            <add-to-group group-id="ToolWindowContextMenu" anchor="after"
+                          relative-to-action="GitScope.Frontend.MoveTabLeft"/>
+        </action>
+        <action id="GitScope.Frontend.RenameTab"
+                class="gitscope.frontend.actions.FrontendRenameTabAction" text="Rename Tab">
+            <add-to-group group-id="ToolWindowContextMenu" anchor="after"
+                          relative-to-action="GitScope.Frontend.MoveTabRight"/>
+        </action>
+        <action id="GitScope.Frontend.ResetTabName"
+                class="gitscope.frontend.actions.FrontendResetTabNameAction" text="Reset Tab Name">
+            <add-to-group group-id="ToolWindowContextMenu" anchor="after"
+                          relative-to-action="GitScope.Frontend.RenameTab"/>
+        </action>
     </actions>
 </idea-plugin>
