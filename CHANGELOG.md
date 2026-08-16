@@ -1,3 +1,18 @@
+## [2026.2.1]
+
+### Fixes
+
+- Fixed ["Only Changes Since Common Ancestor" collected every commit in the range instead of the pull-request diff](https://github.com/comod/git-scope-pro/issues/104)
+    - The scope is now `git diff <selection>...HEAD`: files reverted within the range disappear, and each
+      file's diff, gutter markers and rollback use the merge base rather than a single intermediate commit.
+- Fixed [Files are red even after resolving conflicts](https://github.com/comod/git-scope-pro/issues/78)
+- Fixed missing gutter markers over slow or unstable Remote Development connections
+- Fixed the scope tab context menu (rename, reset, move left/right) missing in Remote Development, and the tooltip
+  showing the original name of a renamed tab
+- Fixed reordering scope tabs by dragging them, which mixed up the tabs and lost one on the next IDE start
+- Fixed the step-between-changes actions jumping erratically: they now follow the order the scope tree shows, skip
+  deleted, binary and directory entries, and keep the focus in the Git Scope window
+
 ## [2026.2]
 
 Remote Development support, built on a split of the plugin into separate frontend and backend modules. Local IDE
@@ -18,9 +33,6 @@ locally or over Remote Development.
 
 - Fixed [Right-click -> Show in Project doesn't switch to Project window](https://github.com/comod/git-scope-pro/issues/100)
 - Fixed [Right-click -> Show in Project for folder selects the first changed file rather than the folder](https://github.com/comod/git-scope-pro/issues/101)
-- Fixed ["Only Changes Since Common Ancestor" collected every commit in the range instead of the pull-request diff](https://github.com/comod/git-scope-pro/issues/104)
-    - The scope is now `git diff <selection>...HEAD`: files reverted within the range disappear, and each
-      file's diff, gutter markers and rollback use the merge base rather than a single intermediate commit.
 
 ## [2026.1.4]
 
