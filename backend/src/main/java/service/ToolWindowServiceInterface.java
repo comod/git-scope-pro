@@ -30,6 +30,12 @@ public interface ToolWindowServiceInterface {
 
     void selectFile(VirtualFile file);
 
+    /**
+     * Paths of the displayed changes in the order the tool window shows them, or an empty list when
+     * it has no tree yet. Safe to call from any thread.
+     */
+    java.util.List<String> getDisplayOrderedPaths();
+
     ToolWindow getToolWindow();
 
     MyModel getModelForContent(com.intellij.ui.content.Content content);

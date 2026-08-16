@@ -1,6 +1,8 @@
 package service;
 
 import com.intellij.openapi.Disposable;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -23,6 +25,8 @@ import java.util.Map;
 
 @Service(Service.Level.PROJECT)
 public final class ToolWindowService implements ToolWindowServiceInterface, Disposable {
+    private static final com.intellij.openapi.diagnostic.Logger LOG = Defs.getLogger(ToolWindowService.class);
+
     private final Project project;
     private final Map<Content, ToolWindowView> contentToViewMap = new HashMap<>();
     private final TabOperations tabOperations;
@@ -189,6 +193,23 @@ public final class ToolWindowService implements ToolWindowServiceInterface, Disp
         if (vcsTree != null) {
             vcsTree.selectFile(file);
         }
+    }
+
+    @Override
+    public java.util.List<String> getDisplayOrderedPaths() {
+        // The tree is a Swing component, so reading its model belongs on the EDT; callers (change
+        // navigation) run on background threads and should not have to know that.
+        java.util.List<String> paths = new java.util.ArrayList<>();
+        ApplicationManager.getApplication().invokeAndWait(() -> {
+            if (project.isDisposed()) return;
+            try {
+                VcsTree vcsTree = getVcsTree();
+                if (vcsTree != null) paths.addAll(vcsTree.getDisplayOrderedPaths());
+            } catch (Exception e) {
+                LOG.debug("Could not read the tool window's display order", e);
+            }
+        }, ModalityState.any());
+        return paths;
     }
 
     @Override
