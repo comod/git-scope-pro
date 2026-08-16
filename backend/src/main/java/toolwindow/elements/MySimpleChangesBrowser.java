@@ -21,6 +21,7 @@ import com.intellij.openapi.vcs.changes.actions.diff.ChangeDiffRequestProducer;
 import com.intellij.openapi.vcs.changes.ui.ChangeDiffRequestChain;
 import com.intellij.openapi.vcs.changes.ui.SimpleAsyncChangesBrowser;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.ui.render.RenderingUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import system.Defs;
@@ -66,6 +67,12 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
         super(project, false, true);
         this.myProject = project;
         setChangesToDisplay(preparedChanges);
+
+        // Navigating to a change moves the focus to the editor, and Swing then repaints the tree's
+        // selection in the washed-out "inactive" colour, so the file navigation just moved to stops
+        // being readable in the tool window. Keep the selection painted as focused, the way the
+        // platform's own always-visible trees do, so the tool window keeps showing where we are.
+        getViewer().putClientProperty(RenderingUtil.ALWAYS_PAINT_SELECTION_AS_FOCUSED, true);
 
         // Add mouse listener for single-click preview functionality
         addSingleClickPreviewSupport();

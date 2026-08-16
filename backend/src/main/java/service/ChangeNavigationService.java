@@ -279,15 +279,32 @@ public final class ChangeNavigationService {
         }
         lastNavigatedFile = path;
         lastNavigatedLine = line;
-        // Request focus so the opened editor becomes the focus owner and the frontend reports the
-        // correct caret position on the next navigation keystroke.
-        FileOpener.openAndGoToLine(project, file, line, true);
-        highlightInToolWindow(file);
+
+        // Stepping through changes from the tool window should leave the focus there. Asking for the
+        // opened editor to be focused takes it away, and on Linux the Project View following the
+        // file ("Autoscroll from Source") can then keep it, so the next keystroke no longer reaches
+        // the tool window at all. Focusing the editor is only what we want when navigation was
+        // triggered from the editor in the first place.
+        //
+        // Dropping the focus request costs nothing: the frontend then reports no focused changed
+        // file, and navigate() continues from lastNavigatedFile/lastNavigatedLine instead.
+        ToolWindowServiceInterface toolWindowService = project.getService(ToolWindowServiceInterface.class);
+        boolean startedInToolWindow = toolWindowService != null && toolWindowService.isFocused();
+
+        FileOpener.openAndGoToLine(project, file, line, !startedInToolWindow);
+        highlightInToolWindow(toolWindowService, file);
+        if (startedInToolWindow) {
+            toolWindowService.restoreFocus();
+        }
     }
 
     /** Selects/highlights the file's change in the Git Scope tool window tree, so the tree stays in sync. */
     private void highlightInToolWindow(@NotNull VirtualFile file) {
-        ToolWindowServiceInterface toolWindowService = project.getService(ToolWindowServiceInterface.class);
+        highlightInToolWindow(project.getService(ToolWindowServiceInterface.class), file);
+    }
+
+    private void highlightInToolWindow(@Nullable ToolWindowServiceInterface toolWindowService,
+                                       @NotNull VirtualFile file) {
         if (toolWindowService == null) return;
         ApplicationManager.getApplication().invokeLater(() -> {
             if (project.isDisposed()) return;

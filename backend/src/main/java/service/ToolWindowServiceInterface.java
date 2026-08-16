@@ -36,6 +36,18 @@ public interface ToolWindowServiceInterface {
      */
     java.util.List<String> getDisplayOrderedPaths();
 
+    /**
+     * Whether the Git Scope tool window is the one currently holding the focus. Safe to call from
+     * any thread.
+     */
+    boolean isFocused();
+
+    /**
+     * Returns the focus to the Git Scope tool window if something took it in the meantime. Does
+     * nothing when the tool window is hidden or still focused. Safe to call from any thread.
+     */
+    void restoreFocus();
+
     ToolWindow getToolWindow();
 
     MyModel getModelForContent(com.intellij.ui.content.Content content);

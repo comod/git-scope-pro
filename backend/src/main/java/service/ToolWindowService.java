@@ -213,6 +213,37 @@ public final class ToolWindowService implements ToolWindowServiceInterface, Disp
     }
 
     @Override
+    public boolean isFocused() {
+        // isActive() reads window-manager state that is only consistent on the EDT; callers (change
+        // navigation) run on background threads and should not have to know that.
+        boolean[] focused = {false};
+        ApplicationManager.getApplication().invokeAndWait(() -> {
+            if (project.isDisposed()) return;
+            ToolWindow toolWindow = getToolWindow();
+            focused[0] = toolWindow != null && toolWindow.isVisible() && toolWindow.isActive();
+        }, ModalityState.any());
+        return focused[0];
+    }
+
+    @Override
+    public void restoreFocus() {
+        // Queued behind the file open the caller scheduled, so the check below sees the focus as it
+        // ends up rather than as it was. Focus transfers the window manager owns -- Project View
+        // being shown next to us on Linux, say -- are asynchronous and can land later still; there
+        // is no way to wait for those, which is why callers avoid moving the focus in the first
+        // place instead of relying on this.
+        ApplicationManager.getApplication().invokeLater(() -> {
+            if (project.isDisposed()) return;
+            ToolWindow toolWindow = getToolWindow();
+            if (toolWindow == null || !toolWindow.isVisible() || toolWindow.isActive()) return;
+            LOG.debug("Returning focus to the Git Scope tool window");
+            // forced=false, so a real user action that moved the focus elsewhere in the meantime
+            // keeps it instead of being overridden.
+            toolWindow.activate(null, true, false);
+        }, ModalityState.any());
+    }
+
+    @Override
     public MyModel getModelForContent(Content content) {
         ToolWindowView toolWindowView = contentToViewMap.get(content);
         if (toolWindowView != null) {
