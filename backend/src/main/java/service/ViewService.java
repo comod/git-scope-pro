@@ -11,6 +11,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.FileStatusManager;
 import com.intellij.openapi.vcs.VcsApplicationSettings;
 import com.intellij.openapi.vcs.changes.Change;
+import com.intellij.openapi.vcs.changes.VcsDirtyScopeManager;
 import com.intellij.openapi.vcs.impl.LineStatusTrackerManagerI;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.ui.content.Content;
@@ -80,6 +81,7 @@ public class ViewService implements Disposable {
     private Integer savedTabIndex;
     private final AtomicBoolean tabInitializationInProgress = new AtomicBoolean(false);
     private final AtomicBoolean initialFileColorsRefreshed = new AtomicBoolean(false);
+    private final AtomicBoolean initialChangelistRefreshed = new AtomicBoolean(false);
     private final Map<MyModel, Consumer<MyModel.field>> modelListeners = new HashMap<>();
 
     public ViewService(Project project) {
@@ -342,7 +344,27 @@ public class ViewService implements Disposable {
 
     public void eventVcsReady() {
         this.vcsReady = true;
+        forceInitialChangelistRefresh();
         init();
+    }
+
+    /**
+     * Forces one full changelist rescan per project, as soon as VCS is usable.
+     *
+     * <p>ChangeListManager restores the changelist persisted in workspace.xml and from then on only
+     * updates incrementally, over whatever VcsDirtyScopeManager reports as dirty. An entry whose
+     * file no longer exists can never enter that dirty scope — no VFS event can fire for a file that
+     * is not there — so it survives every update, is re-persisted on close, and returns on the next
+     * open. Restarting the IDE does not clear it; only a full rescan does, which is why such an
+     * entry otherwise lingers until something unrelated (a commit touching .git/index) forces one.
+     */
+    private void forceInitialChangelistRefresh() {
+        if (project.isDisposed() || !initialChangelistRefreshed.compareAndSet(false, true)) {
+            // directoryMappingChanged() fires again whenever mappings change; one rescan is enough.
+            return;
+        }
+        LOG.debug("Forcing a full changelist rescan to discard entries restored from workspace.xml");
+        VcsDirtyScopeManager.getInstance(project).markEverythingDirty();
     }
 
     public void eventToolWindowReady() {

@@ -270,7 +270,19 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
         if (prev != null) {
             prev.cancel();
         }
-        task.queue();
+
+        // Collect against a settled changelist. ChangeListManager restores the list persisted in
+        // workspace.xml when the project opens and refreshes it only afterwards, so reading
+        // getAllChanges() straight away can hand back entries for files git considers clean — or
+        // that no longer exist at that path at all. Capture the task locally: a newer collection
+        // reassigns the field before this callback runs.
+        final Task.Backgroundable queuedTask = task;
+        ChangeListManager.getInstance(currentProject).invokeAfterUpdate(false, () -> {
+            if (disposing.get() || currentProject.isDisposed()) {
+                return;
+            }
+            queuedTask.queue();
+        });
     }
     
     @Override
@@ -311,7 +323,13 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
             FilePath changePath = ChangesUtil.getFilePath(change);
             String changePathStr = changePath.getPath();
 
-            if (!showDeletedFiles && change.getType() == Change.Type.DELETED) {
+            if (change.getType() == Change.Type.DELETED) {
+                if (!showDeletedFiles) {
+                    continue;
+                }
+            } else if (!isPresentOnDisk(changePath)) {
+                // Stale changelist entry: nothing lives at this path any more, so rendering it would
+                // put a dead node in the tree. DELETED is exempt because absence is what it reports.
                 continue;
             }
 
@@ -339,6 +357,17 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
         }
 
         return filtered;
+    }
+
+    /**
+     * Reports whether a change still has a live file behind it.
+     *
+     * <p>A {@link VirtualFile} can outlive the file it points at when the deletion happened outside
+     * the IDE, so validity is checked alongside presence.
+     */
+    private static boolean isPresentOnDisk(FilePath path) {
+        VirtualFile virtualFile = path.getVirtualFile();
+        return virtualFile != null && virtualFile.isValid();
     }
 
     /**
@@ -372,22 +401,20 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
         try {
             // Local Changes
             ChangeListManager changeListManager = ChangeListManager.getInstance(project);
-            Collection<Change> localChanges = changeListManager.getAllChanges();
+            Collection<Change> localChanges = new ArrayList<>(changeListManager.getAllChanges());
             String repoPath = repo.getRoot().getPath();
+
+            // Add unversioned (untracked) files if the setting is enabled. They join the changelist
+            // entries *before* filtering so they get the same repository and staleness checks —
+            // appending them afterwards let untracked paths bypass both.
+            if (GitScopeSettings.getInstance().isShowUntrackedFiles()) {
+                for (FilePath unversionedPath : changeListManager.getUnversionedFilesPaths()) {
+                    localChanges.add(new Change(null, new CurrentContentRevision(unversionedPath), FileStatus.UNKNOWN));
+                }
+            }
 
             // Filter local changes for this repository
             repoLocalChanges = filterLocalChanges(localChanges, repoPath, null);
-
-            // Add unversioned (untracked) files if the setting is enabled
-            if (GitScopeSettings.getInstance().isShowUntrackedFiles()) {
-                for (FilePath unversionedPath : changeListManager.getUnversionedFilesPaths()) {
-                    String filePathStr = unversionedPath.getPath();
-                    if (filePathStr.startsWith(repoPath)) {
-                        Change untrackedChange = new Change(null, new CurrentContentRevision(unversionedPath), FileStatus.UNKNOWN);
-                        repoLocalChanges.add(untrackedChange);
-                    }
-                }
-            }
 
             // Special handling for HEAD - return local changes only, no scope changes
             if (scopeRef.equals(GitService.BRANCH_HEAD)) {

@@ -12,6 +12,11 @@
 - Fixed reordering scope tabs by dragging them, which mixed up the tabs and lost one on the next IDE start
 - Fixed the step-between-changes actions jumping erratically: they now follow the order the scope tree shows, skip
   deleted, binary and directory entries, and keep the focus in the Git Scope window
+- Fixed the scope listing files that Git reports as unchanged, which survived IDE restarts and only cleared once an
+  unrelated commit happened to force a refresh
+    - The IDE restores its changelist on startup and afterwards only re-checks files it has marked as changed, so an
+      entry whose file no longer exists was never looked at again. Git Scope now forces one full rescan once Git is
+      ready, and ignores entries whose file is gone.
 
 ## [2026.2]
 
