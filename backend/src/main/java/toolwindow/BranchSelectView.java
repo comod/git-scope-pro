@@ -108,7 +108,15 @@ private JPanel createManualInputPanel(GitRepository repository, BranchTree branc
         JPanel help = new JPanel();
         help.setLayout(new FlowLayout(FlowLayout.LEFT));
 
-        JCheckBox checkBox = new JCheckBox("Only Changes Since Common Ancestor (git diff <selection>..HEAD)");
+        JCheckBox checkBox = new JCheckBox("Only Changes Since Common Ancestor (git diff <selection>...HEAD)");
+        checkBox.setToolTipText(
+                "<html>" +
+                        "Compares HEAD against its common ancestor with the selection,<br/>" +
+                        "so changes made on the selected branch since you branched off are excluded.<br/>" +
+                        "This is the diff a pull request shows.<br/>" +
+                        "Unchecked, the selection is compared directly to HEAD." +
+                        "</html>"
+        );
         checkBox.setSelected(this.state.getTwoDotsCheckbox());
         checkBox.setBorder(JBUI.Borders.empty(1)); // top, left, bottom, right padding
         checkBox.addActionListener(e -> this.state.setTwoDotsCheckbox(checkBox.isSelected()));

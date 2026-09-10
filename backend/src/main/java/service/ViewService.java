@@ -11,6 +11,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.FileStatusManager;
 import com.intellij.openapi.vcs.VcsApplicationSettings;
 import com.intellij.openapi.vcs.changes.Change;
+import com.intellij.openapi.vcs.changes.VcsDirtyScopeManager;
 import com.intellij.openapi.vcs.impl.LineStatusTrackerManagerI;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.ui.content.Content;
@@ -80,6 +81,7 @@ public class ViewService implements Disposable {
     private Integer savedTabIndex;
     private final AtomicBoolean tabInitializationInProgress = new AtomicBoolean(false);
     private final AtomicBoolean initialFileColorsRefreshed = new AtomicBoolean(false);
+    private final AtomicBoolean initialChangelistRefreshed = new AtomicBoolean(false);
     private final Map<MyModel, Consumer<MyModel.field>> modelListeners = new HashMap<>();
 
     public ViewService(Project project) {
@@ -342,7 +344,27 @@ public class ViewService implements Disposable {
 
     public void eventVcsReady() {
         this.vcsReady = true;
+        forceInitialChangelistRefresh();
         init();
+    }
+
+    /**
+     * Forces one full changelist rescan per project, as soon as VCS is usable.
+     *
+     * <p>ChangeListManager restores the changelist persisted in workspace.xml and from then on only
+     * updates incrementally, over whatever VcsDirtyScopeManager reports as dirty. An entry whose
+     * file no longer exists can never enter that dirty scope — no VFS event can fire for a file that
+     * is not there — so it survives every update, is re-persisted on close, and returns on the next
+     * open. Restarting the IDE does not clear it; only a full rescan does, which is why such an
+     * entry otherwise lingers until something unrelated (a commit touching .git/index) forces one.
+     */
+    private void forceInitialChangelistRefresh() {
+        if (project.isDisposed() || !initialChangelistRefreshed.compareAndSet(false, true)) {
+            // directoryMappingChanged() fires again whenever mappings change; one rescan is enough.
+            return;
+        }
+        LOG.debug("Forcing a full changelist rescan to discard entries restored from workspace.xml");
+        VcsDirtyScopeManager.getInstance(project).markEverythingDirty();
     }
 
     public void eventToolWindowReady() {
@@ -411,6 +433,9 @@ public class ViewService implements Disposable {
                     }
                 }
             }
+
+            // Publish tooltips for tabs restored with a custom name.
+            project.getService(TabActionService.class).publishRenamedTabs();
 
             // Step 4: Add the listener after all tabs are initialized
             toolWindowService.addListener();
@@ -656,6 +681,7 @@ public class ViewService implements Disposable {
     public CompletableFuture<Void> collectChanges(MyModel model, boolean checkFs) {
         CompletableFuture<Void> done = new CompletableFuture<>();
         if (model == null) {
+            LOG.debug("collectChanges skipped: no current model");
             done.complete(null);
             return done;
         }
@@ -664,6 +690,9 @@ public class ViewService implements Disposable {
         ensureHeadTabInitializedAsync(model, () -> {
             TargetBranchMap targetBranchMap = model.getTargetBranchMap();
             if (targetBranchMap == null) {
+                // Repositories not registered yet, or the tab has no target branch: nothing can be
+                // collected and no later event necessarily retries, so the scope stays as it was.
+                LOG.debug("collectChanges skipped for tab '" + model.getDisplayName() + "': no target branch map");
                 done.complete(null);
                 return;
             }
@@ -685,6 +714,15 @@ public class ViewService implements Disposable {
         final DisposalToken token = this.disposalToken;
         changesExecutor.execute(() -> {
             changesService.collectChangesWithCallback(finalTargetBranchMap, result -> {
+                if (result == null) {
+                    // Superseded or cancelled by a newer collection, which owns the model now.
+                    // Complete the future anyway so chained UI work (e.g. the file-colors refresh
+                    // after a tab switch) is never silently dropped.
+                    LOG.debug("Collection for generation " + gen + " superseded, completing without apply");
+                    done.complete(null);
+                    return;
+                }
+
                 // Build maps on background thread to avoid slow file system operations on EDT
                 Map<String, Change> mergedChangesMap = MyModel.buildChangesByPathMap(result.mergedChanges());
                 Map<String, Change> scopeChangesMap = MyModel.buildChangesByPathMap(result.scopeChanges());
@@ -695,9 +733,25 @@ public class ViewService implements Disposable {
                         long currentGen = applyGeneration.get();
                         if (!project.isDisposed() && !token.disposed && currentGen == gen) {
                             LOG.debug("Applying changes for generation " + gen);
+                            Map<String, Change> previousScopeMap = model.getScopeChangesMap();
                             model.setChangesWithMap(result.mergedChanges(), mergedChangesMap);
                             model.setScopeChangesWithMap(result.scopeChanges(), scopeChangesMap);
                             model.setLocalChangesWithMap(result.localChanges(), localChangesMap);
+
+                            // GitScopeFileStatusProvider answers from the scope map, but the
+                            // platform caches its answers until fileStatusesChanged() -- which
+                            // previously only tab switches triggered, so Project-view colors kept
+                            // showing the pre-collection scope (e.g. conflict-era statuses after a
+                            // rebase). Refresh when the statuses materially changed; the guard
+                            // avoids the LST-disturbing refresh on the common no-change apply.
+                            if (model.isActive() && !sameScopeStatuses(previousScopeMap, scopeChangesMap)) {
+                                LOG.debug("Scope statuses changed for generation " + gen + ", refreshing file colors");
+                                refreshFileColors();
+                            }
+
+                            // Repositories are resolvable by now, so tab tooltips that could not be
+                            // built at boot (empty branch name) can finally be published.
+                            project.getService(TabActionService.class).publishRenamedTabs();
                         } else {
                             LOG.debug("Discarding changes for generation " + gen + " (current generation is " + currentGen + ")");
                         }
@@ -707,6 +761,23 @@ public class ViewService implements Disposable {
                 }, ModalityState.any(), __ -> token.disposed);
             }, checkFs);
         });
+    }
+
+    /**
+     * Whether two scope maps would produce the same file colors: same files, same statuses.
+     * Used to skip the file-status refresh on the common apply where nothing changed.
+     */
+    private static boolean sameScopeStatuses(Map<String, Change> previous, Map<String, Change> current) {
+        if (previous == current) return true;
+        if (previous == null || current == null) return false;
+        if (previous.size() != current.size()) return false;
+        for (Map.Entry<String, Change> entry : previous.entrySet()) {
+            Change other = current.get(entry.getKey());
+            if (other == null || !entry.getValue().getFileStatus().equals(other.getFileStatus())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     // helper to enqueue UI work strictly after the currently queued collections
@@ -833,6 +904,7 @@ public class ViewService implements Disposable {
         }
     }
 
+
     public void onTabReordered(int oldIndex, int newIndex) {
         // Note: The isProcessingTabReorder flag should already be set by the caller
         // before any UI changes are made, to prevent listener interference
@@ -843,6 +915,67 @@ public class ViewService implements Disposable {
 
         // Save the new order
         save();
+    }
+
+    /**
+     * Handles a tab reorder the plugin did not perform — the platform lets tabs be dragged in the
+     * tool window header (monolith only; split mode disables tab drag entirely). The drag ends by
+     * re-adding the content at a new index, which reaches us as a removal, so without this the
+     * model would be deleted while its tab stayed on screen.
+     *
+     * <p>HEAD and "+" are restored to the ends first: the drag helper cannot be told to leave them
+     * alone, so the invariant the popup actions enforce up front is enforced here after the fact.
+     */
+    public void onTabsDragged() {
+        if (isDisposed || toolWindowService == null) return;
+
+        ToolWindow toolWindow = toolWindowService.getToolWindow();
+        if (toolWindow == null) return;
+        ContentManager contentManager = toolWindow.getContentManager();
+
+        isProcessingTabReorder = true;
+        try {
+            restoreSpecialTabPositions(contentManager);
+            rebuildCollectionFromTabOrder();
+            save();
+        } finally {
+            isProcessingTabReorder = false;
+        }
+
+        // Indices changed, so tooltips and the "can be reset" set no longer address the same tabs.
+        project.getService(TabActionService.class).publishRenamedTabs();
+    }
+
+    /** Moves the HEAD tab back to the front and the "+" tab back to the end if a drag moved them. */
+    private void restoreSpecialTabPositions(@NotNull ContentManager contentManager) {
+        Content headContent = null;
+        Content plusContent = null;
+        for (int index = 0; index < contentManager.getContentCount(); index++) {
+            Content content = contentManager.getContent(index);
+            if (content == null) continue;
+            if (PLUS_TAB_LABEL.equals(content.getTabName())) {
+                plusContent = content;
+                continue;
+            }
+            MyModel model = toolWindowService.getModelForContent(content);
+            if (model != null && model.isHeadTab()) {
+                headContent = content;
+            }
+        }
+
+        moveContentTo(contentManager, headContent, 0);
+        moveContentTo(contentManager, plusContent, contentManager.getContentCount() - 1);
+    }
+
+    private void moveContentTo(@NotNull ContentManager contentManager, Content content, int targetIndex) {
+        if (content == null) return;
+        int currentIndex = contentManager.getIndexOfContent(content);
+        if (currentIndex < 0 || currentIndex == targetIndex) return;
+
+        LOG.debug("Restoring special tab '" + content.getTabName() + "' from index " + currentIndex
+                + " to " + targetIndex);
+        contentManager.removeContent(content, false);
+        contentManager.addContent(content, targetIndex);
     }
 
     /**
@@ -863,7 +996,7 @@ public class ViewService implements Disposable {
                 if (model != null && !model.isHeadTab()) {
                     newCollection.add(model);
                 } else {
-                    LOG.warn("Model not found for tab at index " + i + ": " + content.getTabName());
+                    LOG.debug("Model not found for tab at index " + i + ": " + content.getTabName());
                 }
             }
         }

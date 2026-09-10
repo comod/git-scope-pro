@@ -2,7 +2,9 @@ package rpc
 
 import com.intellij.openapi.components.Service
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.atomic.AtomicReference
 
 @Service(Service.Level.PROJECT)
@@ -16,6 +18,18 @@ class UtilCommandService {
      * backend's own UISettings is not synced with the frontend.
      */
     private val previewTabEnabled = AtomicReference<Boolean?>(null)
+
+    /**
+     * Renamed tabs: tab index -> the branch-based name it would revert to. A StateFlow rather than a
+     * command, so the frontend can read the current value at any time — including right after it
+     * subscribes — and so republishing an unchanged map costs subscribers nothing.
+     */
+    private val _renamedTabs = MutableStateFlow<Map<Int, String>>(emptyMap())
+    val renamedTabs = _renamedTabs.asStateFlow()
+
+    fun setRenamedTabs(tabs: Map<Int, String>) {
+        _renamedTabs.value = tabs
+    }
 
     fun selectInProject(filePath: String) {
         _commands.tryEmit(UtilCommand.SelectInProject(filePath))

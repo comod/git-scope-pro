@@ -14,9 +14,17 @@ data class GutterRangeDto(
 data class GutterFileDataDto(
     val filePath: String,
     val ranges: List<GutterRangeDto>,
-    val baseContent: String,
+    /**
+     * Full contents of the diff base / HEAD revision. Contents dominate the message size (the
+     * ranges are a handful of ints), so the backend includes them only when they changed since the
+     * last message for this file within the same subscription; the frontend caches the previous
+     * values and reuses them. [contentsIncluded] distinguishes "unchanged, reuse cache" from a
+     * genuinely null [headContent].
+     */
+    val baseContent: String? = null,
     val headContent: String? = null,
     val scopeRanges: List<GutterRangeDto>? = null,
     val scopeDisplayName: String = "",
-    val separateGutterRendering: Boolean = false
+    val separateGutterRendering: Boolean = false,
+    val contentsIncluded: Boolean = true
 )

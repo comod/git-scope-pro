@@ -341,7 +341,7 @@ internal class ScopeGutterPopupPanel(
             } catch (e: com.intellij.openapi.progress.ProcessCanceledException) {
                 throw e
             } catch (e: Exception) {
-                LOG.warn("Error computing word diff for editor highlights", e)
+                LOG.debug("Error computing word diff for editor highlights", e)
             }
         }
 
@@ -445,7 +445,7 @@ internal class ScopeGutterPopupPanel(
                 } catch (e: com.intellij.openapi.progress.ProcessCanceledException) {
                     throw e
                 } catch (e: Exception) {
-                    LOG.warn("Error applying word diff highlighting", e)
+                    LOG.debug("Error applying word diff highlighting", e)
                 }
             }
         }
@@ -546,7 +546,7 @@ internal class ScopeGutterPopupPanel(
                 }
                 LOG.debug("Successfully rolled back range at line ${range.line1}")
             } catch (e: Exception) {
-                LOG.error("Error rolling back range", e)
+                LOG.warn("Error rolling back range", e)
             }
         }
     }

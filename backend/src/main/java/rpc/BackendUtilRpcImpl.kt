@@ -34,6 +34,29 @@ class BackendUtilRpcImpl : UtilRpcApi {
         val project = projectId.findProjectOrNull() ?: return
         project.service<service.ChangeNavigationService>().showDiff(currentFilePath)
     }
+
+    override suspend fun renameTab(projectId: ProjectId, tabIndex: Int, newName: String) {
+        val project = projectId.findProjectOrNull() ?: return
+        project.service<service.TabActionService>().renameTab(tabIndex, newName)
+    }
+
+    override suspend fun resetTabName(projectId: ProjectId, tabIndex: Int) {
+        val project = projectId.findProjectOrNull() ?: return
+        project.service<service.TabActionService>().resetTabName(tabIndex)
+    }
+
+    override suspend fun moveTab(projectId: ProjectId, tabIndex: Int, direction: TabMoveDirection) {
+        val project = projectId.findProjectOrNull() ?: return
+        project.service<service.TabActionService>().moveTab(tabIndex, direction)
+    }
+
+    override suspend fun getRenamedTabs(projectId: ProjectId): Flow<Map<Int, String>> {
+        val project = projectId.findProjectOrNull() ?: return emptyFlow()
+        // Publish the current state before the subscriber starts collecting, so a frontend that
+        // connects after the tabs were restored still gets the truth rather than the initial empty.
+        project.service<service.TabActionService>().publishRenamedTabs()
+        return project.service<UtilCommandService>().renamedTabs
+    }
 }
 
 class BackendUtilRpcProvider : RemoteApiProvider {

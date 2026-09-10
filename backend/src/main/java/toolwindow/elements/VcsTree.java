@@ -89,10 +89,34 @@ public class VcsTree extends JPanel {
                     positionTracker.setScrollPositionRestored(true);
                 }
             } catch (Exception e) {
-                LOG.error("Error re-attaching scroll listeners after tab switch", e);
+                LOG.debug("Error re-attaching scroll listeners after tab switch", e);
                 positionTracker.setScrollPositionRestored(true);
             }
         });
+    }
+
+    /**
+     * Paths of the displayed changes, in the order the tree shows them.
+     *
+     * <p>Change navigation follows this rather than sorting paths itself, because the order depends
+     * on the tree's grouping — by module, repository or directory, switchable from the toolbar — and
+     * only the tree knows which is active. Grouping by module, for example, puts a repository-root
+     * file after the files of a nested source module, which no path comparison would reproduce.
+     *
+     * <p>Returns an empty list when the tool window has not built its tree yet; navigation then
+     * falls back to plain file-tree ordering.
+     */
+    public List<String> getDisplayOrderedPaths() {
+        if (currentBrowser == null) return Collections.emptyList();
+
+        List<String> paths = new ArrayList<>();
+        // traverse() is a pre-order DFS of the tree model, i.e. exactly the displayed order.
+        for (Change change : com.intellij.openapi.vcs.changes.ui.VcsTreeModelData
+                .all(currentBrowser.getViewer())
+                .userObjects(Change.class)) {
+            paths.add(ChangesUtil.getFilePath(change).getPath());
+        }
+        return paths;
     }
 
     public void selectFile(VirtualFile file) {
@@ -124,7 +148,7 @@ public class VcsTree extends JPanel {
                 return project.getName() + "_tab_" + tabIndex;
             }
         } catch (Exception e) {
-            LOG.warn("Failed to get current tab ID", e);
+            LOG.debug("Failed to get current tab ID", e);
         }
         return project.getName() + "_default_tab";
     }
@@ -388,7 +412,7 @@ public class VcsTree extends JPanel {
             });
 
         } catch (Exception e) {
-            LOG.error("Error updating VcsTree component", e);
+            LOG.warn("Error updating VcsTree component", e);
             try {
                 this.removeAll();
                 this.add(component, BorderLayout.CENTER);

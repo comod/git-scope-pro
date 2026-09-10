@@ -23,6 +23,13 @@ enum class ChangeNavDirection {
     PREVIOUS_FILE
 }
 
+/** Direction for moving a scope tab within the tool window. */
+@Serializable
+enum class TabMoveDirection {
+    LEFT,
+    RIGHT
+}
+
 @Rpc
 interface UtilRpcApi : RemoteApi<Unit> {
     suspend fun getCommands(projectId: ProjectId): Flow<UtilCommand>
@@ -53,6 +60,34 @@ interface UtilRpcApi : RemoteApi<Unit> {
      * window's right-click "Show Diff"). Runs on the backend, which holds the scope change set.
      */
     suspend fun showDiff(projectId: ProjectId, currentFilePath: String?)
+
+    /**
+     * Tab operations for the tool window's tab context menu, addressed by tab index.
+     *
+     * <p>In split mode the tab strip is rendered by the frontend, so the context menu is built from
+     * the frontend's action registry — backend-registered actions never appear in it. The frontend
+     * actions therefore delegate here, because the tool window, its ContentManager and the scope
+     * models all live on the backend. All three are no-ops when the index does not address a
+     * renameable/movable tab, so the backend stays authoritative over the rules.
+     */
+    suspend fun renameTab(projectId: ProjectId, tabIndex: Int, newName: String)
+
+    suspend fun resetTabName(projectId: ProjectId, tabIndex: Int)
+
+    suspend fun moveTab(projectId: ProjectId, tabIndex: Int, direction: TabMoveDirection)
+
+    /**
+     * Renamed tabs, as tab index -> the branch-based name the tab would revert to. Only tabs with a
+     * custom name appear, so presence answers "can this be reset?" and the value is the tooltip to
+     * show on the renamed tab.
+     *
+     * <p>Both are backend model state the frontend cannot reach, and action update() cannot suspend,
+     * so the backend pushes them. A [kotlinx.coroutines.flow.StateFlow]: a new subscriber
+     * immediately receives the current map, and it is republished whenever it can have changed --
+     * after a rename, reset or move, and after a change collection, which is when repositories
+     * first become resolvable and the branch names stop being empty.
+     */
+    suspend fun getRenamedTabs(projectId: ProjectId): Flow<Map<Int, String>>
 
     companion object {
         suspend fun getInstance(): UtilRpcApi {

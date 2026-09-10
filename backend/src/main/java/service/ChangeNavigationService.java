@@ -19,6 +19,7 @@ import org.jetbrains.annotations.Nullable;
 import rpc.ChangeNavDirection;
 import system.Defs;
 import utils.FileOpener;
+import utils.FileTreeOrder;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -81,13 +82,15 @@ public final class ChangeNavigationService {
             return;
         }
 
-        // Ordered, stable list of changed files: the union of scope changes and local (working-tree
-        // vs HEAD) changes, so navigation visits every file that shows a gutter marker — both the
+        // Ordered list of changed files: the union of scope changes and local (working-tree vs
+        // HEAD) changes, so navigation visits every file that shows a gutter marker — both the
         // scope markers we paint and the local markers the IDE paints.
-        java.util.TreeSet<String> fileSet = new java.util.TreeSet<>();
-        fileSet.addAll(scopeChanges.keySet());
-        fileSet.addAll(localChanges.keySet());
-        List<String> files = new ArrayList<>(fileSet);
+        List<String> files = orderedFiles(scopeChanges, localChanges);
+        if (files.isEmpty()) {
+            // Everything in the scope is deleted, a directory, or otherwise not openable.
+            LOG.debug("ChangeNavigation: no navigable files in scope");
+            return;
+        }
 
         // Fall back to our last navigated position when the frontend has no focused editor
         // (or the focused editor isn't one of the changed files). This keeps sequential
@@ -270,17 +273,38 @@ public final class ChangeNavigationService {
             LOG.debug("ChangeNavigation: could not resolve file " + path);
             return;
         }
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("ChangeNavigation: opening " + displayPath(path)
+                    + " [" + file.getFileType().getName() + "] at line " + (line + 1));
+        }
         lastNavigatedFile = path;
         lastNavigatedLine = line;
-        // Request focus so the opened editor becomes the focus owner and the frontend reports the
-        // correct caret position on the next navigation keystroke.
-        FileOpener.openAndGoToLine(project, file, line, true);
-        highlightInToolWindow(file);
+
+        // Stepping through changes from the tool window should leave the focus there. Asking for the
+        // opened editor to be focused takes it away, and on Linux the Project View following the
+        // file ("Autoscroll from Source") can then keep it, so the next keystroke no longer reaches
+        // the tool window at all. Focusing the editor is only what we want when navigation was
+        // triggered from the editor in the first place.
+        //
+        // Dropping the focus request costs nothing: the frontend then reports no focused changed
+        // file, and navigate() continues from lastNavigatedFile/lastNavigatedLine instead.
+        ToolWindowServiceInterface toolWindowService = project.getService(ToolWindowServiceInterface.class);
+        boolean startedInToolWindow = toolWindowService != null && toolWindowService.isFocused();
+
+        FileOpener.openAndGoToLine(project, file, line, !startedInToolWindow);
+        highlightInToolWindow(toolWindowService, file);
+        if (startedInToolWindow) {
+            toolWindowService.restoreFocus();
+        }
     }
 
     /** Selects/highlights the file's change in the Git Scope tool window tree, so the tree stays in sync. */
     private void highlightInToolWindow(@NotNull VirtualFile file) {
-        ToolWindowServiceInterface toolWindowService = project.getService(ToolWindowServiceInterface.class);
+        highlightInToolWindow(project.getService(ToolWindowServiceInterface.class), file);
+    }
+
+    private void highlightInToolWindow(@Nullable ToolWindowServiceInterface toolWindowService,
+                                       @NotNull VirtualFile file) {
         if (toolWindowService == null) return;
         ApplicationManager.getApplication().invokeLater(() -> {
             if (project.isDisposed()) return;
@@ -341,7 +365,7 @@ public final class ChangeNavigationService {
         try {
             baseContent = change.getBeforeRevision().getContent();
         } catch (VcsException e) {
-            LOG.warn("ChangeNavigation: error getting base content for " + path, e);
+            LOG.debug("ChangeNavigation: error getting base content for " + path, e);
             return Collections.emptyList();
         }
         if (baseContent == null) return Collections.emptyList();
@@ -350,9 +374,97 @@ public final class ChangeNavigationService {
         try {
             return RangesBuilder.INSTANCE.createRanges(normalizedCurrent, normalizedBase);
         } catch (Exception e) {
-            LOG.warn("ChangeNavigation: error computing ranges for " + path, e);
+            LOG.debug("ChangeNavigation: error computing ranges for " + path, e);
             return Collections.emptyList();
         }
+    }
+
+    // --- file ordering ---
+
+    /**
+     * The changed files in the order navigation should visit them: the order the Git Scope tree
+     * displays, when it has one.
+     *
+     * <p>The tree's order depends on its grouping — by module, repository or directory, switchable
+     * from the toolbar — so it cannot be derived from the paths alone. Grouping by module puts a
+     * repository-root file such as {@code .gitignore} before the files of a nested source module,
+     * even though on disk they are siblings; sorting paths produced the opposite, which is what made
+     * navigation appear to jump around when crossing a file boundary.
+     *
+     * <p>Falls back to plain file-tree ordering when the tool window has not built its tree (never
+     * opened this session), and appends any changed file the tree does not show, so navigation can
+     * never silently skip a file that has gutter markers.
+     *
+     * <p>Entries that cannot be opened are left out — see {@link #navigable}.
+     */
+    private List<String> orderedFiles(Map<String, Change> scopeChanges, Map<String, Change> localChanges) {
+        java.util.TreeSet<String> changedFiles = new java.util.TreeSet<>(FileTreeOrder.INSTANCE);
+        changedFiles.addAll(scopeChanges.keySet());
+        changedFiles.addAll(localChanges.keySet());
+
+        ToolWindowServiceInterface toolWindowService = project.getService(ToolWindowServiceInterface.class);
+        List<String> displayed = toolWindowService == null
+                ? Collections.emptyList()
+                : toolWindowService.getDisplayOrderedPaths();
+        if (displayed.isEmpty()) {
+            LOG.debug("ChangeNavigation: tree order unavailable, ordering by file tree");
+            return navigable(changedFiles);
+        }
+
+        java.util.LinkedHashSet<String> ordered = new java.util.LinkedHashSet<>();
+        for (String path : displayed) {
+            if (changedFiles.contains(path)) ordered.add(path);
+        }
+        ordered.addAll(changedFiles);
+        return navigable(ordered);
+    }
+
+    /**
+     * Keeps only the entries navigation can actually put a caret in.
+     *
+     * <p>A scope contains things that are not text a caret can move through:
+     * <ul>
+     *   <li>a file deleted in the scope, which has no content left to show;</li>
+     *   <li>a directory recorded as a change of its own — a submodule, whose changed commit hash
+     *       shows up as a change on the checked-out folder, or a folder added or removed;</li>
+     *   <li>a binary file, which opens in a viewer with no lines to step through.</li>
+     * </ul>
+     *
+     * <p>These used to stay in the list, and stepping onto one made navigation stop where it stood,
+     * because opening resolved nothing and returned without moving; pressing again from the
+     * unchanged position then jumped somewhere unrelated.
+     *
+     * <p>Dropping them here rather than when opening also keeps the index arithmetic honest: "the
+     * next file" and the wrap at either end are computed over files that can be reached.
+     */
+    private List<String> navigable(java.util.Collection<String> paths) {
+        List<String> result = new ArrayList<>(paths.size());
+        for (String path : paths) {
+            VirtualFile file = LocalFileSystem.getInstance().findFileByPath(path);
+            if (file != null && file.isValid() && !file.isDirectory() && !isBinary(file)) {
+                result.add(path);
+            }
+        }
+        return result;
+    }
+
+    /** File type resolution touches the VFS, so never let a failure here abort navigation. */
+    private static boolean isBinary(@NotNull VirtualFile file) {
+        try {
+            return file.getFileType().isBinary();
+        } catch (Exception e) {
+            LOG.debug("ChangeNavigation: could not determine file type of " + file.getPath(), e);
+            return false;
+        }
+    }
+
+    /** Project-relative path when possible, so the log lines up with the tree. */
+    private String displayPath(String path) {
+        String base = project.getBasePath();
+        if (base != null && path.length() > base.length() + 1 && path.startsWith(base)) {
+            return path.substring(base.length() + 1);
+        }
+        return path;
     }
 
     // --- small utilities ---

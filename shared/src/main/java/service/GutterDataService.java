@@ -78,17 +78,19 @@ public class GutterDataService implements Disposable {
 
     public void publish(@NotNull String filePath, @NotNull GutterFileData data) {
         fileDataMap.put(filePath, data);
-        LOG.info("GutterDataService.publish: file=" + filePath +
-                ", ranges=" + data.ranges.size() +
-                ", listeners=" + listeners.size() +
-                ", hasBaseContent=" + (data.baseContent != null && !data.baseContent.isEmpty()) +
-                ", hasHeadContent=" + (data.headContent != null));
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("GutterDataService.publish: file=" + filePath +
+                    ", ranges=" + data.ranges.size() +
+                    ", listeners=" + listeners.size() +
+                    ", hasBaseContent=" + (data.baseContent != null && !data.baseContent.isEmpty()) +
+                    ", hasHeadContent=" + (data.headContent != null));
+        }
         for (Listener l : listeners) l.onDataUpdated(filePath, data);
     }
 
     public void clear(@NotNull String filePath) {
         fileDataMap.remove(filePath);
-        LOG.info("GutterDataService.clear: file=" + filePath);
+        LOG.debug("GutterDataService.clear: file=" + filePath);
         for (Listener l : listeners) l.onDataCleared(filePath);
     }
 
@@ -103,6 +105,7 @@ public class GutterDataService implements Disposable {
      * without waiting for the next scope/document update.
      */
     public void republishAll() {
+        LOG.debug("GutterDataService.republishAll: files=" + fileDataMap.size() + ", listeners=" + listeners.size());
         for (Map.Entry<String, GutterFileData> e : fileDataMap.entrySet()) {
             for (Listener l : listeners) l.onDataUpdated(e.getKey(), e.getValue());
         }
@@ -126,7 +129,7 @@ public class GutterDataService implements Disposable {
 
     public void addListener(@NotNull Listener listener) {
         listeners.add(listener);
-        LOG.info("GutterDataService.addListener: " + listener.getClass().getSimpleName() + ", total=" + listeners.size());
+        LOG.debug("GutterDataService.addListener: " + listener.getClass().getSimpleName() + ", total=" + listeners.size());
     }
 
     public void removeListener(@NotNull Listener listener) {

@@ -11,6 +11,7 @@ import service.GitService;
 import state.State;
 import toolwindow.elements.BranchTreeEntry;
 import service.ViewService;
+import utils.ScopeRefRange;
 
 public class MyTreeSelectionListener implements TreeSelectionListener {
     private final Tree tree;
@@ -32,10 +33,10 @@ public class MyTreeSelectionListener implements TreeSelectionListener {
         Object object = node.getUserObject();
         if (object instanceof BranchTreeEntry favLabel) {
             String branchName = favLabel.getName();
-            if (this.state.getTwoDotsCheckbox()) {
-                String twoDots = "..";
-                String head = "HEAD";
-                branchName = branchName + twoDots + head;
+            // Skip refs that already carry a range, otherwise a manually entered "a..b" would
+            // become the unresolvable "a..b...HEAD".
+            if (this.state.getTwoDotsCheckbox() && !ScopeRefRange.isRange(branchName)) {
+                branchName = branchName + "..." + GitService.BRANCH_HEAD;
             }
 
             // Check if this is HEAD - if so, close current tab and switch to HEAD tab

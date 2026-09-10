@@ -30,6 +30,24 @@ public interface ToolWindowServiceInterface {
 
     void selectFile(VirtualFile file);
 
+    /**
+     * Paths of the displayed changes in the order the tool window shows them, or an empty list when
+     * it has no tree yet. Safe to call from any thread.
+     */
+    java.util.List<String> getDisplayOrderedPaths();
+
+    /**
+     * Whether the Git Scope tool window is the one currently holding the focus. Safe to call from
+     * any thread.
+     */
+    boolean isFocused();
+
+    /**
+     * Returns the focus to the Git Scope tool window if something took it in the meantime. Does
+     * nothing when the tool window is hidden or still focused. Safe to call from any thread.
+     */
+    void restoreFocus();
+
     ToolWindow getToolWindow();
 
     MyModel getModelForContent(com.intellij.ui.content.Content content);

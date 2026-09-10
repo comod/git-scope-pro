@@ -31,4 +31,5 @@ dependencies {
 
     implementation(project(":shared"))
     compileOnly("com.google.code.gson:gson:2.14.0")
+    testImplementation("junit:junit:4.13.2")
 }
