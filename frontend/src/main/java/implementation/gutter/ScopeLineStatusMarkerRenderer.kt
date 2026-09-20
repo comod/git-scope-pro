@@ -270,20 +270,12 @@ class ScopeLineStatusMarkerRenderer(
     }
 
     /**
-     * Clears all ranges and removes the highlighter.
+     * Drops the ranges and removes the highlighter. Deliberately not guarded by [disposed]:
+     * [dispose] sets that flag before this runs, and skipping the removal would leave the
+     * highlighter in the markup model.
      */
     @RequiresEdt
-    fun clear() {
-        if (disposed) return
-        clearInternal()
-    }
-
-    /**
-     * Teardown without the [disposed] guard, so [dispose] can still remove the highlighter after
-     * setting the flag.
-     */
-    @RequiresEdt
-    private fun clearInternal() {
+    private fun clear() {
         currentRanges = emptyList()
         gutterHighlighterManager.clear()
     }
@@ -300,7 +292,7 @@ class ScopeLineStatusMarkerRenderer(
              * clear it already gone. Drop the hover first: the removal below logs and swallows
              * its own failures, so the highlighter can outlive this call. */
             hoveredRange = null
-            clearInternal()
+            clear()
         }
     }
 
