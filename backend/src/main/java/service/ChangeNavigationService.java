@@ -336,9 +336,7 @@ public final class ChangeNavigationService {
         GutterDataService gds = project.getService(GutterDataService.class);
         GutterDataService.GutterFileData cached = gds != null ? gds.getData(path) : null;
         if (cached != null) {
-            if (cached.ranges != null) {
-                for (Range r : cached.ranges) lines.add(r.getLine1());
-            }
+            for (Range r : cached.ranges) lines.add(r.getLine1());
             if (cached.localRanges != null) {
                 for (Range r : cached.localRanges) lines.add(r.getLine1());
             }

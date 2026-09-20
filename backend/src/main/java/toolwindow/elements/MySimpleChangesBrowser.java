@@ -144,7 +144,7 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
      * object is not a Change), so clicking a directory does not open a file.
      */
     private @Nullable Change getClickedChange(MouseEvent e) {
-        if (!(getViewer() instanceof javax.swing.JTree tree)) return null;
+        JTree tree = getViewer();
         javax.swing.tree.TreePath path = tree.getPathForLocation(e.getX(), e.getY());
         if (path == null) return null;
         Object node = path.getLastPathComponent();
@@ -277,7 +277,7 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
 
     @Override
     protected void onDoubleClick() {
-        if (!(getViewer() instanceof javax.swing.JTree tree)) return;
+        JTree tree = getViewer();
         javax.swing.tree.TreePath path = tree.getSelectionPath();
         if (path == null) return;
 

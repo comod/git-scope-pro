@@ -1,20 +1,24 @@
 package rpc
 
+import com.intellij.openapi.application.EDT
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.progress.blockingContextScope
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.startup.ProjectActivity
 import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.platform.project.projectId
 import fleet.rpc.client.durable
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import system.Defs
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Mirrors the backend's renamed tabs — tab index -> the branch-based name the tab would revert to.
@@ -60,7 +64,7 @@ class FrontendTabStateService(
                 }
                 // Fall back to "unknown" so the menu stays usable while disconnected.
                 renamedTabs = null
-                delay(RESUBSCRIBE_DELAY_MS)
+                delay(RESUBSCRIBE_DELAY_MS.milliseconds)
             }
         }
     }
@@ -76,19 +80,23 @@ class FrontendTabStateService(
      * label reads Content.getDescription(), and the tool window content UI refreshes it on the
      * resulting property change.
      */
-    private fun applyTooltips(tabs: Map<Int, String>) {
-        ApplicationManager.getApplication().invokeLater {
-            if (project.isDisposed) return@invokeLater
+    private suspend fun applyTooltips(tabs: Map<Int, String>) {
+        withContext(Dispatchers.EDT) {
+            if (project.isDisposed) return@withContext
 
-            val toolWindow = ToolWindowManager.getInstance(project).getToolWindow(Defs.TOOL_WINDOW_NAME)
-                ?: return@invokeLater  // not created yet; the next publish re-applies
-            val contentManager = toolWindow.contentManager
+            // ToolWindowManager.getInstance() requires a blocking context; bridge into one now
+            // that we're on the EDT.
+            blockingContextScope {
+                val toolWindow = ToolWindowManager.getInstance(project).getToolWindow(Defs.TOOL_WINDOW_NAME)
+                    ?: return@blockingContextScope  // not created yet; the next publish re-applies
+                val contentManager = toolWindow.contentManager
 
-            for (index in 0 until contentManager.contentCount) {
-                val content = contentManager.getContent(index) ?: continue
-                val tooltip = tabs[index]
-                if (content.description != tooltip) {
-                    content.description = tooltip
+                for (index in 0 until contentManager.contentCount) {
+                    val content = contentManager.getContent(index) ?: continue
+                    val tooltip = tabs[index]
+                    if (content.description != tooltip) {
+                        content.description = tooltip
+                    }
                 }
             }
         }

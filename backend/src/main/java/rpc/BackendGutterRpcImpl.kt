@@ -71,7 +71,7 @@ class BackendGutterRpcImpl : GutterRpcApi {
              * is missed; a double-send of the same file is harmless (the frontend overwrites). */
             gds.addListener(listener)
             try {
-                for (path in gds.getAllData().keys) {
+                for (path in gds.allData.keys) {
                     markDirty(path)
                 }
 

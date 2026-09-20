@@ -115,6 +115,16 @@ internal class ScopeGutterPopupPanel(
             }
         }
 
+        // Moves the caret/scroll to [range] and refreshes the diff panel and highlights for it.
+        fun navigateToRange(range: Range) {
+            suppressCaretCancel = true
+            editor.caretModel.moveToLogicalPosition(LogicalPosition(range.line1, 0))
+            editor.scrollingModel.scrollToCaret(ScrollType.CENTER)
+            suppressCaretCancel = false
+            updateDiffPanel(range)
+            updateEditorHighlights(range)
+        }
+
         // Create toolbar with action buttons (IDE VCS gutter style)
         val actionGroup = DefaultActionGroup().apply {
             // Previous Change action
@@ -122,19 +132,15 @@ internal class ScopeGutterPopupPanel(
                 override fun actionPerformed(event: AnActionEvent) {
                     if (currentIndex > 0) {
                         currentIndex--
-                        val previousRange = sortedRanges[currentIndex]
-                        suppressCaretCancel = true
-                        editor.caretModel.moveToLogicalPosition(LogicalPosition(previousRange.line1, 0))
-                        editor.scrollingModel.scrollToCaret(ScrollType.CENTER)
-                        suppressCaretCancel = false
-                        updateDiffPanel(previousRange)
-                        updateEditorHighlights(previousRange)
+                        navigateToRange(sortedRanges[currentIndex])
                     }
                 }
 
                 override fun update(e: AnActionEvent) {
                     e.presentation.isEnabled = currentIndex > 0
                 }
+
+                override fun getActionUpdateThread() = ActionUpdateThread.EDT
             })
 
             // Next Change action
@@ -142,19 +148,15 @@ internal class ScopeGutterPopupPanel(
                 override fun actionPerformed(event: AnActionEvent) {
                     if (currentIndex >= 0 && currentIndex < sortedRanges.size - 1) {
                         currentIndex++
-                        val nextRange = sortedRanges[currentIndex]
-                        suppressCaretCancel = true
-                        editor.caretModel.moveToLogicalPosition(LogicalPosition(nextRange.line1, 0))
-                        editor.scrollingModel.scrollToCaret(ScrollType.CENTER)
-                        suppressCaretCancel = false
-                        updateDiffPanel(nextRange)
-                        updateEditorHighlights(nextRange)
+                        navigateToRange(sortedRanges[currentIndex])
                     }
                 }
 
                 override fun update(e: AnActionEvent) {
                     e.presentation.isEnabled = currentIndex >= 0 && currentIndex < sortedRanges.size - 1
                 }
+
+                override fun getActionUpdateThread() = ActionUpdateThread.EDT
             })
 
             // Rollback action

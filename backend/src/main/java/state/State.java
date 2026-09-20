@@ -30,7 +30,7 @@ public class State implements PersistentStateComponent<State> {
 
     @OptionTag(converter = MyModelConverter.class)
     public List<MyModelBase> modelData;
-    public Boolean twoDotsCheckbox = false;
+    public Boolean threeDotsCheckBox = false;
 
     public List<MyModelBase> getModelData() {
         return modelData;
@@ -40,12 +40,12 @@ public class State implements PersistentStateComponent<State> {
         this.modelData = modelData;
     }
 
-    public Boolean getTwoDotsCheckbox() {
-        return twoDotsCheckbox;
+    public Boolean getThreeDotsCheckBox() {
+        return threeDotsCheckBox;
     }
 
-    public void setTwoDotsCheckbox(Boolean value) {
-        twoDotsCheckbox = value;
+    public void setThreeDotsCheckBox(Boolean value) {
+        threeDotsCheckBox = value;
     }
 
     // In your State class, add these methods:

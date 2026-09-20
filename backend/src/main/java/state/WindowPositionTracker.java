@@ -408,31 +408,27 @@ public class WindowPositionTracker {
             recordUserActivity();
         }
 
-        // Keyboard events - track key presses that could cause scrolling
+        // Keyboard events - track key presses/releases that could cause scrolling
         @Override
         public void keyPressed(KeyEvent e) {
-            // Track keyboard events that typically cause scrolling
-            int keyCode = e.getKeyCode();
-            if (keyCode == KeyEvent.VK_UP || keyCode == KeyEvent.VK_DOWN ||
-                    keyCode == KeyEvent.VK_LEFT || keyCode == KeyEvent.VK_RIGHT ||
-                    keyCode == KeyEvent.VK_PAGE_UP || keyCode == KeyEvent.VK_PAGE_DOWN ||
-                    keyCode == KeyEvent.VK_HOME || keyCode == KeyEvent.VK_END ||
-                    keyCode == KeyEvent.VK_SPACE) {
+            if (isScrollKey(e.getKeyCode())) {
                 recordUserActivity();
             }
         }
 
         @Override
         public void keyReleased(KeyEvent e) {
-            // Track key releases for the same keys
-            int keyCode = e.getKeyCode();
-            if (keyCode == KeyEvent.VK_UP || keyCode == KeyEvent.VK_DOWN ||
+            if (isScrollKey(e.getKeyCode())) {
+                recordUserActivity();
+            }
+        }
+
+        private static boolean isScrollKey(int keyCode) {
+            return keyCode == KeyEvent.VK_UP || keyCode == KeyEvent.VK_DOWN ||
                     keyCode == KeyEvent.VK_LEFT || keyCode == KeyEvent.VK_RIGHT ||
                     keyCode == KeyEvent.VK_PAGE_UP || keyCode == KeyEvent.VK_PAGE_DOWN ||
                     keyCode == KeyEvent.VK_HOME || keyCode == KeyEvent.VK_END ||
-                    keyCode == KeyEvent.VK_SPACE) {
-                recordUserActivity();
-            }
+                    keyCode == KeyEvent.VK_SPACE;
         }
 
         @Override

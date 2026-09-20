@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import service.GutterDataService
 import settings.GitScopeSettings
 import system.Defs
+import kotlin.time.Duration.Companion.milliseconds
 
 @Service(Service.Level.PROJECT)
 class FrontendGutterSubscriptions(
@@ -65,7 +66,7 @@ class FrontendGutterSubscriptions(
                            arriving here is unexpected, so log it visibly and keep the subscription alive. */
                         LOG.warn("Gutter update subscription failed, re-subscribing", t)
                     }
-                    delay(RESUBSCRIBE_DELAY_MS)
+                    delay(RESUBSCRIBE_DELAY_MS.milliseconds)
                 }
             }
         }

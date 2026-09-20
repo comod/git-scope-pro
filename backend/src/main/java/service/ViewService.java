@@ -321,7 +321,9 @@ public class ViewService implements Disposable {
             // Save the target branch map
             TargetBranchMap targetBranchMap = myModel.getTargetBranchMap();
             if (targetBranchMap == null) {
-                LOG.warn("Model has null targetBranchMap during save - this should not happen in steady state. Skipping.");
+                /* Unconfigured "New*" tab -- no target picked yet, nothing to persist. Expected,
+                   not exceptional: this is hit any time save() runs (tab rename, reorder, ...)
+                   while a new tab is still open. */
                 return;
             }
 
@@ -339,8 +341,18 @@ public class ViewService implements Disposable {
 
         this.state.setModelData(modelData);
 
-        // Save the current active tab index
-        this.state.setCurrentTabIndex(this.currentTabIndex);
+        /* Only persist the active tab index when it points at a model that was actually saved
+           above. The active tab can be an unconfigured "New*" model (null targetBranchMap,
+           skipped from modelData): persisting that index would, after the next load(), point
+           past the restored (shorter) collection -- landing on the "+" tab and showing a
+           half-baked "New" page instead of the tab the user actually left open. Leaving the
+           previously persisted index alone in that case keeps it pointing at the last real tab. */
+        MyModel activeModel = (currentTabIndex != null && currentTabIndex >= 0 && currentTabIndex < collection.size())
+                ? collection.get(currentTabIndex)
+                : null;
+        if (activeModel != null && activeModel.getTargetBranchMap() != null) {
+            this.state.setCurrentTabIndex(this.currentTabIndex);
+        }
     }
 
     public void eventVcsReady() {

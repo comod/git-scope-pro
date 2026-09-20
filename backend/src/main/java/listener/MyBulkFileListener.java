@@ -45,7 +45,7 @@ public class MyBulkFileListener implements BulkFileListener {
             }
             if (LOG.isDebugEnabled()) {
                 LOG.debug("VFS batch of " + events.size() + " event(s) -> collectChanges for project "
-                        + project.getName() + ", first=" + events.get(0).getPath());
+                        + project.getName() + ", first=" + events.getFirst().getPath());
             }
             // TODO: collectChanges: bulk file event (disabled)
             viewService.collectChanges(true);

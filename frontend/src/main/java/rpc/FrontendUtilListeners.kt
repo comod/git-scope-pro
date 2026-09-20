@@ -4,11 +4,13 @@ import com.intellij.ide.projectView.ProjectView
 import com.intellij.ide.ui.UISettings
 import com.intellij.ide.ui.UISettingsListener
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.EDT
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.FileEditorManagerListener
 import com.intellij.openapi.fileTypes.NativeFileType
+import com.intellij.openapi.progress.blockingContextScope
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -18,7 +20,9 @@ import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.platform.project.projectId
 import fleet.rpc.client.durable
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Service(Service.Level.PROJECT)
 class FrontendUtilSubscriptions(
@@ -81,8 +85,8 @@ class FrontendUtilSubscriptions(
         }
     }
 
-    private fun handleCommand(cmd: UtilCommand) {
-        ApplicationManager.getApplication().invokeLater {
+    private suspend fun handleCommand(cmd: UtilCommand) {
+        withContext(Dispatchers.EDT) {
             when (cmd) {
                 is UtilCommand.SelectInProject -> selectInProject(cmd.filePath)
                 is UtilCommand.OpenInAssociatedApplication ->
@@ -124,14 +128,22 @@ class FrontendUtilSubscriptions(
         }
     }
 
-    private fun selectInProject(filePath: String) {
+    private suspend fun selectInProject(filePath: String) {
+        // VirtualFileManager is nominally a backend API, but Project View selection is a frontend
+        // UI operation in split mode: the tree is rendered against the frontend's own VFS mirror, so
+        // resolving a frontend-side VirtualFile here (rather than on the backend) is intentional.
         val file = com.intellij.openapi.vfs.VirtualFileManager.getInstance().findFileByUrl(filePath)
             ?: LocalFileSystem.getInstance().findFileByPath(filePath)
             ?: return
-        val tw = ToolWindowManager.getInstance(project).getToolWindow(ToolWindowId.PROJECT_VIEW) ?: return
-        tw.activate({
-            ProjectView.getInstance(project).select(null, file, true)
-        }, true, true)
+
+        // ToolWindowManager.getInstance() requires a blocking context; bridge into one now that
+        // we're on the EDT.
+        blockingContextScope {
+            val tw = ToolWindowManager.getInstance(project).getToolWindow(ToolWindowId.PROJECT_VIEW) ?: return@blockingContextScope
+            tw.activate({
+                ProjectView.getInstance(project).select(null, file, true)
+            }, true, true)
+        }
     }
 }
 
