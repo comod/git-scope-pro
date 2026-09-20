@@ -12,6 +12,24 @@ import kotlinx.serialization.Serializable
 sealed class UtilCommand {
     @Serializable
     data class SelectInProject(val filePath: String) : UtilCommand()
+
+    /**
+     * Launches [filePath] in the application the OS associates with its type, for a file the editor
+     * cannot display (PDF, DOCX, ...). Handled by the frontend, not the backend: the platform's
+     * launcher uses java.awt.Desktop/ProcessBuilder in whichever JVM calls it, and the tool window
+     * runs on the backend, so launching there would start the application on the remote host.
+     *
+     * <p>[filePath] is a plain path rather than the `file://` URL [SelectInProject] passes, because
+     * the frontend resolves it through its own LocalFileSystem to establish that the file is on the
+     * machine the user is sitting at. [fileName] is only for the notification shown when it is not.
+     *
+     * <p>Over Remote Development the file exists only on the host, so there is nothing to hand to a
+     * client-side application; the frontend says so instead. The platform draws the same line —
+     * its own OpenInAssociatedApplicationAction is declared
+     * `ActionRemoteBehaviorSpecification.Disabled` rather than being routed to the frontend.
+     */
+    @Serializable
+    data class OpenInAssociatedApplication(val filePath: String, val fileName: String) : UtilCommand()
 }
 
 /** Direction for change/file navigation actions. */

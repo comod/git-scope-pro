@@ -8,6 +8,7 @@ import com.intellij.openapi.editor.ScrollType;
 import com.intellij.openapi.fileEditor.FileEditor;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.TextEditor;
+import com.intellij.openapi.fileTypes.INativeFileType;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.FilePath;
 import com.intellij.openapi.vcs.VcsException;
@@ -289,6 +290,17 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
             // File/change leaf: open in a regular (permanent) tab.
             VirtualFile file = change.getVirtualFile();
             if (file != null) {
+                // PDF, DOCX and friends have no FileEditorProvider, so openFile() returns an empty
+                // composite and the double-click appears to do nothing (issue #106). Hand these to
+                // the frontend, which launches them the way Project View does. Only here, not in
+                // FileOpener: single-click preview and prev/next change navigation traverse files
+                // too, and must not spawn external applications while doing so.
+                if (file.getFileType() instanceof INativeFileType) {
+                    myProject.getService(rpc.UtilCommandService.class)
+                            .openInAssociatedApplication(file.getPath(), file.getName());
+                    LOG.debug("Double-click: routed to associated application: " + file.getName());
+                    return;
+                }
                 openAndScrollToChanges(myProject, file, -1, false);
                 LOG.debug("Double-click: opened in permanent tab: " + file.getName());
             }

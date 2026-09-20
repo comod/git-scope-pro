@@ -6,6 +6,7 @@ import com.intellij.ide.ui.UISettingsListener
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
+import com.intellij.openapi.fileTypes.NativeFileType
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -54,7 +55,42 @@ class FrontendUtilSubscriptions(
         ApplicationManager.getApplication().invokeLater {
             when (cmd) {
                 is UtilCommand.SelectInProject -> selectInProject(cmd.filePath)
+                is UtilCommand.OpenInAssociatedApplication ->
+                    openInAssociatedApplication(cmd.filePath, cmd.fileName)
             }
+        }
+    }
+
+    /**
+     * Launches a file the editor cannot display in its associated application, on this machine.
+     *
+     * <p>[LocalFileSystem.findFileByPath] is the mode check, not just a lookup: it resolves against
+     * the disk of the process that calls it. In monolith and local split mode that is the same
+     * machine as the backend, so the path resolves and the launch reaches the user's desktop. Over
+     * Remote Development the path belongs to the host, nothing resolves here, and there is no local
+     * copy to hand to an application — so say that rather than fail silently.
+     *
+     * <p>(A file at the identical absolute path on both machines would resolve and open the client's
+     * copy. Accepted: it needs the same checkout layout on both sides, and the fallback would be a
+     * notification either way.)
+     */
+    private fun openInAssociatedApplication(filePath: String, fileName: String) {
+        val localFile = LocalFileSystem.getInstance().findFileByPath(filePath)
+        if (localFile == null) {
+            utils.Notification.info(
+                project,
+                "Cannot open $fileName externally",
+                "The file is on the remote host, so it cannot be opened in an application on this machine."
+            )
+            return
+        }
+        // Returns false when the OS has no association or the launch failed; it logs the cause.
+        if (!NativeFileType.openAssociatedApplication(localFile)) {
+            utils.Notification.warn(
+                project,
+                "Could not open $fileName",
+                "No application is associated with this file type, or the system refused to start it."
+            )
         }
     }
 
