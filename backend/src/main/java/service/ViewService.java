@@ -9,6 +9,7 @@ import com.intellij.openapi.editor.EditorKind;
 import com.intellij.openapi.editor.ex.EditorEx;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.FileStatusManager;
+import com.intellij.openapi.vcs.ProjectLevelVcsManager;
 import com.intellij.openapi.vcs.VcsApplicationSettings;
 import com.intellij.openapi.vcs.changes.Change;
 import com.intellij.openapi.vcs.changes.VcsDirtyScopeManager;
@@ -357,14 +358,27 @@ public class ViewService implements Disposable {
      * is not there — so it survives every update, is re-persisted on close, and returns on the next
      * open. Restarting the IDE does not clear it; only a full rescan does, which is why such an
      * entry otherwise lingers until something unrelated (a commit touching .git/index) forces one.
+     *
+     * <p>The rescan has to be queued behind VCS initialization rather than run inline.
+     * {@code directoryMappingChanged()} fires at {@code VcsInitObject.MAPPINGS} (order 10), but
+     * {@code VcsDirtyScopeManagerImpl} only accepts work once its own startup activity has run at
+     * {@code DIRTY_SCOPE_MANAGER} (order 110) — until then {@code markEverythingDirty()} returns
+     * without marking anything and without logging, so calling it here directly was a no-op and the
+     * stale entries stayed. {@code runAfterInitialization} runs at {@code AFTER_COMMON} (order 400),
+     * by which point the dirty scope manager and the Git executable are both ready.
      */
     private void forceInitialChangelistRefresh() {
         if (project.isDisposed() || !initialChangelistRefreshed.compareAndSet(false, true)) {
             // directoryMappingChanged() fires again whenever mappings change; one rescan is enough.
             return;
         }
-        LOG.debug("Forcing a full changelist rescan to discard entries restored from workspace.xml");
-        VcsDirtyScopeManager.getInstance(project).markEverythingDirty();
+        ProjectLevelVcsManager.getInstance(project).runAfterInitialization(() -> {
+            if (project.isDisposed()) {
+                return;
+            }
+            LOG.debug("Forcing a full changelist rescan to discard entries restored from workspace.xml");
+            VcsDirtyScopeManager.getInstance(project).markEverythingDirty();
+        });
     }
 
     public void eventToolWindowReady() {
