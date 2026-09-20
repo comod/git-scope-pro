@@ -37,7 +37,6 @@ Classes are organized by module: **backend**, **frontend**, and **shared**.
 - `listener.VcsStartup`
 - `listener.MyChangeListListener`
 - `listener.MyGitRepositoryChangeListener`
-- `listener.MyFileEditorManagerListener`
 - `listener.MyTabContentListener`
 - `listener.MyTreeSelectionListener`
 - `listener.ToggleHeadAction`

@@ -107,6 +107,15 @@ interface UtilRpcApi : RemoteApi<Unit> {
      */
     suspend fun getRenamedTabs(projectId: ProjectId): Flow<Map<Int, String>>
 
+    /**
+     * Reports that the frontend opened an editor, so the backend can warm the scope model if
+     * nothing has been collected yet (issue #78 fallback). Routed through the frontend rather
+     * than a backend-registered `FileEditorManagerListener`: open editors are frontend-owned
+     * state under Remote Development, so a backend listener for that topic never fires in a
+     * real split deployment.
+     */
+    suspend fun fileOpened(projectId: ProjectId)
+
     companion object {
         suspend fun getInstance(): UtilRpcApi {
             return RemoteApiProviderService.resolve(remoteApiDescriptor<UtilRpcApi>())

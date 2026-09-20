@@ -57,6 +57,11 @@ class BackendUtilRpcImpl : UtilRpcApi {
         project.service<service.TabActionService>().publishRenamedTabs()
         return project.service<UtilCommandService>().renamedTabs
     }
+
+    override suspend fun fileOpened(projectId: ProjectId) {
+        val project = projectId.findProjectOrNull() ?: return
+        project.service<service.ViewService>().collectChanges(false)
+    }
 }
 
 class BackendUtilRpcProvider : RemoteApiProvider {

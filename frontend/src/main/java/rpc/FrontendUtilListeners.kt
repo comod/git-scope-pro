@@ -6,10 +6,13 @@ import com.intellij.ide.ui.UISettingsListener
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
+import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.FileEditorManagerListener
 import com.intellij.openapi.fileTypes.NativeFileType
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
 import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.wm.ToolWindowId
 import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.platform.project.projectId
@@ -39,6 +42,23 @@ class FrontendUtilSubscriptions(
             .subscribe(UISettingsListener.TOPIC, UISettingsListener { settings ->
                 pushPreviewTabEnabled(settings.openInPreviewTabIfPossible)
             })
+
+        /* Warms the backend's scope model on file open, in place of a backend-registered
+           FileEditorManagerListener: open editors are frontend-owned state under Remote
+           Development, so a backend listener for this topic never fires in a real split
+           deployment. Deliberately does not bump the backend's apply generation -- doing so
+           discarded the result of any in-flight fresh collection (e.g. one triggered by a
+           just-finished rebase) and replaced it with this cache-served one, so the scope showed
+           pre-operation state, stuck until the next tab switch (issue #78). collectChanges(false)
+           only warms the model when nothing has been collected yet. */
+        project.messageBus.connect(coroutineScope).subscribe(
+            FileEditorManagerListener.FILE_EDITOR_MANAGER,
+            object : FileEditorManagerListener {
+                override fun fileOpened(source: FileEditorManager, file: VirtualFile) {
+                    notifyBackendFileOpened()
+                }
+            }
+        )
     }
 
     private fun pushPreviewTabEnabled(enabled: Boolean) {
@@ -47,6 +67,16 @@ class FrontendUtilSubscriptions(
                 UtilRpcApi.getInstance().setPreviewTabEnabled(project.projectId(), enabled)
             } catch (e: Throwable) {
                 // best-effort; backend falls back to its own default if never received
+            }
+        }
+    }
+
+    private fun notifyBackendFileOpened() {
+        coroutineScope.launch {
+            try {
+                UtilRpcApi.getInstance().fileOpened(project.projectId())
+            } catch (e: Throwable) {
+                // best-effort; the backend just misses one warm-up opportunity
             }
         }
     }
