@@ -1,3 +1,12 @@
+## [2026.2.2]
+
+### Fixes
+
+- Fixed the scope still listing files that Git reports as unchanged, which the 2026.2.1 fix was meant to clear
+    - The full rescan that fix relies on ran before the IDE was ready to accept it, so it was dropped without any
+      trace and the stale entries stayed until an unrelated Git command happened to force a refresh. The rescan now
+      runs once VCS initialization has finished.
+
 ## [2026.2.1]
 
 ### Fixes
