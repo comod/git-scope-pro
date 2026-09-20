@@ -34,8 +34,8 @@ public class FileTreeOrderTest {
 
     @Test
     public void ordersNamesCaseInsensitively() {
-        // Plain string ordering puts every capitalised name first, which is what made navigation
-        // look erratic: Zebra.java would come before apple.java.
+        /* Plain string ordering puts every capitalised name first, which is what made navigation
+           look erratic: Zebra.java would come before apple.java. */
         assertEquals(
                 Arrays.asList("/p/apple.java", "/p/Banana.java", "/p/Zebra.java"),
                 sorted("/p/Zebra.java", "/p/apple.java", "/p/Banana.java"));
@@ -50,8 +50,8 @@ public class FileTreeOrderTest {
 
     @Test
     public void keepsSiblingDirectoriesSeparate() {
-        // "/p/a.java" must not land between the contents of "/p/a/", which is what happens when
-        // full paths are compared as strings ('.' sorts before '/').
+        /* "/p/a.java" must not land between the contents of "/p/a/", which is what happens when
+           full paths are compared as strings ('.' sorts before '/'). */
         assertEquals(
                 Arrays.asList(
                         "/p/a/one.java",

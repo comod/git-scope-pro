@@ -120,8 +120,8 @@ public class MyLineStatusTrackerImpl implements Disposable {
             }
 
             if (editorsToUpdate.isEmpty()) {
-                // No open editor matches the scope, so nothing is published and the gutter keeps
-                // whatever it last showed.
+                /* No open editor matches the scope, so nothing is published and the gutter keeps
+                 * whatever it last showed. */
                 LOG.debug("Gutter update " + gen + ": none of the " + editors.length
                         + " open editor(s) are in scope (" + scopeChangesMap.size() + " changed file(s))");
                 return;
@@ -259,9 +259,9 @@ public class MyLineStatusTrackerImpl implements Disposable {
             if (headContent != null) {
                 ranges = computeScopeRangesInCurrentSpace(headContent, normalizedBase, normalizedCurrent, filePath);
                 scopeRanges = RangesBuilder.INSTANCE.createRanges(headContent, normalizedBase);
-                // Local changes = current document vs. HEAD, in current-document space. These are the
-                // markers the IDE paints in its own gutter (we exclude them from our scope painting);
-                // publish them so change navigation can also stop on them.
+                /* Local changes = current document vs. HEAD, in current-document space. These are the
+                 * markers the IDE paints in its own gutter (we exclude them from our scope painting);
+                 * publish them so change navigation can also stop on them. */
                 localRanges = RangesBuilder.INSTANCE.createRanges(normalizedCurrent, headContent);
             } else {
                 ranges = RangesBuilder.INSTANCE.createRanges(normalizedCurrent, normalizedBase);

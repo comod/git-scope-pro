@@ -111,36 +111,42 @@ abstract class LineStatusGutterMarkerRenderer : LineMarkerRendererEx, ActiveGutt
                         hoveredRange.line2 == range.line2 &&
                         hoveredRange.type == range.type)
 
-        // lineMarkerAreaWidth is @ApiStatus.Internal on EditorGutterComponentEx.
-        // getGutterArea() already reflects it: areaWidth == gutterArea.second - gutterArea.first.
-        // Using it here means normal and hover thickness are always platform-consistent
-        // (correct on both Windows and Linux without hardcoded pixel guesses).
+        /*
+         * lineMarkerAreaWidth is @ApiStatus.Internal on EditorGutterComponentEx.
+         * getGutterArea() already reflects it: areaWidth == gutterArea.second - gutterArea.first.
+         * Using it here means normal and hover thickness are always platform-consistent
+         * (correct on both Windows and Linux without hardcoded pixel guesses).
+         */
         val gutterArea = getGutterArea(editor)
         val areaWidth = gutterArea.second - gutterArea.first
-        // Hover expands by a fixed JBUI.scale(3), matching the IDE's own VCS marker behaviour
-        // (see LineStatusMarkerDrawUtil.getHoveredMarkerExtraWidth()).
+        /* Hover expands by a fixed JBUI.scale(3), matching the IDE's own VCS marker behaviour
+         * (see LineStatusMarkerDrawUtil.getHoveredMarkerExtraWidth()). */
         val hoverExpansion = JBUI.scale(3)
 
         val x: Int
         val width: Int
         if (settings.isSeparateGutterRendering) {
-            // Separate rendering: paint just to the left of line numbers.
-            // annotationsAreaOffset + annotationsAreaWidth == the left edge of the line-number
-            // column (public API equivalent of the @ApiInternal lineNumberAreaOffset).
-            // Subtract the marker width so the marker's right edge aligns with the line numbers.
-            // maxOf guards the case where annotationsAreaWidth == 0 (no blame).
+            /*
+             * Separate rendering: paint just to the left of line numbers.
+             * annotationsAreaOffset + annotationsAreaWidth == the left edge of the line-number
+             * column (public API equivalent of the @ApiInternal lineNumberAreaOffset).
+             * Subtract the marker width so the marker's right edge aligns with the line numbers.
+             * maxOf guards the case where annotationsAreaWidth == 0 (no blame).
+             */
             width = if (isHovered) areaWidth + hoverExpansion else areaWidth
             x = maxOf(gutter.annotationsAreaOffset, gutter.annotationsAreaOffset + gutter.annotationsAreaWidth - areaWidth)
         } else {
-            // Merged rendering: mirror LineStatusMarkerDrawUtil.getGutterArea()
-            // so our markers align exactly with the IDE's own VCS change bars.
-            // IDE expands left on hover, keeping right edge fixed at gutterArea.second.
+            /*
+             * Merged rendering: mirror LineStatusMarkerDrawUtil.getGutterArea()
+             * so our markers align exactly with the IDE's own VCS change bars.
+             * IDE expands left on hover, keeping right edge fixed at gutterArea.second.
+             */
             x = if (isHovered) gutterArea.first - hoverExpansion else gutterArea.first
             width = gutterArea.second - x
         }
 
-        // Corner radius matches the IDE's RectanglePainter2D approach: use the marker width
-        // as the arc, producing a pill shape that scales naturally with the marker size.
+        /* Corner radius matches the IDE's RectanglePainter2D approach: use the marker width
+         * as the arc, producing a pill shape that scales naturally with the marker size. */
         val arcSize = width
 
         val bounds = rangeYBounds(editor, range)
@@ -200,8 +206,8 @@ abstract class LineStatusGutterMarkerRenderer : LineMarkerRendererEx, ActiveGutt
             }
         }
 
-        // Check if y is over any range.
-        // DELETED ranges have line1 == line2, so y1 == y2 — use the painted height instead.
+        /* Check if y is over any range.
+         * DELETED ranges have line1 == line2, so y1 == y2 — use the painted height instead. */
         return ranges.any { range -> y in rangeYBounds(editor, range) }
     }
 

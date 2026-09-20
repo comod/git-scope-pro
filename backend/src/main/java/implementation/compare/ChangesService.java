@@ -102,10 +102,10 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
         final GitService currentGitService = this.git;
         final long gen = collectionGeneration.incrementAndGet();
 
-        // Clear stale results at scheduling time, not inside run(): a task superseded before its
-        // run() started never reached the clear, so entries cached DURING a git operation
-        // (e.g. conflict-state changes mid-rebase) survived it and were served to the next
-        // cache-permitted collection (issue #78).
+        /* Clear stale results at scheduling time, not inside run(): a task superseded before its
+         * run() started never reached the clear, so entries cached DURING a git operation
+         * (e.g. conflict-state changes mid-rebase) survived it and were served to the next
+         * cache-permitted collection (issue #78). */
         if (checkFs) {
             changesCache.clear();
         }
@@ -118,9 +118,9 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
             public void run(@NotNull ProgressIndicator indicator) {
                 currentIndicator.set(indicator);
                 try {
-                // Early exit if disposing or superseded by a newer collection request.
-                // Nothing is applied and no callback runs, so this is a silent no-update: worth a
-                // line when tracking down a scope that stopped refreshing.
+                /* Early exit if disposing or superseded by a newer collection request.
+                 * Nothing is applied and no callback runs, so this is a silent no-update: worth a
+                 * line when tracking down a scope that stopped refreshing. */
                 if (disposing.get() || indicator.isCanceled() || collectionGeneration.get() != gen) {
                     LOG.debug("Collection " + gen + " abandoned before start (disposing=" + disposing.get()
                             + ", cancelled=" + indicator.isCanceled()
@@ -135,8 +135,8 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
 
                 Collection<GitRepository> repositories = currentGitService.getRepositories();
                 if (repositories.isEmpty()) {
-                    // Happens before the VCS mapping is ready; the scope stays empty until some
-                    // later event triggers another collection.
+                    /* Happens before the VCS mapping is ready; the scope stays empty until some
+                     * later event triggers another collection. */
                     LOG.debug("Collection " + gen + ": no git repositories registered yet");
                 }
 
@@ -156,8 +156,8 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
                         RepoChangesResult repoResult;
 
                         if (!checkFs && changesCache.containsKey(cacheKey)) {
-                            // Use cached result (includes merged, scope, and local changes).
-                            // A cache hit means the filesystem was NOT re-read for this repository.
+                            /* Use cached result (includes merged, scope, and local changes).
+                             * A cache hit means the filesystem was NOT re-read for this repository. */
                             repoResult = changesCache.get(cacheKey);
                             LOG.debug("Collection " + gen + ": cache hit for " + cacheKey);
                         } else {
@@ -204,15 +204,15 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
                     } catch (com.intellij.openapi.progress.ProcessCanceledException e) {
                         throw e;
                     } catch (Exception e) {
-                        // Catch any unexpected errors from individual repo processing
-                        // This ensures one bad repo doesn't crash the entire operation
+                        /* Catch any unexpected errors from individual repo processing.
+                         * This ensures one bad repo doesn't crash the entire operation. */
                         LOG.warn("Unexpected error processing repository " + repo.getRoot().getPath(), e);
                         errorRepos.add(repo.getRoot().getPath());
                     }
                 });
 
-                // Return ERROR_STATE only if ALL repositories failed (e.g. commit hash not found in any repo).
-                // Individual repo failures are expected in multi-repo setups where a commit exists in only one repo.
+                /* Return ERROR_STATE only if ALL repositories failed (e.g. commit hash not found in any repo).
+                 * Individual repo failures are expected in multi-repo setups where a commit exists in only one repo. */
                 if (!errorRepos.isEmpty() && errorRepos.size() == repositories.size()) {
                     LOG.debug("Collection " + gen + ": all " + errorRepos.size()
                             + " repositories failed -> ERROR_STATE");
@@ -237,8 +237,8 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
                     // Double-check the project is still valid
                     if (currentProject.isDisposed() || callBack == null) return;
                     if (this.result == null) {
-                        // The run() above returned early (superseded); a newer collection owns the
-                        // model. Complete the callback with null so chained work still runs.
+                        /* The run() above returned early (superseded); a newer collection owns the
+                         * model. Complete the callback with null so chained work still runs. */
                         LOG.debug("Collection " + gen + " superseded, completing callback without data");
                     }
                     callBack.accept(this.result);
@@ -247,8 +247,8 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
 
             @Override
             public void onCancel() {
-                // Queueing a newer collection cancels this one's indicator; the platform then calls
-                // onCancel instead of onSuccess. The callback chain must still complete.
+                /* Queueing a newer collection cancels this one's indicator; the platform then calls
+                 * onCancel instead of onSuccess. The callback chain must still complete. */
                 ApplicationManager.getApplication().invokeLater(() -> {
                     if (currentProject.isDisposed() || callBack == null) return;
                     LOG.debug("Collection " + gen + " cancelled, completing callback without data");
@@ -271,11 +271,11 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
             prev.cancel();
         }
 
-        // Collect against a settled changelist. ChangeListManager restores the list persisted in
-        // workspace.xml when the project opens and refreshes it only afterwards, so reading
-        // getAllChanges() straight away can hand back entries for files git considers clean — or
-        // that no longer exist at that path at all. Capture the task locally: a newer collection
-        // reassigns the field before this callback runs.
+        /* Collect against a settled changelist. ChangeListManager restores the list persisted in
+         * workspace.xml when the project opens and refreshes it only afterwards, so reading
+         * getAllChanges() straight away can hand back entries for files git considers clean — or
+         * that no longer exist at that path at all. Capture the task locally: a newer collection
+         * reassigns the field before this callback runs. */
         final Task.Backgroundable queuedTask = task;
         ChangeListManager.getInstance(currentProject).invokeAfterUpdate(false, () -> {
             if (disposing.get() || currentProject.isDisposed()) {
@@ -328,8 +328,8 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
                     continue;
                 }
             } else if (!isPresentOnDisk(changePath)) {
-                // Stale changelist entry: nothing lives at this path any more, so rendering it would
-                // put a dead node in the tree. DELETED is exempt because absence is what it reports.
+                /* Stale changelist entry: nothing lives at this path any more, so rendering it would
+                 * put a dead node in the tree. DELETED is exempt because absence is what it reports. */
                 continue;
             }
 
@@ -404,9 +404,9 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
             Collection<Change> localChanges = new ArrayList<>(changeListManager.getAllChanges());
             String repoPath = repo.getRoot().getPath();
 
-            // Add unversioned (untracked) files if the setting is enabled. They join the changelist
-            // entries *before* filtering so they get the same repository and staleness checks —
-            // appending them afterwards let untracked paths bypass both.
+            /* Add unversioned (untracked) files if the setting is enabled. They join the changelist
+             * entries *before* filtering so they get the same repository and staleness checks —
+             * appending them afterwards let untracked paths bypass both. */
             if (GitScopeSettings.getInstance().isShowUntrackedFiles()) {
                 for (FilePath unversionedPath : changeListManager.getUnversionedFilesPaths()) {
                     localChanges.add(new Change(null, new CurrentContentRevision(unversionedPath), FileStatus.UNKNOWN));
@@ -424,9 +424,9 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
             // Diff Changes - these are the pure scope changes
             GitRevisionNumber revisionNumber;
             if (ScopeRefRange.isRange(scopeRef)) {
-                // A range scope ("main..HEAD") asks for everything on HEAD since it diverged from the
-                // selected ref, so the base is their merge base. An unsupported range yields no ref
-                // and falls through to ERROR_STATE rather than being misread as a different diff.
+                /* A range scope ("main..HEAD") asks for everything on HEAD since it diverged from the
+                 * selected ref, so the base is their merge base. An unsupported range yields no ref
+                 * and falls through to ERROR_STATE rather than being misread as a different diff. */
                 String selectedRef = ScopeRefRange.selectedRef(scopeRef);
                 revisionNumber = selectedRef == null ? null : GitUtil.resolveMergeBase(repo, selectedRef);
             } else {
@@ -449,8 +449,8 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
             }
 
             if (revisionNumber != null) {
-                // Diff a single base tree against HEAD. Range scopes pass their merge base, which makes
-                // the result the net pull-request diff instead of a union of every commit's changes.
+                /* Diff a single base tree against HEAD. Range scopes pass their merge base, which makes
+                 * the result the net pull-request diff instead of a union of every commit's changes. */
                 scopeChanges = GitUtil.getDiffChanges(repo, file, revisionNumber);
                 LOG.debug("ChangesService - Repository: " + repoPath + ", Scope: " + scopeRef + ", base: " + revisionNumber.asString() + ", scopeChanges count: " + scopeChanges.size());
             }

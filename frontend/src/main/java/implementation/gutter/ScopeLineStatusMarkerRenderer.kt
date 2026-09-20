@@ -54,8 +54,10 @@ class ScopeLineStatusMarkerRenderer(
         onDoAction = { editor, range, e -> popupPanel.show(editor, range, e) }
     )
 
-    // Filler that reserves annotation area width to push line numbers right in separate mode.
-    // Managed dynamically: re-registers after blame close, unregisters when setting is off.
+    /**
+     * Filler that reserves annotation area width to push line numbers right in separate mode.
+     * Managed dynamically: re-registers after blame close, unregisters when setting is off.
+     */
     @Volatile private var fillerDesired = false
     @Volatile private var suppressFillerCallback = false
 
@@ -91,8 +93,8 @@ class ScopeLineStatusMarkerRenderer(
             clearHover()
         }
         override fun mouseEntered(e: MouseEvent) {
-            // Re-evaluate on entry so any hover state stuck from a previous session
-            // (fast mouse exit, OS focus change, popup covering gutter) is corrected.
+            /* Re-evaluate on entry so any hover state stuck from a previous session
+             * (fast mouse exit, OS focus change, popup covering gutter) is corrected. */
             updateHoverState(e)
         }
     }
@@ -103,9 +105,9 @@ class ScopeLineStatusMarkerRenderer(
     }
 
     private fun installMouseListeners() {
-        // Called from init, which always runs on EDT (renderer construction is EDT-only).
-        // Install synchronously — no invokeLater — so the editor that triggered this
-        // renderer's creation is found immediately via getEditors() without a timing race.
+        /* Called from init, which always runs on EDT (renderer construction is EDT-only).
+         * Install synchronously — no invokeLater — so the editor that triggered this
+         * renderer's creation is found immediately via getEditors() without a timing race. */
         val factory = EditorFactory.getInstance()
         for (editor in factory.getEditors(document, project)) {
             installOnEditor(editor)
@@ -139,8 +141,8 @@ class ScopeLineStatusMarkerRenderer(
         val x = e.x
         val y = e.y
 
-        // Check if in marker area — must match canDoAction logic exactly so that
-        // hover is cleared precisely when the painted marker is no longer under the cursor.
+        /* Check if in marker area — must match canDoAction logic exactly so that
+         * hover is cleared precisely when the painted marker is no longer under the cursor. */
         val gitScopeSettings = settings.GitScopeSettings.getInstance()
         val gutterArea = getGutterArea(editor)
         val areaWidth = gutterArea.second - gutterArea.first

@@ -54,9 +54,9 @@ public class MyTabContentListener implements ContentManagerListener {
             Collections.newSetFromMap(new WeakHashMap<>());
 
     public void contentAdded(@NotNull ContentManagerEvent event) {
-        // Deliberately not time-based: the platform can complete a drag several EDT ticks after the
-        // removal, so anything that checks "is it back yet?" on a timer misses the slow cases and
-        // leaves the tab's model deleted.
+        /* Deliberately not time-based: the platform can complete a drag several EDT ticks after the
+         * removal, so anything that checks "is it back yet?" on a timer misses the slow cases and
+         * leaves the tab's model deleted. */
         if (!removedContents.remove(event.getContent())) {
             return;
         }
@@ -116,16 +116,16 @@ public class MyTabContentListener implements ContentManagerListener {
             return;
         }
 
-        // Treat it as a close, exactly as before: this path also runs when tabs are torn down in
-        // bulk (project close, tool window re-init), and its index check is what keeps those from
-        // wiping the saved collection.
+        /* Treat it as a close, exactly as before: this path also runs when tabs are torn down in
+         * bulk (project close, tool window re-init), and its index check is what keeps those from
+         * wiping the saved collection. */
         viewService.removeTab(event.getIndex());
 
-        // A tab dragged within the header is re-added at its new index, which arrives here as a
-        // removal indistinguishable from a close, and the platform has no "content moved" event.
-        // Remember the content: if it is added back, contentAdded recognises the move and rebuilds
-        // the collection from the tab order, which restores the model removed just above -- it is
-        // still reachable through the content, so nothing is lost.
+        /* A tab dragged within the header is re-added at its new index, which arrives here as a
+         * removal indistinguishable from a close, and the platform has no "content moved" event.
+         * Remember the content: if it is added back, contentAdded recognises the move and rebuilds
+         * the collection from the tab order, which restores the model removed just above -- it is
+         * still reachable through the content, so nothing is lost. */
         removedContents.add(event.getContent());
     }
 }

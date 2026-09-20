@@ -79,8 +79,8 @@ public class TabActionService {
 
             MyModel model = getModelForTab(viewService, tabIndex);
             if (model == null || model.getCustomTabName() == null || model.getCustomTabName().isEmpty()) {
-                // Expected: the frontend cannot see the models, so it offers the action for every
-                // renameable tab and relies on this check.
+                /* Expected: the frontend cannot see the models, so it offers the action for every
+                 * renameable tab and relies on this check. */
                 LOG.debug("resetTabName: tab " + tabIndex + " has no custom name");
                 return;
             }
@@ -115,8 +115,8 @@ public class TabActionService {
             LOG.debug("Moving tab from index " + tabIndex + " to " + newIndex);
             ViewService viewService = project.getService(ViewService.class);
             try {
-                // Set the flag BEFORE moving so the content listener does not treat the
-                // remove/add pair as a user-initiated tab change.
+                /* Set the flag BEFORE moving so the content listener does not treat the
+                 * remove/add pair as a user-initiated tab change. */
                 if (viewService != null) {
                     viewService.setProcessingTabReorder(true);
                 }
@@ -176,8 +176,8 @@ public class TabActionService {
             AtomicInteger pending = new AtomicInteger(renamed.size());
             for (Map.Entry<Integer, MyModel> entry : renamed.entrySet()) {
                 targetBranchService.getTargetBranchDisplayAsync(entry.getValue().getTargetBranchMap(), branchName -> {
-                    // Empty means repositories are not resolvable yet; leave the tab out rather than
-                    // publish a blank tooltip, and a later collection will republish with the name.
+                    /* Empty means repositories are not resolvable yet; leave the tab out rather than
+                     * publish a blank tooltip, and a later collection will republish with the name. */
                     if (branchName != null && !branchName.isEmpty()) {
                         resolved.put(entry.getKey(), branchName);
                     }

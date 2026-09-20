@@ -29,10 +29,10 @@ public class MyBulkFileListener implements BulkFileListener {
         for (Project project : openProjects) {
             if (project.isDisposed()) continue;
 
-            // Only refresh projects that one of the changed files actually belongs to. Without
-            // this, every VFS batch anywhere (build outputs, unrelated projects, IDE internals)
-            // re-collected every open project, and the resulting collection churn repeatedly
-            // cancelled in-flight collections during busy phases like a rebase.
+            /* Only refresh projects that one of the changed files actually belongs to. Without
+             * this, every VFS batch anywhere (build outputs, unrelated projects, IDE internals)
+             * re-collected every open project, and the resulting collection churn repeatedly
+             * cancelled in-flight collections during busy phases like a rebase. */
             if (!touchesRepository(project, events)) {
                 continue;
             }

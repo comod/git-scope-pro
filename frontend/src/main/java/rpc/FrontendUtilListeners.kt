@@ -31,9 +31,9 @@ class FrontendUtilSubscriptions(
             }
         }
 
-        // Report the frontend's current "Enable preview tab" setting to the backend, and keep it
-        // updated. In split mode the backend cannot read this setting reliably (it is not synced),
-        // so it relies on this pushed value to decide whether single-click opens a file.
+        /* Report the frontend's current "Enable preview tab" setting to the backend, and keep it
+           updated. In split mode the backend cannot read this setting reliably (it is not synced),
+           so it relies on this pushed value to decide whether single-click opens a file. */
         pushPreviewTabEnabled(UISettings.getInstance().openInPreviewTabIfPossible)
         ApplicationManager.getApplication().messageBus.connect(coroutineScope)
             .subscribe(UISettingsListener.TOPIC, UISettingsListener { settings ->

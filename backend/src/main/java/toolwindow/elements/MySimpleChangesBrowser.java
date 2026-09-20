@@ -69,10 +69,12 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
         this.myProject = project;
         setChangesToDisplay(preparedChanges);
 
-        // Navigating to a change moves the focus to the editor, and Swing then repaints the tree's
-        // selection in the washed-out "inactive" colour, so the file navigation just moved to stops
-        // being readable in the tool window. Keep the selection painted as focused, the way the
-        // platform's own always-visible trees do, so the tool window keeps showing where we are.
+        /*
+         * Navigating to a change moves the focus to the editor, and Swing then repaints the tree's
+         * selection in the washed-out "inactive" colour, so the file navigation just moved to stops
+         * being readable in the tool window. Keep the selection painted as focused, the way the
+         * platform's own always-visible trees do, so the tool window keeps showing where we are.
+         */
         getViewer().putClientProperty(RenderingUtil.ALWAYS_PAINT_SELECTION_AS_FOCUSED, true);
 
         // Add mouse listener for single-click preview functionality
@@ -100,9 +102,7 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
         return actions;
     }
 
-    /**
-     * Adds mouse listener to support single-click preview functionality
-     */
+    /** Adds mouse listener to support single-click preview functionality. */
     private void addSingleClickPreviewSupport() {
         // Get the changes viewer component (usually a JTree or JList)
         JComponent viewerComponent = getViewer();
@@ -120,10 +120,12 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
                         return; // Let the default selection behavior handle it
                     }
 
-                    // Only open when the clicked node is an actual file/change leaf. Clicking a
-                    // directory (or any grouping node) must not open a file: getSelectedChanges()
-                    // aggregates all changes under a directory, so using it here would open the
-                    // directory's first file. Resolve the node under the click point instead.
+                    /*
+                     * Only open when the clicked node is an actual file/change leaf. Clicking a
+                     * directory (or any grouping node) must not open a file: getSelectedChanges()
+                     * aggregates all changes under a directory, so using it here would open the
+                     * directory's first file. Resolve the node under the click point instead.
+                     */
                     Change clickedChange = getClickedChange(e);
                     if (clickedChange != null) {
                         VirtualFile file = clickedChange.getVirtualFile();
@@ -290,11 +292,13 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
             // File/change leaf: open in a regular (permanent) tab.
             VirtualFile file = change.getVirtualFile();
             if (file != null) {
-                // PDF, DOCX and friends have no FileEditorProvider, so openFile() returns an empty
-                // composite and the double-click appears to do nothing (issue #106). Hand these to
-                // the frontend, which launches them the way Project View does. Only here, not in
-                // FileOpener: single-click preview and prev/next change navigation traverse files
-                // too, and must not spawn external applications while doing so.
+                /*
+                 * PDF, DOCX and friends have no FileEditorProvider, so openFile() returns an empty
+                 * composite and the double-click appears to do nothing (issue #106). Hand these to
+                 * the frontend, which launches them the way Project View does. Only here, not in
+                 * FileOpener: single-click preview and prev/next change navigation traverse files
+                 * too, and must not spawn external applications while doing so.
+                 */
                 if (file.getFileType() instanceof INativeFileType) {
                     myProject.getService(rpc.UtilCommandService.class)
                             .openInAssociatedApplication(file.getPath(), file.getName());
@@ -305,9 +309,11 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
                 LOG.debug("Double-click: opened in permanent tab: " + file.getName());
             }
         } else {
-            // Directory / grouping node: toggle expand/collapse. The platform's double-click
-            // handler always reports the event as handled, which suppresses the tree's default
-            // expand/collapse, so we do it explicitly here.
+            /*
+             * Directory / grouping node: toggle expand/collapse. The platform's double-click
+             * handler always reports the event as handled, which suppresses the tree's default
+             * expand/collapse, so we do it explicitly here.
+             */
             if (tree.isExpanded(path)) {
                 tree.collapsePath(path);
             } else {

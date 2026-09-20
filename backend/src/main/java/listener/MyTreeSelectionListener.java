@@ -33,8 +33,8 @@ public class MyTreeSelectionListener implements TreeSelectionListener {
         Object object = node.getUserObject();
         if (object instanceof BranchTreeEntry favLabel) {
             String branchName = favLabel.getName();
-            // Skip refs that already carry a range, otherwise a manually entered "a..b" would
-            // become the unresolvable "a..b...HEAD".
+            /* Skip refs that already carry a range, otherwise a manually entered "a..b" would
+             * become the unresolvable "a..b...HEAD". */
             if (this.state.getTwoDotsCheckbox() && !ScopeRefRange.isRange(branchName)) {
                 branchName = branchName + "..." + GitService.BRANCH_HEAD;
             }

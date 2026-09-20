@@ -119,8 +119,8 @@ public class GitUtil {
             }
             GitRevisionNumber headRevision = new GitRevisionNumber(headRevisionStr);
 
-            // Compare target revision to HEAD (not working directory) to get only scope changes
-            // This excludes uncommitted local changes which are handled separately
+            /* Compare target revision to HEAD (not working directory) to get only scope changes.
+             * This excludes uncommitted local changes which are handled separately. */
             Collection<Change> changes =
                     GitChangeUtils.getDiff(project, repository.getRoot(), revisionNumber.asString(), headRevision.asString(), Collections.singletonList(filePath));
 

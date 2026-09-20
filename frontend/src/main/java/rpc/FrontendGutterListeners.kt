@@ -34,9 +34,9 @@ class FrontendGutterSubscriptions(
     }
 
     init {
-        // Only subscribe to gutter updates via RPC in split mode — in monolith,
-        // the frontend GutterDataService IS the backend GutterDataService (same instance),
-        // so re-publishing would cause an infinite loop.
+        /* Only subscribe to gutter updates via RPC in split mode — in monolith,
+           the frontend GutterDataService IS the backend GutterDataService (same instance),
+           so re-publishing would cause an infinite loop. */
         if (!com.intellij.platform.ide.productMode.IdeProductMode.isMonolith) {
             coroutineScope.launch {
                 while (isActive) {
@@ -45,9 +45,9 @@ class FrontendGutterSubscriptions(
                             GutterRpcApi.getInstance()
                                 .getGutterUpdates(project.projectId())
                                 .collect { event ->
-                                    // One bad event must not kill the subscription: the stream is
-                                    // the only source of gutter data, so letting an exception
-                                    // propagate here would leave the gutter permanently empty.
+                                    /* One bad event must not kill the subscription: the stream is
+                                       the only source of gutter data, so letting an exception
+                                       propagate here would leave the gutter permanently empty. */
                                     try {
                                         handleEvent(event)
                                     } catch (e: CancellationException) {
@@ -61,8 +61,8 @@ class FrontendGutterSubscriptions(
                     } catch (e: CancellationException) {
                         throw e
                     } catch (t: Throwable) {
-                        // durable already retries RPC-level failures with its own backoff; anything
-                        // arriving here is unexpected, so log it visibly and keep the subscription alive.
+                        /* durable already retries RPC-level failures with its own backoff; anything
+                           arriving here is unexpected, so log it visibly and keep the subscription alive. */
                         LOG.warn("Gutter update subscription failed, re-subscribing", t)
                     }
                     delay(RESUBSCRIBE_DELAY_MS)
@@ -79,8 +79,8 @@ class FrontendGutterSubscriptions(
                 gds.scopeDisplayName = dto.scopeDisplayName
                 GitScopeSettings.getInstance().isSeparateGutterRendering = dto.separateGutterRendering
 
-                // Contents are omitted when unchanged since the backend's last message for this
-                // file; the previously published data then carries them.
+                /* Contents are omitted when unchanged since the backend's last message for this
+                   file; the previously published data then carries them. */
                 val baseContent: String
                 val headContent: String?
                 if (dto.contentsIncluded) {
@@ -93,8 +93,8 @@ class FrontendGutterSubscriptions(
                 } else {
                     val cached = gds.getData(dto.filePath)
                     if (cached == null) {
-                        // Should not happen: the backend only omits contents it already sent within
-                        // this subscription, and clears that memory together with AllCleared.
+                        /* Should not happen: the backend only omits contents it already sent within
+                           this subscription, and clears that memory together with AllCleared. */
                         LOG.warn("Gutter update for ${dto.filePath} references cached contents that are missing, skipping")
                         return
                     }

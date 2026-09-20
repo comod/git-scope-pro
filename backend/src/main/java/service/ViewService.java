@@ -88,8 +88,8 @@ public class ViewService implements Disposable {
     public ViewService(Project project) {
         this.project = project;
         ApplicationManager.getApplication().executeOnPooledThread(() -> {
-            // Force lazy service initialization on BGT where blocking ops are allowed,
-            // preventing EDT warnings from config loading (e.g. Maven path macro resolution)
+            /* Force lazy service initialization on BGT where blocking ops are allowed,
+               preventing EDT warnings from config loading (e.g. Maven path macro resolution) */
             project.getService(ChangesService.class);
             project.getService(ToolWindowServiceInterface.class);
             project.getService(StatusBarService.class);
@@ -585,8 +585,9 @@ public class ViewService implements Disposable {
                         Collection<Change> changes = model.getChanges();
                         doUpdateDebounced(changes);
 
-                        // Refresh file colors once on initial startup after changes are loaded for the active model
-                        // This handles the boot case where setActiveModel() is called before changes are collected
+                        /* Refresh file colors once on initial startup after changes are loaded for
+                           the active model. This handles the boot case where setActiveModel() is
+                           called before changes are collected */
                         if (!initialFileColorsRefreshed.get() && changes != null && !changes.isEmpty()) {
                             if (initialFileColorsRefreshed.compareAndSet(false, true)) {
                                 refreshFileColors();
@@ -597,8 +598,8 @@ public class ViewService implements Disposable {
                 // TODO: collectChanges: tab switched
                 case active -> {
                     incrementUpdate(); // Increment generation to cancel any stale updates for previous tab
-                    // Refresh file colors AFTER scopeChangesMap is updated
-                    // This ensures GitScopeFileStatusProvider sees the correct scope
+                    /* Refresh file colors AFTER scopeChangesMap is updated. This ensures
+                       GitScopeFileStatusProvider sees the correct scope */
                     collectChanges(model, true).thenRun(this::refreshFileColors);
                 }
                 case tabName -> {
@@ -704,8 +705,8 @@ public class ViewService implements Disposable {
         ensureHeadTabInitializedAsync(model, () -> {
             TargetBranchMap targetBranchMap = model.getTargetBranchMap();
             if (targetBranchMap == null) {
-                // Repositories not registered yet, or the tab has no target branch: nothing can be
-                // collected and no later event necessarily retries, so the scope stays as it was.
+                /* Repositories not registered yet, or the tab has no target branch: nothing can be
+                   collected and no later event necessarily retries, so the scope stays as it was. */
                 LOG.debug("collectChanges skipped for tab '" + model.getDisplayName() + "': no target branch map");
                 done.complete(null);
                 return;
@@ -729,9 +730,9 @@ public class ViewService implements Disposable {
         changesExecutor.execute(() -> {
             changesService.collectChangesWithCallback(finalTargetBranchMap, result -> {
                 if (result == null) {
-                    // Superseded or cancelled by a newer collection, which owns the model now.
-                    // Complete the future anyway so chained UI work (e.g. the file-colors refresh
-                    // after a tab switch) is never silently dropped.
+                    /* Superseded or cancelled by a newer collection, which owns the model now.
+                       Complete the future anyway so chained UI work (e.g. the file-colors refresh
+                       after a tab switch) is never silently dropped. */
                     LOG.debug("Collection for generation " + gen + " superseded, completing without apply");
                     done.complete(null);
                     return;
@@ -752,19 +753,19 @@ public class ViewService implements Disposable {
                             model.setScopeChangesWithMap(result.scopeChanges(), scopeChangesMap);
                             model.setLocalChangesWithMap(result.localChanges(), localChangesMap);
 
-                            // GitScopeFileStatusProvider answers from the scope map, but the
-                            // platform caches its answers until fileStatusesChanged() -- which
-                            // previously only tab switches triggered, so Project-view colors kept
-                            // showing the pre-collection scope (e.g. conflict-era statuses after a
-                            // rebase). Refresh when the statuses materially changed; the guard
-                            // avoids the LST-disturbing refresh on the common no-change apply.
+                            /* GitScopeFileStatusProvider answers from the scope map, but the
+                               platform caches its answers until fileStatusesChanged() -- which
+                               previously only tab switches triggered, so Project-view colors kept
+                               showing the pre-collection scope (e.g. conflict-era statuses after a
+                               rebase). Refresh when the statuses materially changed; the guard
+                               avoids the LST-disturbing refresh on the common no-change apply. */
                             if (model.isActive() && !sameScopeStatuses(previousScopeMap, scopeChangesMap)) {
                                 LOG.debug("Scope statuses changed for generation " + gen + ", refreshing file colors");
                                 refreshFileColors();
                             }
 
-                            // Repositories are resolvable by now, so tab tooltips that could not be
-                            // built at boot (empty branch name) can finally be published.
+                            /* Repositories are resolvable by now, so tab tooltips that could not be
+                               built at boot (empty branch name) can finally be published. */
                             project.getService(TabActionService.class).publishRenamedTabs();
                         } else {
                             LOG.debug("Discarding changes for generation " + gen + " (current generation is " + currentGen + ")");
@@ -1072,8 +1073,8 @@ public class ViewService implements Disposable {
         try {
             isProcessingTabRename = true;
 
-            // Rebuild collection from tab order to ensure consistency
-            // This is critical because the collection might be out of sync with actual tabs
+            /* Rebuild collection from tab order to ensure consistency. This is critical because
+               the collection might be out of sync with actual tabs */
             rebuildCollectionFromTabOrder();
 
             // Update the model with custom name if needed

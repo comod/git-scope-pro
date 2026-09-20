@@ -35,9 +35,9 @@ class BackendGutterRpcImpl : GutterRpcApi {
         val gds = project.service<GutterDataService>()
 
         return flow {
-            // Contents last sent to THIS subscriber, per file. Contents dominate the message size,
-            // so they are resent only when they actually changed; a new subscription starts empty
-            // and therefore always sends contents on first contact with a file.
+            /* Contents last sent to THIS subscriber, per file. Contents dominate the message size,
+             * so they are resent only when they actually changed; a new subscription starts empty
+             * and therefore always sends contents on first contact with a file. */
             val lastSentContents = HashMap<String, Pair<String, String?>>()
 
             // Conflated: always accepts, coalesces repeated wake-ups; listeners never block or fail.
@@ -67,8 +67,8 @@ class BackendGutterRpcImpl : GutterRpcApi {
 
                 override fun onAllCleared() = markDirty(null)
             }
-            // Register the listener before the replay so no update between replay and registration
-            // is missed; a double-send of the same file is harmless (the frontend overwrites).
+            /* Register the listener before the replay so no update between replay and registration
+             * is missed; a double-send of the same file is harmless (the frontend overwrites). */
             gds.addListener(listener)
             try {
                 for (path in gds.getAllData().keys) {
@@ -89,14 +89,14 @@ class BackendGutterRpcImpl : GutterRpcApi {
                         if (!clearAll && paths.isEmpty()) break
 
                         if (clearAll) {
-                            // The frontend drops its cache on AllCleared, so nothing previously
-                            // sent may be referred to afterwards.
+                            /* The frontend drops its cache on AllCleared, so nothing previously
+                             * sent may be referred to afterwards. */
                             lastSentContents.clear()
                             emit(GutterUpdateEvent.AllCleared)
                         }
                         for (path in paths) {
-                            // Read the freshest snapshot at send time, not at event time. A file
-                            // cleared while queued yields null and becomes a DataCleared.
+                            /* Read the freshest snapshot at send time, not at event time. A file
+                             * cleared while queued yields null and becomes a DataCleared. */
                             val data = gds.getData(path)
                             if (data == null) {
                                 lastSentContents.remove(path)

@@ -101,9 +101,11 @@ class FrontendRenameTabAction : TabContextAction() {
 }
 
 class FrontendResetTabNameAction : TabContextAction() {
-    // Whether a tab carries a custom name is backend model state, mirrored by
-    // FrontendTabStateService. While that state is still unknown the action stays enabled and the
-    // backend no-ops if there is nothing to reset.
+    /**
+     * Whether a tab carries a custom name is backend model state, mirrored by
+     * FrontendTabStateService. While that state is still unknown the action stays enabled and the
+     * backend no-ops if there is nothing to reset.
+     */
     override fun isEnabled(project: Project, contentManager: ContentManager, index: Int, content: Content) =
         isRegularTab(index, content) &&
             project.service<FrontendTabStateService>().hasCustomNameOrUnknown(index)
