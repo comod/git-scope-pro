@@ -19,7 +19,7 @@ public class MyModelBase {
         if (targetBranchMap == null) {
             targetBranchMap = TargetBranchMap.create();
         }
-        targetBranchMap.add(repo.toString(), branch);
+        targetBranchMap.add(repo, branch);
     }
 
     public String getCustomTabName() {

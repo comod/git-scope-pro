@@ -71,13 +71,8 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
     }
 
     @NotNull
-    private static String getBranchToCompare(TargetBranchMap targetBranchByRepo, GitRepository repo) {
-        String branchToCompare;
-        if (targetBranchByRepo == null) {
-            branchToCompare = GitService.BRANCH_HEAD;
-        } else {
-            branchToCompare = targetBranchByRepo.value().get(repo.toString());
-        }
+    private static String getBranchToCompare(TargetBranchMap targetBranchByRepo, GitRepository repo, int repositoryCount) {
+        String branchToCompare = targetBranchByRepo != null ? targetBranchByRepo.resolve(repo, repositoryCount) : null;
         if (branchToCompare == null) {
             branchToCompare = GitService.BRANCH_HEAD;
         }
@@ -148,7 +143,7 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
                         return;
                     }
                     try {
-                        String branchToCompare = getBranchToCompare(targetBranchByRepo, repo);
+                        String branchToCompare = getBranchToCompare(targetBranchByRepo, repo, repositories.size());
 
                         // Use repo path + target branch as cache key to ensure different branches don't share cache
                         String cacheKey = repo.getRoot().getPath() + "|" + branchToCompare;

@@ -2,6 +2,7 @@ package state;
 
 import com.intellij.openapi.components.PersistentStateComponent;
 import com.intellij.openapi.components.Storage;
+import com.intellij.openapi.components.StoragePathMacros;
 import com.intellij.util.xmlb.XmlSerializerUtil;
 import com.intellij.util.xmlb.annotations.OptionTag;
 import model.MyModelBase;
@@ -22,9 +23,18 @@ import java.util.List;
  * PersistentStateComponent keeps project config values.
  * Similar notion of 'preference' in Android
  */
+/* GitScopePro.xml is a project-shared file (not gitignored by default), so it stored repo
+ * target-branch selections keyed by an absolute path that could point at the wrong machine's
+ * checkout for every collaborator but the one who saved it (#110). workspace.xml is per-user
+ * and local, which is what this data actually is. The deprecated storage is only read when
+ * workspace.xml has nothing yet (existing users keep their saved tabs on upgrade), and is never
+ * written to again once it's read once -- see Storage.deprecated() javadoc. */
 @com.intellij.openapi.components.State(
         name = "GitScope",
-        storages = {@Storage(value = "GitScopePro.xml")}
+        storages = {
+                @Storage(StoragePathMacros.WORKSPACE_FILE),
+                @Storage(value = "GitScopePro.xml", deprecated = true)
+        }
 )
 public class State implements PersistentStateComponent<State> {
 
