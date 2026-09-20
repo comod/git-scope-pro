@@ -42,6 +42,14 @@ public class State implements PersistentStateComponent<State> {
     public List<MyModelBase> modelData;
     public Boolean threeDotsCheckBox = false;
 
+    /**
+     * Per-project "show untracked/deleted files" toggle (Git Scope window buttons, #111). Null
+     * until {@link service.ViewService} seeds it from {@link settings.GitScopeSettings}'s
+     * new-project default on first load; from then on this project's own value is authoritative.
+     */
+    public Boolean showUntrackedFiles;
+    public Boolean showDeletedFiles;
+
     public List<MyModelBase> getModelData() {
         return modelData;
     }
@@ -56,6 +64,22 @@ public class State implements PersistentStateComponent<State> {
 
     public void setThreeDotsCheckBox(Boolean value) {
         threeDotsCheckBox = value;
+    }
+
+    public Boolean getShowUntrackedFiles() {
+        return showUntrackedFiles;
+    }
+
+    public void setShowUntrackedFiles(Boolean value) {
+        showUntrackedFiles = value;
+    }
+
+    public Boolean getShowDeletedFiles() {
+        return showDeletedFiles;
+    }
+
+    public void setShowDeletedFiles(Boolean value) {
+        showDeletedFiles = value;
     }
 
     // In your State class, add these methods:

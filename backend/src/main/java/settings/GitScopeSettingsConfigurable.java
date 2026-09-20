@@ -47,23 +47,21 @@ public class GitScopeSettingsConfigurable implements Configurable {
     public void apply() throws ConfigurationException {
         GitScopeSettings settings = GitScopeSettings.getInstance();
         boolean tabColorsChanged = settingsComponent.isScopeFileColors() != settings.isScopeFileColors();
-        boolean workingTreeChanged = settingsComponent.isShowUntrackedFiles() != settings.isShowUntrackedFiles()
-            || settingsComponent.isShowDeletedFiles() != settings.isShowDeletedFiles();
         boolean separateGutterChanged = settingsComponent.isSeparateGutterRendering() != settings.isSeparateGutterRendering();
         settings.setSeparateGutterRendering(settingsComponent.isSeparateGutterRendering());
         settings.setScopeFileColors(settingsComponent.isScopeFileColors());
+        /* showUntrackedFiles/showDeletedFiles are only the new-project default (#111): already-open
+         * projects have their own toggle state (see State.showUntrackedFiles/showDeletedFiles,
+         * flipped via the Git Scope window buttons) and are intentionally not refreshed here. */
         settings.setShowUntrackedFiles(settingsComponent.isShowUntrackedFiles());
         settings.setShowDeletedFiles(settingsComponent.isShowDeletedFiles());
 
-        for (var project : ProjectManager.getInstance().getOpenProjects()) {
-            if (!project.isDisposed()) {
-                ViewService viewService = project.getService(ViewService.class);
-                if (viewService != null && !viewService.isDisposed()) {
-                    if (tabColorsChanged) {
+        if (tabColorsChanged) {
+            for (var project : ProjectManager.getInstance().getOpenProjects()) {
+                if (!project.isDisposed()) {
+                    ViewService viewService = project.getService(ViewService.class);
+                    if (viewService != null && !viewService.isDisposed()) {
                         viewService.refreshFileColors();
-                    }
-                    if (workingTreeChanged) {
-                        viewService.collectChanges(true);
                     }
                 }
             }

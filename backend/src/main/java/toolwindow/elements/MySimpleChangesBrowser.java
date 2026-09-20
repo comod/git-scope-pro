@@ -1,6 +1,9 @@
 package toolwindow.elements;
 
+import com.intellij.openapi.actionSystem.ActionGroup;
+import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.AnAction;
+import com.intellij.openapi.actionSystem.Separator;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.LogicalPosition;
@@ -20,6 +23,7 @@ import com.intellij.openapi.vcs.changes.CurrentContentRevision;
 import service.ViewService;
 import com.intellij.openapi.vcs.changes.actions.diff.ChangeDiffRequestProducer;
 import com.intellij.openapi.vcs.changes.ui.ChangeDiffRequestChain;
+import com.intellij.openapi.vcs.changes.ui.ChangesTree;
 import com.intellij.openapi.vcs.changes.ui.SimpleAsyncChangesBrowser;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.render.RenderingUtil;
@@ -42,20 +46,25 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
     // Instance-level actions to avoid static references that prevent plugin unloading
     // Use lazy initialization since super() constructor may call createToolbarActions() before field initialization
     private AnAction selectOpenedFileAction;
+    private AnAction groupByAction;
+    private AnAction showUntrackedFilesAction;
+    private AnAction showDeletedFilesAction;
     private AnAction showInProjectAction;
     private AnAction rollbackAction;
     private AnAction createPatchAction;
     private AnAction copyAsPatchAction;
-    private List<AnAction> toolbarActions;
 
     private void initializeActions() {
         if (selectOpenedFileAction == null) {
             selectOpenedFileAction = new VcsTreeActions.SelectOpenedFileAction();
+            groupByAction = new VcsTreeActions.RightAlignedGroup(
+                    (ActionGroup) ActionManager.getInstance().getAction(ChangesTree.GROUP_BY_ACTION_GROUP));
+            showUntrackedFilesAction = new VcsTreeActions.ShowUntrackedFilesAction();
+            showDeletedFilesAction = new VcsTreeActions.ShowDeletedFilesAction();
             showInProjectAction = new VcsTreeActions.ShowInProjectAction();
             rollbackAction = new VcsTreeActions.RollbackAction();
             createPatchAction = new VcsTreeActions.CreatePatchAction();
             copyAsPatchAction = new VcsTreeActions.CopyAsPatchAction();
-            toolbarActions = Collections.singletonList(selectOpenedFileAction);
         }
     }
 
@@ -96,10 +105,23 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
     @Override
     protected @NotNull List<AnAction> createToolbarActions() {
         initializeActions();
-        // Include parent actions first (on the left), then add our custom action (on the right)
+        // Left: action icons -- parent actions (Diff) plus ours.
         List<AnAction> actions = new ArrayList<>(super.createToolbarActions());
         actions.add(selectOpenedFileAction);
+        actions.add(Separator.getInstance());
+        // Right: presentation-changing toggles, right-aligned (see VcsTreeActions.RightAlignedGroup
+        // / RightAlignedToolbarAction) so they sit apart from the action icons above.
+        actions.add(groupByAction);
+        actions.add(showDeletedFilesAction);
+        actions.add(showUntrackedFilesAction);
         return actions;
+    }
+
+    @Override
+    protected @NotNull List<AnAction> createLastToolbarActions() {
+        // The platform default (Separator + Group By) is folded into createToolbarActions() above
+        // instead, wrapped so Group By right-aligns next to our own toggles.
+        return List.of();
     }
 
     /** Adds mouse listener to support single-click preview functionality. */

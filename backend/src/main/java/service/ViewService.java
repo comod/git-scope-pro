@@ -25,6 +25,7 @@ import model.MyModel;
 import model.MyModelBase;
 import model.TargetBranchMap;
 import org.jetbrains.annotations.NotNull;
+import settings.GitScopeSettings;
 import state.State;
 import implementation.scope.MyScope;
 import system.Defs;
@@ -175,9 +176,25 @@ public class ViewService implements Disposable {
         this.gitService = project.getService(GitService.class);
         this.targetBranchService = project.getService(TargetBranchService.class);
         this.state = project.getService(State.class);
+        seedWorkingTreeDefaults();
         this.myLineStatusTrackerImpl = new MyLineStatusTrackerImpl(project, this);
         this.myScope = new MyScope(project);
         this.debouncer = new Debounce();
+    }
+
+    /**
+     * Seeds this project's untracked/deleted-file toggles (#111) from the application-level
+     * "new project" default the first time they're touched. Once seeded, a project's own stored
+     * value is authoritative -- later changes to the Settings default no longer affect it.
+     */
+    private void seedWorkingTreeDefaults() {
+        GitScopeSettings defaults = GitScopeSettings.getInstance();
+        if (state.getShowUntrackedFiles() == null) {
+            state.setShowUntrackedFiles(defaults.isShowUntrackedFiles());
+        }
+        if (state.getShowDeletedFiles() == null) {
+            state.setShowDeletedFiles(defaults.isShowDeletedFiles());
+        }
     }
 
     private void doUpdateDebounced(Collection<Change> changes) {

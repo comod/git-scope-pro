@@ -22,7 +22,7 @@ import git4idea.repo.GitRepository;
 import model.TargetBranchMap;
 import org.jetbrains.annotations.NotNull;
 import service.GitService;
-import settings.GitScopeSettings;
+import state.State;
 import system.Defs;
 import utils.PlatformApiReflection;
 import utils.GitUtil;
@@ -312,7 +312,7 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
      */
     private Collection<Change> filterLocalChanges(Collection<Change> localChanges, String repoPath, Collection<Change> existingChanges) {
         Collection<Change> filtered = new ArrayList<>();
-        boolean showDeletedFiles = GitScopeSettings.getInstance().isShowDeletedFiles();
+        boolean showDeletedFiles = Boolean.TRUE.equals(project.getService(State.class).getShowDeletedFiles());
 
         for (Change change : localChanges) {
             FilePath changePath = ChangesUtil.getFilePath(change);
@@ -402,7 +402,7 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
             /* Add unversioned (untracked) files if the setting is enabled. They join the changelist
              * entries *before* filtering so they get the same repository and staleness checks —
              * appending them afterwards let untracked paths bypass both. */
-            if (GitScopeSettings.getInstance().isShowUntrackedFiles()) {
+            if (Boolean.TRUE.equals(project.getService(State.class).getShowUntrackedFiles())) {
                 for (FilePath unversionedPath : changeListManager.getUnversionedFilesPaths()) {
                     localChanges.add(new Change(null, new CurrentContentRevision(unversionedPath), FileStatus.UNKNOWN));
                 }
