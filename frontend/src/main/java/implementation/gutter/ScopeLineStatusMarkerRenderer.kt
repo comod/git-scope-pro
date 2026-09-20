@@ -239,6 +239,15 @@ class ScopeLineStatusMarkerRenderer(
     @RequiresEdt
     fun clear() {
         if (disposed) return
+        clearInternal()
+    }
+
+    /**
+     * Teardown without the [disposed] guard, so [dispose] can still remove the highlighter after
+     * setting the flag.
+     */
+    @RequiresEdt
+    private fun clearInternal() {
         currentRanges = emptyList()
         gutterHighlighterManager.clear()
     }
@@ -248,7 +257,14 @@ class ScopeLineStatusMarkerRenderer(
 
         ApplicationManager.getApplication().invokeLater {
             removeMouseListeners()
-            clear()
+            /* Deliberately not clear(): this runs a tick after disposed was set, so the guard
+             * there would skip the removal and leave the highlighter in the markup model,
+             * painting the stale ranges through this instance's providers -- including a hover
+             * expansion frozen at whatever was under the cursor, with the listeners that would
+             * clear it already gone. Drop the hover first: the removal below logs and swallows
+             * its own failures, so the highlighter can outlive this call. */
+            hoveredRange = null
+            clearInternal()
         }
     }
 
