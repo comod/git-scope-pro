@@ -1,6 +1,9 @@
 package toolwindow.elements;
 
+import com.intellij.openapi.actionSystem.ActionGroup;
+import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.AnAction;
+import com.intellij.openapi.actionSystem.Separator;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.LogicalPosition;
@@ -8,6 +11,7 @@ import com.intellij.openapi.editor.ScrollType;
 import com.intellij.openapi.fileEditor.FileEditor;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.TextEditor;
+import com.intellij.openapi.fileTypes.INativeFileType;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.FilePath;
 import com.intellij.openapi.vcs.VcsException;
@@ -19,6 +23,7 @@ import com.intellij.openapi.vcs.changes.CurrentContentRevision;
 import service.ViewService;
 import com.intellij.openapi.vcs.changes.actions.diff.ChangeDiffRequestProducer;
 import com.intellij.openapi.vcs.changes.ui.ChangeDiffRequestChain;
+import com.intellij.openapi.vcs.changes.ui.ChangesTree;
 import com.intellij.openapi.vcs.changes.ui.SimpleAsyncChangesBrowser;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.render.RenderingUtil;
@@ -41,20 +46,25 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
     // Instance-level actions to avoid static references that prevent plugin unloading
     // Use lazy initialization since super() constructor may call createToolbarActions() before field initialization
     private AnAction selectOpenedFileAction;
+    private AnAction groupByAction;
+    private AnAction showUntrackedFilesAction;
+    private AnAction showDeletedFilesAction;
     private AnAction showInProjectAction;
     private AnAction rollbackAction;
     private AnAction createPatchAction;
     private AnAction copyAsPatchAction;
-    private List<AnAction> toolbarActions;
 
     private void initializeActions() {
         if (selectOpenedFileAction == null) {
             selectOpenedFileAction = new VcsTreeActions.SelectOpenedFileAction();
+            groupByAction = new VcsTreeActions.RightAlignedGroup(
+                    (ActionGroup) ActionManager.getInstance().getAction(ChangesTree.GROUP_BY_ACTION_GROUP));
+            showUntrackedFilesAction = new VcsTreeActions.ShowUntrackedFilesAction();
+            showDeletedFilesAction = new VcsTreeActions.ShowDeletedFilesAction();
             showInProjectAction = new VcsTreeActions.ShowInProjectAction();
             rollbackAction = new VcsTreeActions.RollbackAction();
             createPatchAction = new VcsTreeActions.CreatePatchAction();
             copyAsPatchAction = new VcsTreeActions.CopyAsPatchAction();
-            toolbarActions = Collections.singletonList(selectOpenedFileAction);
         }
     }
 
@@ -68,10 +78,12 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
         this.myProject = project;
         setChangesToDisplay(preparedChanges);
 
-        // Navigating to a change moves the focus to the editor, and Swing then repaints the tree's
-        // selection in the washed-out "inactive" colour, so the file navigation just moved to stops
-        // being readable in the tool window. Keep the selection painted as focused, the way the
-        // platform's own always-visible trees do, so the tool window keeps showing where we are.
+        /*
+         * Navigating to a change moves the focus to the editor, and Swing then repaints the tree's
+         * selection in the washed-out "inactive" colour, so the file navigation just moved to stops
+         * being readable in the tool window. Keep the selection painted as focused, the way the
+         * platform's own always-visible trees do, so the tool window keeps showing where we are.
+         */
         getViewer().putClientProperty(RenderingUtil.ALWAYS_PAINT_SELECTION_AS_FOCUSED, true);
 
         // Add mouse listener for single-click preview functionality
@@ -93,15 +105,26 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
     @Override
     protected @NotNull List<AnAction> createToolbarActions() {
         initializeActions();
-        // Include parent actions first (on the left), then add our custom action (on the right)
+        // Left: action icons -- parent actions (Diff) plus ours.
         List<AnAction> actions = new ArrayList<>(super.createToolbarActions());
         actions.add(selectOpenedFileAction);
+        actions.add(Separator.getInstance());
+        // Right: presentation-changing toggles, right-aligned (see VcsTreeActions.RightAlignedGroup
+        // / RightAlignedToolbarAction) so they sit apart from the action icons above.
+        actions.add(groupByAction);
+        actions.add(showDeletedFilesAction);
+        actions.add(showUntrackedFilesAction);
         return actions;
     }
 
-    /**
-     * Adds mouse listener to support single-click preview functionality
-     */
+    @Override
+    protected @NotNull List<AnAction> createLastToolbarActions() {
+        // The platform default (Separator + Group By) is folded into createToolbarActions() above
+        // instead, wrapped so Group By right-aligns next to our own toggles.
+        return List.of();
+    }
+
+    /** Adds mouse listener to support single-click preview functionality. */
     private void addSingleClickPreviewSupport() {
         // Get the changes viewer component (usually a JTree or JList)
         JComponent viewerComponent = getViewer();
@@ -119,10 +142,12 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
                         return; // Let the default selection behavior handle it
                     }
 
-                    // Only open when the clicked node is an actual file/change leaf. Clicking a
-                    // directory (or any grouping node) must not open a file: getSelectedChanges()
-                    // aggregates all changes under a directory, so using it here would open the
-                    // directory's first file. Resolve the node under the click point instead.
+                    /*
+                     * Only open when the clicked node is an actual file/change leaf. Clicking a
+                     * directory (or any grouping node) must not open a file: getSelectedChanges()
+                     * aggregates all changes under a directory, so using it here would open the
+                     * directory's first file. Resolve the node under the click point instead.
+                     */
                     Change clickedChange = getClickedChange(e);
                     if (clickedChange != null) {
                         VirtualFile file = clickedChange.getVirtualFile();
@@ -141,7 +166,7 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
      * object is not a Change), so clicking a directory does not open a file.
      */
     private @Nullable Change getClickedChange(MouseEvent e) {
-        if (!(getViewer() instanceof javax.swing.JTree tree)) return null;
+        JTree tree = getViewer();
         javax.swing.tree.TreePath path = tree.getPathForLocation(e.getX(), e.getY());
         if (path == null) return null;
         Object node = path.getLastPathComponent();
@@ -274,7 +299,7 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
 
     @Override
     protected void onDoubleClick() {
-        if (!(getViewer() instanceof javax.swing.JTree tree)) return;
+        JTree tree = getViewer();
         javax.swing.tree.TreePath path = tree.getSelectionPath();
         if (path == null) return;
 
@@ -289,13 +314,28 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
             // File/change leaf: open in a regular (permanent) tab.
             VirtualFile file = change.getVirtualFile();
             if (file != null) {
+                /*
+                 * PDF, DOCX and friends have no FileEditorProvider, so openFile() returns an empty
+                 * composite and the double-click appears to do nothing (issue #106). Hand these to
+                 * the frontend, which launches them the way Project View does. Only here, not in
+                 * FileOpener: single-click preview and prev/next change navigation traverse files
+                 * too, and must not spawn external applications while doing so.
+                 */
+                if (file.getFileType() instanceof INativeFileType) {
+                    myProject.getService(rpc.UtilCommandService.class)
+                            .openInAssociatedApplication(file.getPath(), file.getName());
+                    LOG.debug("Double-click: routed to associated application: " + file.getName());
+                    return;
+                }
                 openAndScrollToChanges(myProject, file, -1, false);
                 LOG.debug("Double-click: opened in permanent tab: " + file.getName());
             }
         } else {
-            // Directory / grouping node: toggle expand/collapse. The platform's double-click
-            // handler always reports the event as handled, which suppresses the tree's default
-            // expand/collapse, so we do it explicitly here.
+            /*
+             * Directory / grouping node: toggle expand/collapse. The platform's double-click
+             * handler always reports the event as handled, which suppresses the tree's default
+             * expand/collapse, so we do it explicitly here.
+             */
             if (tree.isExpanded(path)) {
                 tree.collapsePath(path);
             } else {

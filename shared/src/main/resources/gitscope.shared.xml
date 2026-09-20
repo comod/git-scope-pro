@@ -6,5 +6,10 @@
     <extensions defaultExtensionNs="com.intellij">
         <applicationService serviceImplementation="settings.GitScopeSettings"/>
         <projectService serviceImplementation="service.GutterDataService"/>
+
+        <!-- Registered here rather than in the frontend or backend descriptor: this module is
+             loading="required", so the group exists in every product mode. The id matches
+             Defs.APPLICATION_NAME, which utils.Notification uses. -->
+        <notificationGroup id="Git Scope" displayType="BALLOON"/>
     </extensions>
 </idea-plugin>

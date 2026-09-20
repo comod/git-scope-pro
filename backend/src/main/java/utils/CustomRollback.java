@@ -145,24 +145,7 @@ public class CustomRollback {
             scrollPane.setPreferredSize(new Dimension(500, Math.min(300, files.size() * 20)));
             panel.add(scrollPane, BorderLayout.CENTER);
 
-            DialogWrapper confirmDialog = new DialogWrapper(project, true) {
-                {
-                    setTitle(icon == Messages.getWarningIcon() ? "Confirm Rollback" : "Rollback Failed");
-                    init();
-                }
-                @Override
-                protected JComponent createCenterPanel() {
-                    return panel;
-                }
-                @Override
-                protected Action @NotNull [] createActions() {
-                    if (icon == Messages.getWarningIcon()) {
-                        return super.createActions(); // OK/Cancel
-                    } else {
-                        return new Action[]{getOKAction()};
-                    }
-                }
-            };
+            DialogWrapper confirmDialog = createConfirmDialog(project, panel, icon);
             confirmDialog.show();
             result[0] = confirmDialog.isOK();
         };
@@ -173,6 +156,27 @@ public class CustomRollback {
             ApplicationManager.getApplication().invokeAndWait(show);
         }
         return result[0];
+    }
+
+    private DialogWrapper createConfirmDialog(@NotNull Project project, JPanel panel, Icon icon) {
+        return new DialogWrapper(project, true) {
+            {
+                setTitle(icon == Messages.getWarningIcon() ? "Confirm Rollback" : "Rollback Failed");
+                init();
+            }
+            @Override
+            protected JComponent createCenterPanel() {
+                return panel;
+            }
+            @Override
+            protected Action @NotNull [] createActions() {
+                if (icon == Messages.getWarningIcon()) {
+                    return super.createActions(); // OK/Cancel
+                } else {
+                    return new Action[]{getOKAction()};
+                }
+            }
+        };
     }
 
     private void showFailedFilesDialog(@NotNull Project project, @NotNull List<String> failedFiles) {

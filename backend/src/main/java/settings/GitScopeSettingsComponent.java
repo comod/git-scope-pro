@@ -44,11 +44,11 @@ public class GitScopeSettingsComponent {
             .addComponent(scopeFileColorsCheckBox, 1)
             .addTooltip("When enabled (default), project and editor file colors reflect the active Git Scope")
             .addVerticalGap(10)
-            .addComponent(new TitledSeparator("Working Tree"))
+            .addComponent(new TitledSeparator("Working Tree (default for new projects)"))
             .addComponent(showUntrackedFilesCheckBox, 1)
-            .addTooltip("When enabled, untracked (unversioned) files appear in the Git Scope view")
+            .addTooltip("Initial state of the \"Show Untracked Files\" toggle in the Git Scope window")
             .addComponent(showDeletedFilesCheckBox, 1)
-            .addTooltip("When enabled, locally deleted files appear in the Git Scope view")
+            .addTooltip("Initial state of the \"Show Deleted Files\" toggle in the Git Scope window")
             .addComponentFillVertically(new JPanel(), 0)
             .getPanel();
 

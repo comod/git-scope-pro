@@ -1,7 +1,9 @@
 
 package toolwindow.elements;
 
+import com.intellij.ide.HelpTooltipKt;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.text.HtmlChunk;
 import service.GitService;
 
 import javax.swing.*;
@@ -48,7 +50,7 @@ public class CurrentBranch extends JLabel {
                     branchName = count + " Repositories";
                 }
                 setText(branchName);
-                setToolTipText(branchName);
+                HelpTooltipKt.setToolTipText(this, HtmlChunk.text(branchName));
             });
         });
     }

@@ -115,6 +115,16 @@ internal class ScopeGutterPopupPanel(
             }
         }
 
+        // Moves the caret/scroll to [range] and refreshes the diff panel and highlights for it.
+        fun navigateToRange(range: Range) {
+            suppressCaretCancel = true
+            editor.caretModel.moveToLogicalPosition(LogicalPosition(range.line1, 0))
+            editor.scrollingModel.scrollToCaret(ScrollType.CENTER)
+            suppressCaretCancel = false
+            updateDiffPanel(range)
+            updateEditorHighlights(range)
+        }
+
         // Create toolbar with action buttons (IDE VCS gutter style)
         val actionGroup = DefaultActionGroup().apply {
             // Previous Change action
@@ -122,19 +132,15 @@ internal class ScopeGutterPopupPanel(
                 override fun actionPerformed(event: AnActionEvent) {
                     if (currentIndex > 0) {
                         currentIndex--
-                        val previousRange = sortedRanges[currentIndex]
-                        suppressCaretCancel = true
-                        editor.caretModel.moveToLogicalPosition(LogicalPosition(previousRange.line1, 0))
-                        editor.scrollingModel.scrollToCaret(ScrollType.CENTER)
-                        suppressCaretCancel = false
-                        updateDiffPanel(previousRange)
-                        updateEditorHighlights(previousRange)
+                        navigateToRange(sortedRanges[currentIndex])
                     }
                 }
 
                 override fun update(e: AnActionEvent) {
                     e.presentation.isEnabled = currentIndex > 0
                 }
+
+                override fun getActionUpdateThread() = ActionUpdateThread.EDT
             })
 
             // Next Change action
@@ -142,19 +148,15 @@ internal class ScopeGutterPopupPanel(
                 override fun actionPerformed(event: AnActionEvent) {
                     if (currentIndex >= 0 && currentIndex < sortedRanges.size - 1) {
                         currentIndex++
-                        val nextRange = sortedRanges[currentIndex]
-                        suppressCaretCancel = true
-                        editor.caretModel.moveToLogicalPosition(LogicalPosition(nextRange.line1, 0))
-                        editor.scrollingModel.scrollToCaret(ScrollType.CENTER)
-                        suppressCaretCancel = false
-                        updateDiffPanel(nextRange)
-                        updateEditorHighlights(nextRange)
+                        navigateToRange(sortedRanges[currentIndex])
                     }
                 }
 
                 override fun update(e: AnActionEvent) {
                     e.presentation.isEnabled = currentIndex >= 0 && currentIndex < sortedRanges.size - 1
                 }
+
+                override fun getActionUpdateThread() = ActionUpdateThread.EDT
             })
 
             // Rollback action
@@ -220,12 +222,12 @@ internal class ScopeGutterPopupPanel(
         updateDiffPanel(range)
         updateEditorHighlights(range)
 
-        // Create lightweight popup with toolbar and inline diff.
-        // cancelOnClickOutside=false: the EditorMouseListener handles closing so the gutter
-        // click is NOT consumed by the popup mechanism — enabling single-click switching.
-        // setBorderColor: explicitly set the popup window border so it is consistent across
-        // themes. Without it, themes that don't decorate popup windows render the toolbar
-        // area without any surrounding border while the diff panel below it has one.
+        /* Create lightweight popup with toolbar and inline diff.
+           cancelOnClickOutside=false: the EditorMouseListener handles closing so the gutter
+           click is NOT consumed by the popup mechanism — enabling single-click switching.
+           setBorderColor: explicitly set the popup window border so it is consistent across
+           themes. Without it, themes that don't decorate popup windows render the toolbar
+           area without any surrounding border while the diff panel below it has one. */
         val popupBorderColor = JBColor.namedColor("VersionControl.MarkerPopup.borderColor", JBColor(Gray._206, Gray._75))
         popupRef = JBPopupFactory.getInstance()
             .createComponentPopupBuilder(contentPanel, null)
@@ -237,8 +239,8 @@ internal class ScopeGutterPopupPanel(
             .setBorderColor(popupBorderColor)
             .createPopup()
 
-        // Show just below the last line of the clicked range so the changed text stays visible.
-        // For DELETED ranges line2 == line1 (no current lines), so anchor below line1.
+        /* Show just below the last line of the clicked range so the changed text stays visible.
+           For DELETED ranges line2 == line1 (no current lines), so anchor below line1. */
         val anchorLine = if (range.type == Range.DELETED) range.line1 else range.line2
         val linePoint = editor.logicalPositionToXY(LogicalPosition(anchorLine, 0))
         val screenPoint = Point(linePoint).also {
@@ -247,8 +249,8 @@ internal class ScopeGutterPopupPanel(
         val relativePoint = RelativePoint(Point(e.locationOnScreen.x, screenPoint.y))
         popupRef.show(relativePoint)
 
-        // Track the active popup and add a mouse listener so clicking any marker
-        // closes it first (allowing doAction to open a new one in a single click)
+        /* Track the active popup and add a mouse listener so clicking any marker
+           closes it first (allowing doAction to open a new one in a single click) */
         val capturedPopup = popupRef
         activePopup = capturedPopup
 
@@ -300,10 +302,10 @@ internal class ScopeGutterPopupPanel(
 
         val highlighters = mutableListOf<RangeHighlighter>()
 
-        // Line-level background — use the dimmer "ignored" variant (withIgnored=true) so the
-        // highlight is subtle rather than the full opaque diff background.
-        // withHideStripeMarkers / withHideGutterMarkers avoids duplicating the overview-stripe
-        // and gutter icons that we already paint ourselves.
+        /* Line-level background — use the dimmer "ignored" variant (withIgnored=true) so the
+           highlight is subtle rather than the full opaque diff background.
+           withHideStripeMarkers / withHideGutterMarkers avoids duplicating the overview-stripe
+           and gutter icons that we already paint ourselves. */
         highlighters.addAll(
             DiffDrawUtil.LineHighlighterBuilder(editor, startLine, endLine, diffType)
                 .withLayerPriority(1) // DiffDrawUtil.LAYER_PRIORITY_LST
@@ -351,10 +353,10 @@ internal class ScopeGutterPopupPanel(
     private fun createInlineDiffPanel(editor: EditorEx, range: Range): JPanel {
         val panel = JPanel(BorderLayout())
 
-        // Get content based on range type:
-        //   DELETED   → show the deleted scope-base lines (nothing exists in current)
-        //   MODIFIED  → show the scope-base lines; word-level diff highlights what changed
-        //   INSERTED  → nothing to show (the inserted lines are already visible in the editor)
+        /* Get content based on range type:
+             DELETED   → show the deleted scope-base lines (nothing exists in current)
+             MODIFIED  → show the scope-base lines; word-level diff highlights what changed
+             INSERTED  → nothing to show (the inserted lines are already visible in the editor) */
         val content = when (range.type) {
             Range.DELETED, Range.MODIFIED -> diffViewer.getVcsContentForRange(range, includeContext = false)
             else -> ""
@@ -373,8 +375,8 @@ internal class ScopeGutterPopupPanel(
         textField.setOneLineMode(false)
         textField.setFontInheritedFromLAF(false)
 
-        // Calculate reasonable width based on editor viewport
-        // Use 90% of the editor's visible width as maximum
+        /* Calculate reasonable width based on editor viewport.
+           Use 90% of the editor's visible width as maximum */
         val editorVisibleWidth = editor.scrollingModel.visibleArea.width
         val maxPopupWidth = (editorVisibleWidth * 0.9).toInt()
 
@@ -413,10 +415,10 @@ internal class ScopeGutterPopupPanel(
             popupEditor.settings.setTabSize(editor.settings.getTabSize(project))
             popupEditor.settings.setUseTabCharacter(editor.settings.isUseTabCharacter(project))
 
-            // Apply word-level diff highlighting for modified ranges.
-            // The popup shows the scope-base (vcs) text, so highlights land at offset1
-            // positions (left/old side of the diff). Fragments with an empty offset1
-            // range are pure insertions in the current file and produce no highlight.
+            /* Apply word-level diff highlighting for modified ranges.
+               The popup shows the scope-base (vcs) text, so highlights land at offset1
+               positions (left/old side of the diff). Fragments with an empty offset1
+               range are pure insertions in the current file and produce no highlight. */
             if (range.type == Range.MODIFIED) {
                 try {
                     val currentContent = run {

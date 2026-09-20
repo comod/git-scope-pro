@@ -82,7 +82,7 @@ public class GutterDataService implements Disposable {
             LOG.debug("GutterDataService.publish: file=" + filePath +
                     ", ranges=" + data.ranges.size() +
                     ", listeners=" + listeners.size() +
-                    ", hasBaseContent=" + (data.baseContent != null && !data.baseContent.isEmpty()) +
+                    ", hasBaseContent=" + !data.baseContent.isEmpty() +
                     ", hasHeadContent=" + (data.headContent != null));
         }
         for (Listener l : listeners) l.onDataUpdated(filePath, data);

@@ -48,17 +48,19 @@ public class GitScopeFileStatusProvider implements FileStatusProvider {
 
         String filePath = virtualFile.getPath();
 
-        // STRATEGY: If file is locally modified towards HEAD, let IntelliJ handle it.
-        // Use ChangeListManager for a live (non-cached) check so that after an undo the
-        // scope color is restored immediately without waiting for the next collectChanges().
+        /*
+         * STRATEGY: If file is locally modified towards HEAD, let IntelliJ handle it.
+         * Use ChangeListManager for a live (non-cached) check so that after an undo the
+         * scope color is restored immediately without waiting for the next collectChanges().
+         */
         FileStatus localStatus = ChangeListManager.getInstance(project).getStatus(virtualFile);
         if (localStatus != FileStatus.NOT_CHANGED) {
             // File is actively being modified - let IntelliJ's default provider handle it
             return null;
         }
 
-        // File is NOT in local changes - check if it's in the Git Scope (scope changes only)
-        // Use HashMap lookup for O(1) performance instead of iterating through all changes
+        /* File is NOT in local changes - check if it's in the Git Scope (scope changes only).
+         * Use HashMap lookup for O(1) performance instead of iterating through all changes. */
         Map<String, Change> scopeChangesMap = viewService.getScopeChangesMap();
         if (scopeChangesMap == null || scopeChangesMap.isEmpty()) {
             // No changes in scope - return null to fall back to default behavior
@@ -68,8 +70,8 @@ public class GitScopeFileStatusProvider implements FileStatusProvider {
         // Check if this file has changes in the current scope using O(1) lookup
         Change change = scopeChangesMap.get(filePath);
         if (change != null) {
-            // File is in Git Scope but NOT in local changes - we control the color
-            // Use the FileStatus directly from the Change object
+            /* File is in Git Scope but NOT in local changes - we control the color.
+             * Use the FileStatus directly from the Change object. */
             return change.getFileStatus();
         }
 

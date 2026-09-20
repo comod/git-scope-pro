@@ -33,13 +33,17 @@ public class GitScopeSettings implements PersistentStateComponent<GitScopeSettin
     public boolean scopeFileColors = true;
 
     /**
-     * If true, untracked (unversioned) files are shown in the Git Scope view.
+     * Initial value of the "Show Untracked Files" toggle (Git Scope window toolbar) for a
+     * project opened for the first time. Already-open projects keep their own toggle state;
+     * changing this has no effect on them.
      * Default: false
      */
     public boolean showUntrackedFiles = false;
 
     /**
-     * If true, locally deleted files are shown in the Git Scope view.
+     * Initial value of the "Show Deleted Files" toggle (Git Scope window toolbar) for a
+     * project opened for the first time. Already-open projects keep their own toggle state;
+     * changing this has no effect on them.
      * Default: false
      */
     public boolean showDeletedFiles = false;

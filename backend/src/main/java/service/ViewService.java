@@ -9,6 +9,7 @@ import com.intellij.openapi.editor.EditorKind;
 import com.intellij.openapi.editor.ex.EditorEx;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.FileStatusManager;
+import com.intellij.openapi.vcs.ProjectLevelVcsManager;
 import com.intellij.openapi.vcs.VcsApplicationSettings;
 import com.intellij.openapi.vcs.changes.Change;
 import com.intellij.openapi.vcs.changes.VcsDirtyScopeManager;
@@ -24,6 +25,7 @@ import model.MyModel;
 import model.MyModelBase;
 import model.TargetBranchMap;
 import org.jetbrains.annotations.NotNull;
+import settings.GitScopeSettings;
 import state.State;
 import implementation.scope.MyScope;
 import system.Defs;
@@ -87,8 +89,8 @@ public class ViewService implements Disposable {
     public ViewService(Project project) {
         this.project = project;
         ApplicationManager.getApplication().executeOnPooledThread(() -> {
-            // Force lazy service initialization on BGT where blocking ops are allowed,
-            // preventing EDT warnings from config loading (e.g. Maven path macro resolution)
+            /* Force lazy service initialization on BGT where blocking ops are allowed,
+               preventing EDT warnings from config loading (e.g. Maven path macro resolution) */
             project.getService(ChangesService.class);
             project.getService(ToolWindowServiceInterface.class);
             project.getService(StatusBarService.class);
@@ -174,9 +176,25 @@ public class ViewService implements Disposable {
         this.gitService = project.getService(GitService.class);
         this.targetBranchService = project.getService(TargetBranchService.class);
         this.state = project.getService(State.class);
+        seedWorkingTreeDefaults();
         this.myLineStatusTrackerImpl = new MyLineStatusTrackerImpl(project, this);
         this.myScope = new MyScope(project);
         this.debouncer = new Debounce();
+    }
+
+    /**
+     * Seeds this project's untracked/deleted-file toggles (#111) from the application-level
+     * "new project" default the first time they're touched. Once seeded, a project's own stored
+     * value is authoritative -- later changes to the Settings default no longer affect it.
+     */
+    private void seedWorkingTreeDefaults() {
+        GitScopeSettings defaults = GitScopeSettings.getInstance();
+        if (state.getShowUntrackedFiles() == null) {
+            state.setShowUntrackedFiles(defaults.isShowUntrackedFiles());
+        }
+        if (state.getShowDeletedFiles() == null) {
+            state.setShowDeletedFiles(defaults.isShowDeletedFiles());
+        }
     }
 
     private void doUpdateDebounced(Collection<Change> changes) {
@@ -320,7 +338,9 @@ public class ViewService implements Disposable {
             // Save the target branch map
             TargetBranchMap targetBranchMap = myModel.getTargetBranchMap();
             if (targetBranchMap == null) {
-                LOG.warn("Model has null targetBranchMap during save - this should not happen in steady state. Skipping.");
+                /* Unconfigured "New*" tab -- no target picked yet, nothing to persist. Expected,
+                   not exceptional: this is hit any time save() runs (tab rename, reorder, ...)
+                   while a new tab is still open. */
                 return;
             }
 
@@ -338,8 +358,18 @@ public class ViewService implements Disposable {
 
         this.state.setModelData(modelData);
 
-        // Save the current active tab index
-        this.state.setCurrentTabIndex(this.currentTabIndex);
+        /* Only persist the active tab index when it points at a model that was actually saved
+           above. The active tab can be an unconfigured "New*" model (null targetBranchMap,
+           skipped from modelData): persisting that index would, after the next load(), point
+           past the restored (shorter) collection -- landing on the "+" tab and showing a
+           half-baked "New" page instead of the tab the user actually left open. Leaving the
+           previously persisted index alone in that case keeps it pointing at the last real tab. */
+        MyModel activeModel = (currentTabIndex != null && currentTabIndex >= 0 && currentTabIndex < collection.size())
+                ? collection.get(currentTabIndex)
+                : null;
+        if (activeModel != null && activeModel.getTargetBranchMap() != null) {
+            this.state.setCurrentTabIndex(this.currentTabIndex);
+        }
     }
 
     public void eventVcsReady() {
@@ -357,14 +387,27 @@ public class ViewService implements Disposable {
      * is not there — so it survives every update, is re-persisted on close, and returns on the next
      * open. Restarting the IDE does not clear it; only a full rescan does, which is why such an
      * entry otherwise lingers until something unrelated (a commit touching .git/index) forces one.
+     *
+     * <p>The rescan has to be queued behind VCS initialization rather than run inline.
+     * {@code directoryMappingChanged()} fires at {@code VcsInitObject.MAPPINGS} (order 10), but
+     * {@code VcsDirtyScopeManagerImpl} only accepts work once its own startup activity has run at
+     * {@code DIRTY_SCOPE_MANAGER} (order 110) — until then {@code markEverythingDirty()} returns
+     * without marking anything and without logging, so calling it here directly was a no-op and the
+     * stale entries stayed. {@code runAfterInitialization} runs at {@code AFTER_COMMON} (order 400),
+     * by which point the dirty scope manager and the Git executable are both ready.
      */
     private void forceInitialChangelistRefresh() {
         if (project.isDisposed() || !initialChangelistRefreshed.compareAndSet(false, true)) {
             // directoryMappingChanged() fires again whenever mappings change; one rescan is enough.
             return;
         }
-        LOG.debug("Forcing a full changelist rescan to discard entries restored from workspace.xml");
-        VcsDirtyScopeManager.getInstance(project).markEverythingDirty();
+        ProjectLevelVcsManager.getInstance(project).runAfterInitialization(() -> {
+            if (project.isDisposed()) {
+                return;
+            }
+            LOG.debug("Forcing a full changelist rescan to discard entries restored from workspace.xml");
+            VcsDirtyScopeManager.getInstance(project).markEverythingDirty();
+        });
     }
 
     public void eventToolWindowReady() {
@@ -571,8 +614,9 @@ public class ViewService implements Disposable {
                         Collection<Change> changes = model.getChanges();
                         doUpdateDebounced(changes);
 
-                        // Refresh file colors once on initial startup after changes are loaded for the active model
-                        // This handles the boot case where setActiveModel() is called before changes are collected
+                        /* Refresh file colors once on initial startup after changes are loaded for
+                           the active model. This handles the boot case where setActiveModel() is
+                           called before changes are collected */
                         if (!initialFileColorsRefreshed.get() && changes != null && !changes.isEmpty()) {
                             if (initialFileColorsRefreshed.compareAndSet(false, true)) {
                                 refreshFileColors();
@@ -583,8 +627,8 @@ public class ViewService implements Disposable {
                 // TODO: collectChanges: tab switched
                 case active -> {
                     incrementUpdate(); // Increment generation to cancel any stale updates for previous tab
-                    // Refresh file colors AFTER scopeChangesMap is updated
-                    // This ensures GitScopeFileStatusProvider sees the correct scope
+                    /* Refresh file colors AFTER scopeChangesMap is updated. This ensures
+                       GitScopeFileStatusProvider sees the correct scope */
                     collectChanges(model, true).thenRun(this::refreshFileColors);
                 }
                 case tabName -> {
@@ -690,8 +734,8 @@ public class ViewService implements Disposable {
         ensureHeadTabInitializedAsync(model, () -> {
             TargetBranchMap targetBranchMap = model.getTargetBranchMap();
             if (targetBranchMap == null) {
-                // Repositories not registered yet, or the tab has no target branch: nothing can be
-                // collected and no later event necessarily retries, so the scope stays as it was.
+                /* Repositories not registered yet, or the tab has no target branch: nothing can be
+                   collected and no later event necessarily retries, so the scope stays as it was. */
                 LOG.debug("collectChanges skipped for tab '" + model.getDisplayName() + "': no target branch map");
                 done.complete(null);
                 return;
@@ -715,9 +759,9 @@ public class ViewService implements Disposable {
         changesExecutor.execute(() -> {
             changesService.collectChangesWithCallback(finalTargetBranchMap, result -> {
                 if (result == null) {
-                    // Superseded or cancelled by a newer collection, which owns the model now.
-                    // Complete the future anyway so chained UI work (e.g. the file-colors refresh
-                    // after a tab switch) is never silently dropped.
+                    /* Superseded or cancelled by a newer collection, which owns the model now.
+                       Complete the future anyway so chained UI work (e.g. the file-colors refresh
+                       after a tab switch) is never silently dropped. */
                     LOG.debug("Collection for generation " + gen + " superseded, completing without apply");
                     done.complete(null);
                     return;
@@ -738,19 +782,19 @@ public class ViewService implements Disposable {
                             model.setScopeChangesWithMap(result.scopeChanges(), scopeChangesMap);
                             model.setLocalChangesWithMap(result.localChanges(), localChangesMap);
 
-                            // GitScopeFileStatusProvider answers from the scope map, but the
-                            // platform caches its answers until fileStatusesChanged() -- which
-                            // previously only tab switches triggered, so Project-view colors kept
-                            // showing the pre-collection scope (e.g. conflict-era statuses after a
-                            // rebase). Refresh when the statuses materially changed; the guard
-                            // avoids the LST-disturbing refresh on the common no-change apply.
+                            /* GitScopeFileStatusProvider answers from the scope map, but the
+                               platform caches its answers until fileStatusesChanged() -- which
+                               previously only tab switches triggered, so Project-view colors kept
+                               showing the pre-collection scope (e.g. conflict-era statuses after a
+                               rebase). Refresh when the statuses materially changed; the guard
+                               avoids the LST-disturbing refresh on the common no-change apply. */
                             if (model.isActive() && !sameScopeStatuses(previousScopeMap, scopeChangesMap)) {
                                 LOG.debug("Scope statuses changed for generation " + gen + ", refreshing file colors");
                                 refreshFileColors();
                             }
 
-                            // Repositories are resolvable by now, so tab tooltips that could not be
-                            // built at boot (empty branch name) can finally be published.
+                            /* Repositories are resolvable by now, so tab tooltips that could not be
+                               built at boot (empty branch name) can finally be published. */
                             project.getService(TabActionService.class).publishRenamedTabs();
                         } else {
                             LOG.debug("Discarding changes for generation " + gen + " (current generation is " + currentGen + ")");
@@ -1058,8 +1102,8 @@ public class ViewService implements Disposable {
         try {
             isProcessingTabRename = true;
 
-            // Rebuild collection from tab order to ensure consistency
-            // This is critical because the collection might be out of sync with actual tabs
+            /* Rebuild collection from tab order to ensure consistency. This is critical because
+               the collection might be out of sync with actual tabs */
             rebuildCollectionFromTabOrder();
 
             // Update the model with custom name if needed

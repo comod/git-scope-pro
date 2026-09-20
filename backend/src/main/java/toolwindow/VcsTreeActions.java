@@ -11,8 +11,10 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ide.projectView.ProjectView;
 import model.MyModel;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import service.ToolWindowServiceInterface;
 import service.ViewService;
+import state.State;
 import utils.CustomRollback;
 
 import java.util.Arrays;
@@ -152,6 +154,93 @@ public class VcsTreeActions {
         public void update(@NotNull AnActionEvent e) {
             Change[] changes = e.getData(VcsDataKeys.CHANGES);
             e.getPresentation().setEnabledAndVisible(changes != null && changes.length > 0);
+        }
+    }
+
+    /**
+     * Wraps a platform action group (e.g. "Group By") so it right-aligns in the toolbar next to
+     * our own {@link RightAlignedToolbarAction} toggles, without reimplementing it.
+     */
+    public static class RightAlignedGroup extends ActionGroupWrapper implements RightAlignedToolbarAction {
+        public RightAlignedGroup(@NotNull ActionGroup delegate) {
+            super(delegate);
+        }
+
+        /**
+         * {@code ChangesBrowserBase.init()} walks the whole toolbar group with
+         * {@code DiffUtil.recursiveRegisterShortcutSet} to register shortcuts, which calls
+         * {@code getChildren(null)} on any {@link ActionGroup} it doesn't specifically recognize --
+         * including this wrapper. Forwarding a null event straight to the delegate (a
+         * {@link DefaultActionGroup}) trips its "do not call getChildren(null)" assertion, so route
+         * around it the same way {@code DiffUtil} itself does for a plain {@link DefaultActionGroup}.
+         */
+        @Override
+        public AnAction @NotNull [] getChildren(@Nullable AnActionEvent e) {
+            if (e == null && getDelegate() instanceof DefaultActionGroup delegateGroup) {
+                return delegateGroup.getChildren(ActionManager.getInstance());
+            }
+            return super.getChildren(e);
+        }
+    }
+
+    /** Presentation toggles (untracked/deleted files, "Group By") right-align via {@link RightAlignedToolbarAction},
+     * away from the action icons (rollback, create patch, ...) on the left. */
+    public static class ShowUntrackedFilesAction extends ToggleAction implements RightAlignedToolbarAction {
+        public ShowUntrackedFilesAction() {
+            super("Show Untracked Files", "Show untracked (unversioned) files in this project", AllIcons.Vcs.ShowUnversionedFiles);
+        }
+
+        @Override
+        public @NotNull ActionUpdateThread getActionUpdateThread() {
+            return ActionUpdateThread.EDT;
+        }
+
+        @Override
+        public boolean isSelected(@NotNull AnActionEvent e) {
+            Project project = e.getProject();
+            if (project == null) return false;
+            return Boolean.TRUE.equals(project.getService(State.class).getShowUntrackedFiles());
+        }
+
+        @Override
+        public void setSelected(@NotNull AnActionEvent e, boolean state) {
+            Project project = e.getProject();
+            if (project == null) return;
+            project.getService(State.class).setShowUntrackedFiles(state);
+            refreshChanges(project);
+        }
+    }
+
+    public static class ShowDeletedFilesAction extends ToggleAction implements RightAlignedToolbarAction {
+        public ShowDeletedFilesAction() {
+            super("Show Deleted Files", "Show locally deleted files in this project", AllIcons.Actions.Close);
+        }
+
+        @Override
+        public @NotNull ActionUpdateThread getActionUpdateThread() {
+            return ActionUpdateThread.EDT;
+        }
+
+        @Override
+        public boolean isSelected(@NotNull AnActionEvent e) {
+            Project project = e.getProject();
+            if (project == null) return false;
+            return Boolean.TRUE.equals(project.getService(State.class).getShowDeletedFiles());
+        }
+
+        @Override
+        public void setSelected(@NotNull AnActionEvent e, boolean state) {
+            Project project = e.getProject();
+            if (project == null) return;
+            project.getService(State.class).setShowDeletedFiles(state);
+            refreshChanges(project);
+        }
+    }
+
+    private static void refreshChanges(@NotNull Project project) {
+        ViewService viewService = project.getService(ViewService.class);
+        if (viewService != null && !viewService.isDisposed()) {
+            viewService.collectChanges(true);
         }
     }
 

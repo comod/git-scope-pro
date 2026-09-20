@@ -33,8 +33,9 @@ public class TargetBranchService {
         gitService.getRepositoriesAsync(repositories -> {
             Set<String> branches = new LinkedHashSet<>();
 
+            int repositoryCount = repositories.size();
             repositories.forEach(repo -> {
-                String currentBranchName = getTargetBranchByRepositoryDisplay(repo, targetBranch);
+                String currentBranchName = getTargetBranchByRepositoryDisplay(repo, targetBranch, repositoryCount);
 
                 if (!Objects.equals(currentBranchName, GitService.BRANCH_HEAD)) {
                     branches.add(currentBranchName);
@@ -51,8 +52,9 @@ public class TargetBranchService {
         }
         Set<String> branches = new LinkedHashSet<>();
         gitService.getRepositoriesAsync(repositories -> {
+            int repositoryCount = repositories.size();
             repositories.forEach(repo -> {
-                String currentBranchName = getTargetBranchByRepositoryDisplay(repo, targetBranch);
+                String currentBranchName = getTargetBranchByRepositoryDisplay(repo, targetBranch, repositoryCount);
 
                 if (!Objects.equals(currentBranchName, GitService.BRANCH_HEAD)) {
                     branches.add(currentBranchName);
@@ -62,9 +64,9 @@ public class TargetBranchService {
         return String.join(", ", branches);
     }
 
-    public String getTargetBranchByRepositoryDisplay(GitRepository repo, TargetBranchMap targetBranch) {
+    public String getTargetBranchByRepositoryDisplay(GitRepository repo, TargetBranchMap targetBranch, int repositoryCount) {
 
-        String branch = getTargetBranchByRepository(repo, targetBranch);
+        String branch = getTargetBranchByRepository(repo, targetBranch, repositoryCount);
         if (branch != null) {
             return branch;
         }
@@ -73,13 +75,13 @@ public class TargetBranchService {
 
     }
 
-    public String getTargetBranchByRepository(GitRepository repo, TargetBranchMap repositoryTargetBranchMap) {
+    public String getTargetBranchByRepository(GitRepository repo, TargetBranchMap repositoryTargetBranchMap, int repositoryCount) {
 
         if (repositoryTargetBranchMap == null) {
             return null;
         }
 
-        return repositoryTargetBranchMap.value().get(repo.toString());
+        return repositoryTargetBranchMap.resolve(repo, repositoryCount);
 
     }
 }

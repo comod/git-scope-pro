@@ -1,7 +1,9 @@
 package toolwindow;
 
+import com.intellij.ide.HelpTooltipKt;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ui.componentsList.layout.VerticalStackLayout;
+import com.intellij.openapi.util.text.HtmlChunk;
 import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.SearchTextField;
 import com.intellij.ui.components.JBScrollPane;
@@ -40,16 +42,16 @@ private JPanel createManualInputPanel(GitRepository repository, BranchTree branc
     manualInputPanel.setBorder(JBUI.Borders.empty(2, 8)); // top, left, bottom, right margins
     
     JBTextField manualInput = new JBTextField();
-    manualInput.setToolTipText(
-            "<html>" +
-                    "Enter any valid Git reference:<br/>" +
-                    "• Branch names (e.g., main, develop, feature/xyz)<br/>" +
-                    "• Tag names (e.g., v1.0.0, release-2023)<br/>" +
-                    "• Special refs (e.g., HEAD, HEAD~1, HEAD~5)<br/>" +
-                    "• Commit hashes (full or abbreviated)<br/>" +
-                    "• Other Git syntax (e.g., @{upstream}, origin/main)" +
-                    "</html>"
-    );
+    HelpTooltipKt.setToolTipText(manualInput, HtmlChunk.tag("div").attr("style", "white-space: nowrap;").children(
+            HtmlChunk.text("Enter any valid Git reference:"),
+            HtmlChunk.ul().children(
+                    HtmlChunk.li().addText("Branch names (e.g., main, develop, feature/xyz)"),
+                    HtmlChunk.li().addText("Tag names (e.g., v1.0.0, release-2023)"),
+                    HtmlChunk.li().addText("Special refs (e.g., HEAD, HEAD~1, HEAD~5)"),
+                    HtmlChunk.li().addText("Commit hashes (full or abbreviated)"),
+                    HtmlChunk.li().addText("Other Git syntax (e.g., @{upstream}, origin/main)")
+            )
+    ));
     manualInput.getEmptyText()
             .setText("Enter branch, tag, or git ref...")
             .setFont(manualInput.getFont().deriveFont(Font.ITALIC));
@@ -64,20 +66,7 @@ private JPanel createManualInputPanel(GitRepository repository, BranchTree branc
                     Tree tree = (Tree) branchTree.getTreeComponent();
 
                     DefaultMutableTreeNode root = (DefaultMutableTreeNode) tree.getModel().getRoot();
-
-                    // Find or create "Manual Input" node
-                    DefaultMutableTreeNode manualNode = null;
-                    for (int i = 0; i < root.getChildCount(); i++) {
-                        DefaultMutableTreeNode child = (DefaultMutableTreeNode) root.getChildAt(i);
-                        if ("Manual Input".equals(child.getUserObject())) {
-                            manualNode = child;
-                            break;
-                        }
-                    }
-                    if (manualNode == null) {
-                        manualNode = new DefaultMutableTreeNode("Manual Input");
-                        root.add(manualNode);
-                    }
+                    DefaultMutableTreeNode manualNode = findOrCreateManualInputNode(root);
 
                     DefaultMutableTreeNode entryNode = new DefaultMutableTreeNode(entry);
                     manualNode.add(entryNode);
@@ -94,6 +83,19 @@ private JPanel createManualInputPanel(GitRepository repository, BranchTree branc
     return manualInputPanel;
 }
 
+    /** Finds the "Manual Input" child node under {@code root}, creating it if it doesn't exist yet. */
+    private DefaultMutableTreeNode findOrCreateManualInputNode(DefaultMutableTreeNode root) {
+        for (int i = 0; i < root.getChildCount(); i++) {
+            DefaultMutableTreeNode child = (DefaultMutableTreeNode) root.getChildAt(i);
+            if ("Manual Input".equals(child.getUserObject())) {
+                return child;
+            }
+        }
+        DefaultMutableTreeNode manualNode = new DefaultMutableTreeNode("Manual Input");
+        root.add(manualNode);
+        return manualNode;
+    }
+
 
     public BranchSelectView(Project project) {
         this.project = project;
@@ -109,24 +111,15 @@ private JPanel createManualInputPanel(GitRepository repository, BranchTree branc
         help.setLayout(new FlowLayout(FlowLayout.LEFT));
 
         JCheckBox checkBox = new JCheckBox("Only Changes Since Common Ancestor (git diff <selection>...HEAD)");
-        checkBox.setToolTipText(
-                "<html>" +
-                        "Compares HEAD against its common ancestor with the selection,<br/>" +
-                        "so changes made on the selected branch since you branched off are excluded.<br/>" +
-                        "This is the diff a pull request shows.<br/>" +
-                        "Unchecked, the selection is compared directly to HEAD." +
-                        "</html>"
-        );
-        checkBox.setSelected(this.state.getTwoDotsCheckbox());
+        HelpTooltipKt.setToolTipText(checkBox, HtmlChunk.fragment(
+                HtmlChunk.text("Compares HEAD against its common ancestor with the selection,"), HtmlChunk.br(),
+                HtmlChunk.text("so changes made on the selected branch since you branched off are excluded."), HtmlChunk.br(),
+                HtmlChunk.text("This is the diff a pull request shows."), HtmlChunk.br(),
+                HtmlChunk.text("Unchecked, the selection is compared directly to HEAD.")
+        ));
+        checkBox.setSelected(this.state.getThreeDotsCheckBox());
         checkBox.setBorder(JBUI.Borders.empty(1)); // top, left, bottom, right padding
-        checkBox.addActionListener(e -> this.state.setTwoDotsCheckbox(checkBox.isSelected()));
-
-        // Add a mouse listener to the help icon label to show the tool tip on hover
-        checkBox.addMouseListener(new MouseAdapter() {
-            public void mouseEntered(MouseEvent me) {
-                checkBox.setToolTipText("See what you have added since [selection] branch point");
-            }
-        });
+        checkBox.addActionListener(e -> this.state.setThreeDotsCheckBox(checkBox.isSelected()));
 
         help.add(checkBox);
         main.add(help);

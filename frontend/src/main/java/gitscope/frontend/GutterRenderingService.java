@@ -234,8 +234,8 @@ public class GutterRenderingService implements Disposable, GutterDataService.Lis
                 }
             }, ModalityState.defaultModalityState());
         } catch (Exception e) {
-            // Runs on every document change; a failure here costs one stale repaint, and the next
-            // keystroke retries. Not worth an error report.
+            /* Runs on every document change; a failure here costs one stale repaint, and the next
+               keystroke retries. Not worth an error report. */
             LOG.debug("Error recalculating ranges", e);
         }
     }
@@ -349,8 +349,10 @@ public class GutterRenderingService implements Disposable, GutterDataService.Lis
         }
     }
 
-    // Teardown races with the platform disposing editors and documents underneath us, so failures
-    // here are expected and already recovered from by dropping the renderer.
+    /**
+     * Teardown races with the platform disposing editors and documents underneath us, so failures
+     * here are expected and already recovered from by dropping the renderer.
+     */
     private synchronized void releaseRenderer(@NotNull Document document) {
         RendererInfo info = renderers.remove(document);
         if (info != null) {

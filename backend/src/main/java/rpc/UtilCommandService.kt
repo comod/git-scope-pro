@@ -35,6 +35,14 @@ class UtilCommandService {
         _commands.tryEmit(UtilCommand.SelectInProject(filePath))
     }
 
+    /**
+     * Asks the frontend to launch a file the editor cannot display in its associated application.
+     * Deliberately not done here — see [UtilCommand.OpenInAssociatedApplication].
+     */
+    fun openInAssociatedApplication(filePath: String, fileName: String) {
+        _commands.tryEmit(UtilCommand.OpenInAssociatedApplication(filePath, fileName))
+    }
+
     fun setPreviewTabEnabled(enabled: Boolean) {
         previewTabEnabled.set(enabled)
     }

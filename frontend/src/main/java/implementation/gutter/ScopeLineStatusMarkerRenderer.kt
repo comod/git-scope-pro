@@ -12,6 +12,7 @@ import com.intellij.openapi.editor.TextAnnotationGutterProvider
 import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.openapi.editor.event.EditorFactoryEvent
 import com.intellij.openapi.editor.event.EditorFactoryListener
+import com.intellij.openapi.editor.event.VisibleAreaListener
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
@@ -54,8 +55,10 @@ class ScopeLineStatusMarkerRenderer(
         onDoAction = { editor, range, e -> popupPanel.show(editor, range, e) }
     )
 
-    // Filler that reserves annotation area width to push line numbers right in separate mode.
-    // Managed dynamically: re-registers after blame close, unregisters when setting is off.
+    /**
+     * Filler that reserves annotation area width to push line numbers right in separate mode.
+     * Managed dynamically: re-registers after blame close, unregisters when setting is off.
+     */
     @Volatile private var fillerDesired = false
     @Volatile private var suppressFillerCallback = false
 
@@ -91,9 +94,19 @@ class ScopeLineStatusMarkerRenderer(
             clearHover()
         }
         override fun mouseEntered(e: MouseEvent) {
-            // Re-evaluate on entry so any hover state stuck from a previous session
-            // (fast mouse exit, OS focus change, popup covering gutter) is corrected.
+            /* Re-evaluate on entry so any hover state stuck from a previous session
+             * (fast mouse exit, OS focus change, popup covering gutter) is corrected. */
             updateHoverState(e)
+        }
+    }
+
+    /**
+     * Hover is otherwise only re-evaluated from mouse events, so scrolling with the cursor resting
+     * on a marker leaves the expansion painted on a range the cursor has moved off.
+     */
+    private val visibleAreaListener = VisibleAreaListener { e ->
+        if (e.oldRectangle?.location != e.newRectangle.location) {
+            (e.editor as? EditorEx)?.let { updateHoverFromPointer(it) }
         }
     }
 
@@ -103,9 +116,9 @@ class ScopeLineStatusMarkerRenderer(
     }
 
     private fun installMouseListeners() {
-        // Called from init, which always runs on EDT (renderer construction is EDT-only).
-        // Install synchronously — no invokeLater — so the editor that triggered this
-        // renderer's creation is found immediately via getEditors() without a timing race.
+        /* Called from init, which always runs on EDT (renderer construction is EDT-only).
+         * Install synchronously — no invokeLater — so the editor that triggered this
+         * renderer's creation is found immediately via getEditors() without a timing race. */
         val factory = EditorFactory.getInstance()
         for (editor in factory.getEditors(document, project)) {
             installOnEditor(editor)
@@ -127,6 +140,7 @@ class ScopeLineStatusMarkerRenderer(
             val gutter = editor.gutterComponentEx
             gutter.addMouseMotionListener(mouseMotionListener)
             gutter.addMouseListener(mouseListener)
+            editor.scrollingModel.addVisibleAreaListener(visibleAreaListener)
         }
     }
 
@@ -135,12 +149,36 @@ class ScopeLineStatusMarkerRenderer(
             .filterIsInstance<EditorEx>()
             .firstOrNull { it.gutterComponentEx == e.source } ?: return
 
-        val gutter = editor.gutterComponentEx
-        val x = e.x
-        val y = e.y
+        updateHoverAt(editor, e.x, e.y)
+    }
 
-        // Check if in marker area — must match canDoAction logic exactly so that
-        // hover is cleared precisely when the painted marker is no longer under the cursor.
+    /**
+     * Re-evaluates hover against the current pointer position rather than a mouse event, for
+     * [visibleAreaListener] — scrolling slides markers out from under a stationary cursor without
+     * producing any mouse event to drive [updateHoverState].
+     */
+    private fun updateHoverFromPointer(editor: EditorEx) {
+        if (disposed || hoveredRange == null) return
+
+        val gutter = editor.gutterComponentEx
+        if (!gutter.isShowing) return
+
+        val pointer = java.awt.MouseInfo.getPointerInfo() ?: return
+        val point = java.awt.Point(pointer.location)
+        javax.swing.SwingUtilities.convertPointFromScreen(point, gutter)
+
+        if (!gutter.contains(point)) {
+            clearHover()
+            return
+        }
+        updateHoverAt(editor, point.x, point.y)
+    }
+
+    private fun updateHoverAt(editor: EditorEx, x: Int, y: Int) {
+        val gutter = editor.gutterComponentEx
+
+        /* Check if in marker area — must match canDoAction logic exactly so that
+         * hover is cleared precisely when the painted marker is no longer under the cursor. */
         val gitScopeSettings = settings.GitScopeSettings.getInstance()
         val gutterArea = getGutterArea(editor)
         val areaWidth = gutterArea.second - gutterArea.first
@@ -232,11 +270,12 @@ class ScopeLineStatusMarkerRenderer(
     }
 
     /**
-     * Clears all ranges and removes the highlighter.
+     * Drops the ranges and removes the highlighter. Deliberately not guarded by [disposed]:
+     * [dispose] sets that flag before this runs, and skipping the removal would leave the
+     * highlighter in the markup model.
      */
     @RequiresEdt
-    fun clear() {
-        if (disposed) return
+    private fun clear() {
         currentRanges = emptyList()
         gutterHighlighterManager.clear()
     }
@@ -246,6 +285,13 @@ class ScopeLineStatusMarkerRenderer(
 
         ApplicationManager.getApplication().invokeLater {
             removeMouseListeners()
+            /* Deliberately not clear(): this runs a tick after disposed was set, so the guard
+             * there would skip the removal and leave the highlighter in the markup model,
+             * painting the stale ranges through this instance's providers -- including a hover
+             * expansion frozen at whatever was under the cursor, with the listeners that would
+             * clear it already gone. Drop the hover first: the removal below logs and swallows
+             * its own failures, so the highlighter can outlive this call. */
+            hoveredRange = null
             clear()
         }
     }
@@ -260,6 +306,7 @@ class ScopeLineStatusMarkerRenderer(
                 val gutter = editor.gutterComponentEx
                 gutter.removeMouseMotionListener(mouseMotionListener)
                 gutter.removeMouseListener(mouseListener)
+                editor.scrollingModel.removeVisibleAreaListener(visibleAreaListener)
             }
         }
     }

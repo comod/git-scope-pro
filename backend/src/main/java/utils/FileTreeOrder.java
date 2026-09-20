@@ -38,9 +38,9 @@ public final class FileTreeOrder implements Comparator<String> {
             boolean isDirectory1 = end1 != -1;
             boolean isDirectory2 = end2 != -1;
             if (isDirectory1 != isDirectory2) {
-                // Same level, one descends and one does not: directories come first, whatever the
-                // names are. This is what makes navigation walk a directory to its end before
-                // continuing with the files beside it.
+                /* Same level, one descends and one does not: directories come first, whatever the
+                 * names are. This is what makes navigation walk a directory to its end before
+                 * continuing with the files beside it. */
                 return isDirectory1 ? -1 : 1;
             }
 
@@ -51,9 +51,9 @@ public final class FileTreeOrder implements Comparator<String> {
             if (byName != 0) return byName;
 
             if (!isDirectory1) {
-                // Same name and both are the final segment: identical paths apart from case, which
-                // the natural comparison ignores. Fall back to an exact comparison so the order
-                // stays stable rather than reporting two distinct files as equal.
+                /* Same name and both are the final segment: identical paths apart from case, which
+                 * the natural comparison ignores. Fall back to an exact comparison so the order
+                 * stays stable rather than reporting two distinct files as equal. */
                 return path1.compareTo(path2);
             }
 

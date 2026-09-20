@@ -44,8 +44,10 @@ public class VcsTree extends JPanel {
     private final Map<String, Collection<Change>> lastChangesPerTab = new ConcurrentHashMap<>();
     private final Map<String, Integer> lastChangesHashCodePerTab = new ConcurrentHashMap<>();
 
-    // Use a single browser instance for this VcsTree to avoid toolbar recreation issues
-    // When switching tabs, we just update the browser's contents instead of swapping components
+    /**
+     * Use a single browser instance for this VcsTree to avoid toolbar recreation issues.
+     * When switching tabs, we just update the browser's contents instead of swapping components.
+     */
     private MySimpleChangesBrowser singleBrowser = null;
     private CompletableFuture<MySimpleChangesBrowser> pendingBrowserCreation = null;
 
@@ -71,8 +73,8 @@ public class VcsTree extends JPanel {
                 // Get the current tab ID to restore its scroll position
                 String currentTabId = getCurrentTabId();
 
-                // With single browser approach, the browser is already in place if it exists
-                // We just need to restore the scroll position for this tab
+                /* With single browser approach, the browser is already in place if it exists.
+                 * We just need to restore the scroll position for this tab. */
 
                 Component currentComponent = getComponentCount() > 0 ? getComponent(0) : null;
                 if (currentComponent != null) {
@@ -457,7 +459,9 @@ public class VcsTree extends JPanel {
     @Override
     public void removeNotify() {
         super.removeNotify();
-        // DO NOT call cleanup() here - removeNotify() is called when switching tabs
-        // cleanup() should only be called from ToolWindowView.dispose() when the tab is actually closed
+        /*
+         * DO NOT call cleanup() here - removeNotify() is called when switching tabs.
+         * cleanup() should only be called from ToolWindowView.dispose() when the tab is actually closed.
+         */
     }
 }

@@ -43,16 +43,20 @@ public final class ChangeNavigationService {
 
     private final Project project;
 
-    // Last position we navigated to. Used as a fallback when the frontend reports no focused
-    // editor (a transient race right after opening a file without focus), so navigation continues
-    // from where we were instead of resetting to the first file.
+    /**
+     * Last position we navigated to. Used as a fallback when the frontend reports no focused
+     * editor (a transient race right after opening a file without focus), so navigation continues
+     * from where we were instead of resetting to the first file.
+     */
     private volatile String lastNavigatedFile = null;
     private volatile int lastNavigatedLine = -1;
 
-    // Cache of the diff editor-tab file per changed-file path. Reusing the same
-    // ChainDiffVirtualFile instance means DiffEditorTabFilesManager focuses the already-open diff
-    // tab instead of opening a duplicate. Each entry is tagged with the scope base revision it was
-    // built from, so switching scope/target rebuilds the diff instead of focusing a stale one.
+    /**
+     * Cache of the diff editor-tab file per changed-file path. Reusing the same
+     * ChainDiffVirtualFile instance means DiffEditorTabFilesManager focuses the already-open diff
+     * tab instead of opening a duplicate. Each entry is tagged with the scope base revision it was
+     * built from, so switching scope/target rebuilds the diff instead of focusing a stale one.
+     */
     private final Map<String, CachedDiff> openDiffFiles = new java.util.concurrent.ConcurrentHashMap<>();
 
     private record CachedDiff(com.intellij.diff.editor.ChainDiffVirtualFile file, String signature) {
@@ -82,9 +86,9 @@ public final class ChangeNavigationService {
             return;
         }
 
-        // Ordered list of changed files: the union of scope changes and local (working-tree vs
-        // HEAD) changes, so navigation visits every file that shows a gutter marker — both the
-        // scope markers we paint and the local markers the IDE paints.
+        /* Ordered list of changed files: the union of scope changes and local (working-tree vs
+         * HEAD) changes, so navigation visits every file that shows a gutter marker — both the
+         * scope markers we paint and the local markers the IDE paints. */
         List<String> files = orderedFiles(scopeChanges, localChanges);
         if (files.isEmpty()) {
             // Everything in the scope is deleted, a directory, or otherwise not openable.
@@ -92,9 +96,9 @@ public final class ChangeNavigationService {
             return;
         }
 
-        // Fall back to our last navigated position when the frontend has no focused editor
-        // (or the focused editor isn't one of the changed files). This keeps sequential
-        // next/previous presses moving forward instead of snapping back to the first file.
+        /* Fall back to our last navigated position when the frontend has no focused editor
+         * (or the focused editor isn't one of the changed files). This keeps sequential
+         * next/previous presses moving forward instead of snapping back to the first file. */
         String fromFile = currentFilePath;
         int fromLine = caretLine;
         if (fromFile == null || !files.contains(fromFile)) {
@@ -144,17 +148,17 @@ public final class ChangeNavigationService {
             var fem = com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project);
             var diffManager = com.intellij.diff.editor.DiffEditorTabFilesManager.getInstance(project);
 
-            // Reuse (focus) the existing Git Scope diff tab only when it is still open AND was built
-            // for the same scope base revision. If the scope/target changed, the signature differs
-            // and we rebuild the diff for the new scope.
+            /* Reuse (focus) the existing Git Scope diff tab only when it is still open AND was built
+             * for the same scope base revision. If the scope/target changed, the signature differs
+             * and we rebuild the diff for the new scope. */
             var cached = openDiffFiles.get(path);
             if (cached != null && cached.signature().equals(signature) && fem.isFileOpen(cached.file())) {
                 diffManager.showDiffFile(cached.file(), true);
                 highlightTreeFor(path);
                 return;
             }
-            // Stale (closed or different scope): drop it and, if a stale tab is still open, close it
-            // so we don't leave an outdated diff around.
+            /* Stale (closed or different scope): drop it and, if a stale tab is still open, close it
+             * so we don't leave an outdated diff around. */
             if (cached != null && fem.isFileOpen(cached.file())) {
                 fem.closeFile(cached.file());
             }
@@ -191,8 +195,8 @@ public final class ChangeNavigationService {
         if (currentFilePath != null && scopeChanges.containsKey(currentFilePath)) {
             return currentFilePath;
         }
-        // Fallback: the last file we navigated to (e.g. when a diff tab is currently focused, so the
-        // frontend has no underlying changed-file editor).
+        /* Fallback: the last file we navigated to (e.g. when a diff tab is currently focused, so the
+         * frontend has no underlying changed-file editor). */
         if (lastNavigatedFile != null && scopeChanges.containsKey(lastNavigatedFile)) {
             return lastNavigatedFile;
         }
@@ -280,14 +284,16 @@ public final class ChangeNavigationService {
         lastNavigatedFile = path;
         lastNavigatedLine = line;
 
-        // Stepping through changes from the tool window should leave the focus there. Asking for the
-        // opened editor to be focused takes it away, and on Linux the Project View following the
-        // file ("Autoscroll from Source") can then keep it, so the next keystroke no longer reaches
-        // the tool window at all. Focusing the editor is only what we want when navigation was
-        // triggered from the editor in the first place.
-        //
-        // Dropping the focus request costs nothing: the frontend then reports no focused changed
-        // file, and navigate() continues from lastNavigatedFile/lastNavigatedLine instead.
+        /*
+         * Stepping through changes from the tool window should leave the focus there. Asking for the
+         * opened editor to be focused takes it away, and on Linux the Project View following the
+         * file ("Autoscroll from Source") can then keep it, so the next keystroke no longer reaches
+         * the tool window at all. Focusing the editor is only what we want when navigation was
+         * triggered from the editor in the first place.
+         *
+         * Dropping the focus request costs nothing: the frontend then reports no focused changed
+         * file, and navigate() continues from lastNavigatedFile/lastNavigatedLine instead.
+         */
         ToolWindowServiceInterface toolWindowService = project.getService(ToolWindowServiceInterface.class);
         boolean startedInToolWindow = toolWindowService != null && toolWindowService.isFocused();
 
@@ -330,9 +336,7 @@ public final class ChangeNavigationService {
         GutterDataService gds = project.getService(GutterDataService.class);
         GutterDataService.GutterFileData cached = gds != null ? gds.getData(path) : null;
         if (cached != null) {
-            if (cached.ranges != null) {
-                for (Range r : cached.ranges) lines.add(r.getLine1());
-            }
+            for (Range r : cached.ranges) lines.add(r.getLine1());
             if (cached.localRanges != null) {
                 for (Range r : cached.localRanges) lines.add(r.getLine1());
             }

@@ -59,7 +59,7 @@ public final class FileOpener {
                     if (fileEditor instanceof TextEditor) {
                         Editor editor = ((TextEditor) fileEditor).getEditor();
                         int lineCount = editor.getDocument().getLineCount();
-                        int target = Math.max(0, Math.min(line, Math.max(0, lineCount - 1)));
+                        int target = Math.max(0, Math.clamp(lineCount - 1, 0, line));
                         LogicalPosition pos = new LogicalPosition(target, 0);
                         editor.getCaretModel().moveToLogicalPosition(pos);
                         editor.getScrollingModel().scrollToCaret(ScrollType.CENTER);

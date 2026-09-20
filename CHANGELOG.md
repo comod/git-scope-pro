@@ -1,3 +1,26 @@
+## [2026.2.2]
+
+### Added
+
+- Added [toggle buttons for untracked/deleted files in the Git Scope window](https://github.com/comod/git-scope-pro/issues/111),
+  complementing the global setting with a per-project one
+
+### Fixes
+
+- Fixed [Files that are not viewable by IntelliJ do not open at all](https://github.com/comod/git-scope-pro/issues/106)
+    - Opens such files in the associated application on double-click, like the Project view; explains why that's not
+      possible over Remote Development instead of staying silent.
+- Fixed the scope still listing files that Git reports as unchanged, which the 2026.2.1 fix was meant to clear
+    - The rescan that fix depends on ran before the IDE could accept it and was silently dropped; it now runs once
+      VCS initialization finishes.
+- Fixed [target branch selection silently falling back to HEAD after moving the project or repo](https://github.com/comod/git-scope-pro/issues/110)
+- Fixed a blank tab showing on next launch after closing the IDE with an unconfigured "New*" tab active
+- Fixed scope warm-up for already-open files not running over Remote Development
+
+### Changed
+
+- Bumped versions of plugins and build tooling (IntelliJ Platform Gradle Plugin, Gradle, GitHub Actions)
+
 ## [2026.2.1]
 
 ### Fixes

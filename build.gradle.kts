@@ -10,8 +10,8 @@ val platformType = properties("platformType")
 plugins {
     application
     id("java")
-    id("org.jetbrains.intellij.platform") version "2.18.1"
-    id("org.jetbrains.intellij.platform.module") version "2.18.1" apply false
+    id("org.jetbrains.intellij.platform") version "2.19.0"
+    id("org.jetbrains.intellij.platform.module") version "2.19.0" apply false
     id("org.jetbrains.changelog") version "2.5.0"
     id("org.jetbrains.kotlin.jvm") version "2.3.20" apply false
     id("org.jetbrains.kotlin.plugin.serialization") version "2.3.20" apply false
