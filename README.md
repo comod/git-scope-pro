@@ -13,8 +13,8 @@ Create custom "scopes" for any Git reference—branch, tag, or commit hash. Each
 in the **Git Scope** tool window. The currently selected scope visualizes changes through:
 
 - **Scope tree diff** — Shows all modified files in the Git Scope tool window
-- **File colors** - Files highlighted in editor tabs and project window according to the Git Scope status (added;
-  modified; deleted; ...)
+- **File colors** — Files highlighted in editor tabs and project window according to the Git Scope status (added,
+  modified, deleted, ...)
 - **Editor line status** — Displays change markers in the editor gutter for open files
 - **Custom scope** — Enables filtered search, replace, and inspection operations
 - **Status bar widget** — Displays the current scope selection
@@ -28,11 +28,16 @@ The plugin will add a new tool window named **Git Scope**:
 By default, it will appear as a secondary tool window on the left side, but you can move it anywhere to suit your
 workflow. Plugin settings are available under **Settings → Tools → Git Scope**.
 
+Clicking the button opens the Git Scope window:
+
+![](docs/tool_window_opened.png)
+
 ### Plugin Features
 
 ![](docs/icon.svg) **New Scope:**
 
 To add a new scope, click the "+" tab on the Git Scope panel:
+
 ![](docs/add.png)
 
 In the "New*" tab you get a few different options to define the scope:
@@ -57,11 +62,23 @@ built-in speed search — just start typing to narrow down the list.
 
 ![](docs/toolwindow.png)
 
+The toolbar above the change list follows one rule: action icons that operate on the current selection (**Diff**,
+**Select Opened File**) stay on the left, and icons that change how the list is presented (**Group By**, **Show
+Deleted Files**, **Show Untracked Files**) are right-aligned:
+
+![](docs/toolbar_toggles.png)
+
+**Show Untracked Files** and **Show Deleted Files** are per-project toggles — off by default — for whether untracked
+(unversioned) and locally deleted files show up in the Git Scope view. The initial value for newly opened projects can
+be changed under **Settings → Tools → Git Scope** (see **Settings** below); once a project has been opened, it keeps
+its own toggle state independent of that default.
+
 Right click on any file will present a number of actions:
 
 ![](docs/context_menu.png)
 
-- **Show Diff**: Opens a diff window showing the diff of the selected file (s) `<selected-scope>..HEAD`
+- **Show Diff**: Opens a diff window showing the diff of the selected file (s) `<selected-scope>..working tree`
+- **Show Diff in a New Tab**: The same diff, opened as a regular editor tab instead of the diff window
 - **Show in Project**: Highlight this file in the Project tool window
 - **Create Patch...**: Opens a dialog to save the selected file (s) scope diff as a `.patch` file
 - **Copy as Patch to Clipboard**: Copies the selected file (s) scope diff as a unified patch directly to the clipboard
@@ -113,7 +130,7 @@ Git Scope is well suited for *reviewing* an entire scope — walking through eve
 the same way you would review a pull request, but directly in the editor with full language support (syntax
 highlighting, navigation, inspections).
 
-To make this fast and mouse-free, the plugin adds four navigation actions plus two diff actions. They ship **without
+To make this fast and mouse-free, the plugin adds four navigation actions plus a diff action. They ship **without
 default shortcuts** so they never clash with your keymap — assign your own under **Settings → Keymap** (search for "Git
 Scope"):
 
@@ -153,7 +170,7 @@ A typical review flow:
 
 Adds a custom *Scope* (used to do inspections, search/replace, etc), i.e. search results are filtered by **Git Scope**.
 
-READ: https://www.jetbrains.com/help/phpstorm/scopes.html
+READ: https://www.jetbrains.com/help/idea/scopes.html
 
 ![](docs/scope.png)
 
@@ -168,10 +185,14 @@ widget.
 
 The tab name is per default set to the selected scope reference. If the selected scope is a git hash, you can rename the
 scope tab name by right clicking on the tab and selecting "Rename Tab". Any renamed tab will show the original Git Scope
-reference as a tooltip. You can rest the tab name to the original Git Scope scope reference by right clicking on the tab
-and selecting "Reset Tab Name".
+reference as a tooltip. You can reset the tab name to the original Git Scope reference by right clicking on the tab and
+selecting "Reset Tab Name".
 
 ![](docs/rename.png)
+
+Scope tabs can be reordered either by dragging a tab to its new position, or with "Move Tab Left" / "Move Tab Right"
+from the same context menu. Over Remote Development only the context menu actions are available — the IntelliJ Platform
+does not support drag-and-drop tab reordering in remote mode.
 
 ![](docs/icon.svg) **Use Commit as Git Scope**
 
@@ -195,8 +216,8 @@ In.
 
 ![](docs/selectin.png)
 
-The Git Scope window itself also has the "Select Opened File" action button, so you can highlight any file directly in
-the Git Scope tool window (if the file is part of the current selected scope):
+The Git Scope window itself also has the "Select Opened File" action button, so you can highlight the currently opened
+editor file directly in the Git Scope tool window (if the file is part of the current selected scope):
 
 ![](docs/select_opened.png)
 
@@ -210,8 +231,7 @@ Plugin settings are available under **Settings → Tools → Git Scope**:
 |-------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **Separate Git Scope and IDE gutter rendering** | When enabled, Git Scope gutter markers are rendered in a dedicated column to the left of the line numbers, separate from the IDE's native markers. When disabled (default), both sets of markers share the same gutter column. |
 | **Color files based on Git Scope**              | When enabled (default), file colors in the project tree and editor tabs reflect the active Git Scope status. Disable to use the IDE's default HEAD-based file coloring.                                                        |
-| **Show untracked files**                        | When enabled, untracked (unversioned) files appear in the Git Scope view. Disabled by default.                                                                                                                                 |
-| **Show deleted files**                          | When enabled, locally deleted files appear in the Git Scope view. Disabled by default.                                                                                                                                         |
+| **Show untracked files** / **Show deleted files** *(Working Tree)* | Initial state of the matching toggle button in the Git Scope window toolbar, applied the first time a project is opened. Already-open projects keep their own toggle state. Off by default.       |
 
 ## Shortcuts (Added by this Plugin)
 
@@ -220,8 +240,8 @@ Plugin settings are available under **Settings → Tools → Git Scope**:
 | Alt+H    | Toggle between HEAD and last Git Scope selection |
 
 The following review-navigation actions are also added, but ship **without** default shortcuts — assign your own under
-**Settings → Keymap** (search for "Git Scope"). See
-[Reviewing a Scope](#) above for the recommended workflow:
+**Settings → Keymap** (search for "Git Scope"). See **Reviewing a Scope (Keyboard Navigation)** above for the
+recommended workflow:
 
 | Action                           | Description                                                        |
 |----------------------------------|--------------------------------------------------------------------|
