@@ -1,3 +1,11 @@
+## [2026.2.3]
+
+### Fixes
+
+- Fixed [selected file text being hard to read when the Git Scope window is unfocused](https://github.com/comod/git-scope-pro/issues/113)
+    - The selection now turns to the theme's inactive colour when the focus leaves the tool window, like the Project
+      view.
+
 ## [2026.2.2]
 
 ### Added

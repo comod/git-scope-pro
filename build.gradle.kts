@@ -69,6 +69,15 @@ changelog {
     keepUnreleasedSection.set(false)
 }
 
+/*
+ * The IntelliJ Platform Gradle Plugin makes publishPlugin depend on patchChangelog, which rewrites
+ * CHANGELOG.md with a "# Changelog" header and version-compare links. Release sections are written
+ * by hand, so leave the file alone.
+ */
+tasks.named("patchChangelog") {
+    enabled = false
+}
+
 dependencies {
     intellijPlatform {
         val type: String = providers.gradleProperty("platformType").get()
