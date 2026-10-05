@@ -4,7 +4,6 @@ import com.intellij.openapi.Disposable;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.changes.Change;
 import model.MyModel;
-import org.jdesktop.swingx.StackLayout;
 import toolwindow.elements.VcsTree;
 import java.util.Collection;
 import java.util.function.Consumer;
@@ -14,9 +13,13 @@ import java.awt.*;
 
 public class ToolWindowView implements Disposable {
 
+    private static final String BRANCH_SELECT_CARD = "branchSelect";
+    private static final String CHANGES_CARD = "changes";
+
     private final MyModel myModel;
     private final Project project;
-    private final JPanel rootPanel = new JPanel(new StackLayout());
+    private final CardLayout rootLayout = new CardLayout();
+    private final JPanel rootPanel = new JPanel(rootLayout);
 
     private VcsTree vcsTree;
     private JPanel sceneA;
@@ -65,8 +68,8 @@ public class ToolWindowView implements Disposable {
     private void draw() {
         this.sceneA = getBranchSelectPanel();
         this.sceneB = getChangesPanel();
-        rootPanel.add(sceneA);
-        rootPanel.add(sceneB);
+        rootPanel.add(sceneA, BRANCH_SELECT_CARD);
+        rootPanel.add(sceneB, CHANGES_CARD);
     }
 
     private JPanel getBranchSelectPanel() {
@@ -75,8 +78,7 @@ public class ToolWindowView implements Disposable {
     }
 
     private JPanel getChangesPanel() {
-        JPanel panel = new JPanel();
-        panel.setLayout(new StackLayout());
+        JPanel panel = new JPanel(new BorderLayout());
 
         vcsTree = new VcsTree(this.project);
         vcsTree.setLayout(new BorderLayout());
@@ -89,8 +91,7 @@ public class ToolWindowView implements Disposable {
         boolean myModelIsNew = myModel.isNew();
         boolean isHeadTab = myModel.isHeadTab();
         boolean showSceneA = myModelIsNew && !isHeadTab;
-        sceneA.setVisible(showSceneA);
-        sceneB.setVisible(!showSceneA);
+        rootLayout.show(rootPanel, showSceneA ? BRANCH_SELECT_CARD : CHANGES_CARD);
         Collection<Change> modelChanges = myModel.getChanges();
         if (modelChanges != null) {
             vcsTree.update(modelChanges);
