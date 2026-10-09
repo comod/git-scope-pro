@@ -87,6 +87,7 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
         // Include parent actions (which provide diff functionality) plus our custom actions
         List<AnAction> actions = new ArrayList<>(super.createPopupMenuActions());
         actions.add(showInProjectAction);
+        actions.add(ActionManager.getInstance().getAction("CopyReferencePopupGroup"));
         actions.add(createPatchAction);
         actions.add(copyAsPatchAction);
         actions.add(rollbackAction);
