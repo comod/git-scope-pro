@@ -1,3 +1,10 @@
+## [2026.2.4]
+
+### Added
+
+- Added [Copy Path/Reference to the file context menu in the Git Scope window](https://github.com/comod/git-scope-pro/pull/116),
+  like the Project view
+
 ## [2026.2.3]
 
 ### Fixes
