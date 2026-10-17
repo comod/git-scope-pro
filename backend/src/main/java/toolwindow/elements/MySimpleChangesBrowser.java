@@ -5,12 +5,6 @@ import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.Separator;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.editor.Editor;
-import com.intellij.openapi.editor.LogicalPosition;
-import com.intellij.openapi.editor.ScrollType;
-import com.intellij.openapi.fileEditor.FileEditor;
-import com.intellij.openapi.fileEditor.FileEditorManager;
-import com.intellij.openapi.fileEditor.TextEditor;
 import com.intellij.openapi.fileTypes.INativeFileType;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.FilePath;
@@ -242,21 +236,7 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
         if (isPreview) {
             openInPreviewTab(project, file, line);
         } else {
-            ApplicationManager.getApplication().invokeLater(() -> {
-                if (project.isDisposed()) return;
-                FileEditor[] editors = FileEditorManager.getInstance(project).openFile(file, true);
-
-                for (FileEditor fileEditor : editors) {
-                    if (fileEditor instanceof TextEditor) {
-                        Editor editor = ((TextEditor) fileEditor).getEditor();
-                        if (line > 0) {
-                            LogicalPosition pos = new LogicalPosition(line - 1, 0);
-                            editor.getCaretModel().moveToLogicalPosition(pos);
-                        }
-                        editor.getScrollingModel().scrollToCaret(ScrollType.CENTER);
-                    }
-                }
-            });
+            utils.FileOpener.openPermanent(project, file, line > 0 ? line - 1 : -1);
         }
     }
 
