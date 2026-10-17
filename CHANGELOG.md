@@ -9,6 +9,12 @@
 - Added a setting to fade the Git Scope gutter markers (20–80% opacity) so they stand back from the IDE's own markers,
   in both merged and separate gutter mode
 
+### Fixes
+
+- Fixed the Git Scope window reopening on the HEAD tab instead of the tab that was selected when the IDE was closed
+    - A regression in 2026.2.2: switching to a scope tab was often not remembered (always for the last tab), so the
+      window fell back to an earlier selection such as HEAD.
+
 ## [2026.2.4]
 
 ### Added

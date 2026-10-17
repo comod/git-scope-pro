@@ -363,11 +363,17 @@ public class ViewService implements Disposable {
            skipped from modelData): persisting that index would, after the next load(), point
            past the restored (shorter) collection -- landing on the "+" tab and showing a
            half-baked "New" page instead of the tab the user actually left open. Leaving the
-           previously persisted index alone in that case keeps it pointing at the last real tab. */
-        MyModel activeModel = (currentTabIndex != null && currentTabIndex >= 0 && currentTabIndex < collection.size())
-                ? collection.get(currentTabIndex)
+           previously persisted index alone in that case keeps it pointing at the last real tab.
+           currentTabIndex is a tab index: 0 is the HEAD tab, which has no model in collection and
+           is always restorable; tab i holds collection[i - 1]. */
+        if (currentTabIndex == null) {
+            return;
+        }
+        int modelIndex = getModelIndex(currentTabIndex);
+        MyModel activeModel = (modelIndex >= 0 && modelIndex < collection.size())
+                ? collection.get(modelIndex)
                 : null;
-        if (activeModel != null && activeModel.getTargetBranchMap() != null) {
+        if (currentTabIndex == 0 || (activeModel != null && activeModel.getTargetBranchMap() != null)) {
             this.state.setCurrentTabIndex(this.currentTabIndex);
         }
     }
