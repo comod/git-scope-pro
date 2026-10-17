@@ -39,7 +39,7 @@ public class GitScopeSettings implements PersistentStateComponent<GitScopeSettin
     public int gutterMarkerOpacity = 60;
 
     public static final int MIN_GUTTER_MARKER_OPACITY = 20;
-    public static final int MAX_GUTTER_MARKER_OPACITY = 90;
+    public static final int MAX_GUTTER_MARKER_OPACITY = 80;
 
     /**
      * If true, editor tab colors reflect the active Git Scope diff (scope vs. base branch).

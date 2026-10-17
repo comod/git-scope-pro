@@ -76,7 +76,7 @@ class GitScopeSettingsPanel {
     }
 
     private fun opacityLabels(): Map<Int, JLabel> =
-        (GitScopeSettings.MIN_GUTTER_MARKER_OPACITY..GitScopeSettings.MAX_GUTTER_MARKER_OPACITY step 10)
+        (GitScopeSettings.MIN_GUTTER_MARKER_OPACITY..GitScopeSettings.MAX_GUTTER_MARKER_OPACITY step 20)
             .associateWith { JLabel("$it%") }
 
     val preferredFocusedComponent: JComponent
