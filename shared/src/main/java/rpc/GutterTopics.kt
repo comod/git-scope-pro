@@ -26,5 +26,7 @@ data class GutterFileDataDto(
     val scopeRanges: List<GutterRangeDto>? = null,
     val scopeDisplayName: String = "",
     val separateGutterRendering: Boolean = false,
+    val fadeGutterMarkers: Boolean = false,
+    val gutterMarkerOpacity: Int = 60,
     val contentsIncluded: Boolean = true
 )

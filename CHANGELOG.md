@@ -1,3 +1,14 @@
+## [2026.2.5]
+
+### Added
+
+- Added [customizable Git Scope gutter marker colors](https://github.com/comod/git-scope-pro/issues/118) under
+  **Settings → Editor → Color Scheme → Git Scope**
+    - Added, modified and deleted markers can be given their own colors per color scheme; by default they inherit the
+      IDE's change marker colors as before. Color schemes and themes can define them too.
+- Added a setting to fade the Git Scope gutter markers (20–90% opacity) so they stand back from the IDE's own markers,
+  in both merged and separate gutter mode
+
 ## [2026.2.4]
 
 ### Added

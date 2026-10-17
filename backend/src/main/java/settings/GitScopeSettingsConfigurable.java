@@ -14,7 +14,7 @@ import javax.swing.*;
  * This creates the settings page in IntelliJ's Settings dialog.
  */
 public class GitScopeSettingsConfigurable implements Configurable {
-    private GitScopeSettingsComponent settingsComponent;
+    private GitScopeSettingsPanel settingsComponent;
 
     @Nls(capitalization = Nls.Capitalization.Title)
     @Override
@@ -30,7 +30,7 @@ public class GitScopeSettingsConfigurable implements Configurable {
     @Nullable
     @Override
     public JComponent createComponent() {
-        settingsComponent = new GitScopeSettingsComponent();
+        settingsComponent = new GitScopeSettingsPanel();
         return settingsComponent.getPanel();
     }
 
@@ -38,6 +38,8 @@ public class GitScopeSettingsConfigurable implements Configurable {
     public boolean isModified() {
         GitScopeSettings settings = GitScopeSettings.getInstance();
         return settingsComponent.isSeparateGutterRendering() != settings.isSeparateGutterRendering()
+            || settingsComponent.isFadeGutterMarkers() != settings.isFadeGutterMarkers()
+            || settingsComponent.getGutterMarkerOpacity() != settings.getGutterMarkerOpacity()
             || settingsComponent.isScopeFileColors() != settings.isScopeFileColors()
             || settingsComponent.isShowUntrackedFiles() != settings.isShowUntrackedFiles()
             || settingsComponent.isShowDeletedFiles() != settings.isShowDeletedFiles();
@@ -47,8 +49,12 @@ public class GitScopeSettingsConfigurable implements Configurable {
     public void apply() throws ConfigurationException {
         GitScopeSettings settings = GitScopeSettings.getInstance();
         boolean tabColorsChanged = settingsComponent.isScopeFileColors() != settings.isScopeFileColors();
-        boolean separateGutterChanged = settingsComponent.isSeparateGutterRendering() != settings.isSeparateGutterRendering();
+        boolean gutterChanged = settingsComponent.isSeparateGutterRendering() != settings.isSeparateGutterRendering()
+            || settingsComponent.isFadeGutterMarkers() != settings.isFadeGutterMarkers()
+            || settingsComponent.getGutterMarkerOpacity() != settings.getGutterMarkerOpacity();
         settings.setSeparateGutterRendering(settingsComponent.isSeparateGutterRendering());
+        settings.setFadeGutterMarkers(settingsComponent.isFadeGutterMarkers());
+        settings.setGutterMarkerOpacity(settingsComponent.getGutterMarkerOpacity());
         settings.setScopeFileColors(settingsComponent.isScopeFileColors());
         /* showUntrackedFiles/showDeletedFiles are only the new-project default (#111): already-open
          * projects have their own toggle state (see State.showUntrackedFiles/showDeletedFiles,
@@ -67,7 +73,7 @@ public class GitScopeSettingsConfigurable implements Configurable {
             }
         }
 
-        if (separateGutterChanged) {
+        if (gutterChanged) {
             for (var project : ProjectManager.getInstance().getOpenProjects()) {
                 if (!project.isDisposed()) {
                     var gds = project.getService(service.GutterDataService.class);
@@ -81,6 +87,8 @@ public class GitScopeSettingsConfigurable implements Configurable {
     public void reset() {
         GitScopeSettings settings = GitScopeSettings.getInstance();
         settingsComponent.setSeparateGutterRendering(settings.isSeparateGutterRendering());
+        settingsComponent.setFadeGutterMarkers(settings.isFadeGutterMarkers());
+        settingsComponent.setGutterMarkerOpacity(settings.getGutterMarkerOpacity());
         settingsComponent.setScopeFileColors(settings.isScopeFileColors());
         settingsComponent.setShowUntrackedFiles(settings.isShowUntrackedFiles());
         settingsComponent.setShowDeletedFiles(settings.isShowDeletedFiles());

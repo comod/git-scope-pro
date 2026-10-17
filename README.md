@@ -100,8 +100,8 @@ experienced when hooking into the IDE's own gutter system.
 > **Version Control → Confirmation → Highlight modified lines in gutter** is enabled.
 
 Each changed line is marked with a colored bar — inserted, modified, and deleted lines each get their own dedicated
-color as defined by the active IDE theme — relative to the selected Git Scope target. Clicking any marker opens a popup
-with the following actions:
+color (see **Gutter colors and fading** below) — relative to the selected Git Scope target. Clicking any marker opens
+a popup with the following actions:
 
 - **↑ / ↓** — Navigate to the previous or next change
 - **↺** — Rollback this change to the scope base version
@@ -123,6 +123,18 @@ immediately clear which changes are relative to the Git Scope target and which a
 the IDE's native HEAD diff markers:
 
 ![](docs/separate_gutter.png)
+
+**Gutter colors and fading** — By default the scope markers use the same colors as the IDE's own change markers. To
+tell them apart:
+
+- **Custom colors:** Set your own added/modified/deleted colors under
+  **Settings → Editor → Color Scheme → Git Scope** (also reachable via the link in **Settings → Tools → Git Scope**).
+  Each color inherits the IDE's matching change marker color until you turn inheriting off for it. Colors are stored
+  per color scheme, so light and dark schemes can differ, and theme or color scheme plugins can define them too
+  (`GIT_SCOPE_ADDED_LINES_COLOR`, `GIT_SCOPE_MODIFIED_LINES_COLOR`, `GIT_SCOPE_DELETED_LINES_COLOR`).
+- **Fading:** Enable **Fade Git Scope gutter markers** in **Settings → Tools → Git Scope** to paint the scope markers
+  semi-transparent (20–90% opacity), so they stand back from the IDE's HEAD markers while keeping their colors. Works in
+  both merged and separate mode.
 
 ![](docs/icon.svg) **Reviewing a Scope (Keyboard Navigation):**
 
@@ -230,6 +242,7 @@ Plugin settings are available under **Settings → Tools → Git Scope**:
 | Setting                                         | Description                                                                                                                                                                                                                    |
 |-------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **Separate Git Scope and IDE gutter rendering** | When enabled, Git Scope gutter markers are rendered in a dedicated column to the left of the line numbers, separate from the IDE's native markers. When disabled (default), both sets of markers share the same gutter column. |
+| **Fade Git Scope gutter markers** / **Opacity** | When enabled, Git Scope gutter markers are painted semi-transparent at the chosen opacity (20–90%, default 60%), in both merged and separate mode. Off by default. Marker colors themselves are set under **Settings → Editor → Color Scheme → Git Scope**. |
 | **Color files based on Git Scope**              | When enabled (default), file colors in the project tree and editor tabs reflect the active Git Scope status. Disable to use the IDE's default HEAD-based file coloring.                                                        |
 | **Show untracked files** / **Show deleted files** *(Working Tree)* | Initial state of the matching toggle button in the Git Scope window toolbar, applied the first time a project is opened. Already-open projects keep their own toggle state. Off by default.       |
 

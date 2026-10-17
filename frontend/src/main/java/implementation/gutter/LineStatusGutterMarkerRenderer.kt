@@ -5,13 +5,11 @@ package implementation.gutter
 
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.LogicalPosition
-import com.intellij.openapi.editor.colors.EditorColors
 import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.openapi.editor.ex.EditorGutterComponentEx
 import com.intellij.openapi.editor.impl.EditorImpl
 import com.intellij.openapi.editor.markup.ActiveGutterRenderer
 import com.intellij.openapi.editor.markup.LineMarkerRendererEx
-import com.intellij.ui.JBColor
 import com.intellij.ui.paint.PaintUtil
 import com.intellij.ui.scale.JBUIScale
 import com.intellij.util.ui.JBUI
@@ -93,8 +91,8 @@ abstract class LineStatusGutterMarkerRenderer : LineMarkerRendererEx, ActiveGutt
     }
 
     private fun paintRange(editor: EditorEx, g: Graphics, gutter: EditorGutterComponentEx, range: Range) {
-        val color = getColorForChangeType(editor, range.type)
-        
+        val color = ScopeGutterColors.getGutterColor(editor.colorsScheme, range.type)
+
         // Enable anti-aliasing for smooth rounded corners
         val g2d = g as Graphics2D
         val oldHints = g2d.renderingHints
@@ -161,16 +159,6 @@ abstract class LineStatusGutterMarkerRenderer : LineMarkerRendererEx, ActiveGutt
         val y2 = if (range.type == Range.DELETED) y1 + JBUI.scale(8)
                  else editor.logicalPositionToXY(LogicalPosition(range.line2, 0)).y
         return y1..y2
-    }
-
-    private fun getColorForChangeType(editor: EditorEx, type: Byte): java.awt.Color {
-        val scheme = editor.colorsScheme
-        return when (type) {
-            Range.INSERTED -> scheme.getColor(EditorColors.ADDED_LINES_COLOR) ?: JBColor.GREEN
-            Range.DELETED -> scheme.getColor(EditorColors.DELETED_LINES_COLOR) ?: JBColor.RED
-            Range.MODIFIED -> scheme.getColor(EditorColors.MODIFIED_LINES_COLOR) ?: JBColor.BLUE
-            else -> JBColor.GRAY
-        }
     }
 
     // ActiveGutterRenderer methods for mouse interaction

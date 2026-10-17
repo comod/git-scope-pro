@@ -14,6 +14,8 @@
         <postStartupActivity implementation="rpc.FrontendGutterSubscriptionsStartup"/>
         <postStartupActivity implementation="rpc.FrontendUtilSubscriptionsStartup"/>
         <postStartupActivity implementation="rpc.FrontendTabStateStartup"/>
+        <!-- Frontend, where the editors and their color scheme live. -->
+        <colorSettingsPage implementation="implementation.gutter.ScopeGutterColorSettingsPage"/>
     </extensions>
 
     <actions>

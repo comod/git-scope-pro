@@ -131,6 +131,8 @@ class BackendGutterRpcImpl : GutterRpcApi {
         scopeRanges = scopeRanges?.map { GutterRangeDto(it.line1, it.line2, it.vcsLine1, it.vcsLine2) },
         scopeDisplayName = scopeDisplayName,
         separateGutterRendering = GitScopeSettings.getInstance().isSeparateGutterRendering,
+        fadeGutterMarkers = GitScopeSettings.getInstance().isFadeGutterMarkers,
+        gutterMarkerOpacity = GitScopeSettings.getInstance().gutterMarkerOpacity,
         contentsIncluded = includeContents
     )
 }

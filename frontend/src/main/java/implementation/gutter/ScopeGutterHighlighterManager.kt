@@ -7,7 +7,6 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.EditorFactory
-import com.intellij.openapi.editor.colors.EditorColors
 import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.openapi.editor.ex.MarkupModelEx
 import com.intellij.openapi.editor.ex.RangeHighlighterEx
@@ -17,7 +16,6 @@ import com.intellij.openapi.editor.markup.LineMarkerRenderer
 import com.intellij.openapi.editor.markup.MarkupEditorFilterFactory
 import com.intellij.openapi.editor.markup.RangeHighlighter
 import com.intellij.openapi.project.Project
-import com.intellij.ui.JBColor
 import com.intellij.util.concurrency.annotations.RequiresEdt
 import system.Defs
 import java.awt.Color
@@ -197,12 +195,6 @@ internal class ScopeGutterHighlighterManager(
 
     private fun getErrorStripeColor(type: Byte): Color? {
         val editor = EditorFactory.getInstance().getEditors(document, project).firstOrNull() as? EditorEx ?: return null
-        val scheme = editor.colorsScheme
-        return when (type) {
-            Range.INSERTED -> scheme.getColor(EditorColors.ADDED_LINES_COLOR) ?: JBColor.GREEN
-            Range.DELETED  -> scheme.getColor(EditorColors.DELETED_LINES_COLOR) ?: JBColor.RED
-            Range.MODIFIED -> scheme.getColor(EditorColors.MODIFIED_LINES_COLOR) ?: JBColor.BLUE
-            else -> null
-        }
+        return ScopeGutterColors.getColor(editor.colorsScheme, type)
     }
 }
