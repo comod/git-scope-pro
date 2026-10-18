@@ -79,6 +79,8 @@ class FrontendGutterSubscriptions(
                 val dto = event.data
                 gds.scopeDisplayName = dto.scopeDisplayName
                 GitScopeSettings.getInstance().isSeparateGutterRendering = dto.separateGutterRendering
+                GitScopeSettings.getInstance().isFadeGutterMarkers = dto.fadeGutterMarkers
+                GitScopeSettings.getInstance().gutterMarkerOpacity = dto.gutterMarkerOpacity
 
                 /* Contents are omitted when unchanged since the backend's last message for this
                    file; the previously published data then carries them. */

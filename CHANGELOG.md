@@ -1,3 +1,21 @@
+## [2026.2.5]
+
+### Added
+
+- Added [customizable Git Scope gutter marker colors](https://github.com/comod/git-scope-pro/issues/118) under
+  **Settings → Editor → Color Scheme → Git Scope**
+    - Added, modified and deleted markers can be given their own colors per color scheme; by default they inherit the
+      IDE's change marker colors as before. Color schemes and themes can define them too.
+- Added a setting to fade the Git Scope gutter markers (20–80% opacity) so they stand back from the IDE's own markers,
+  in both merged and separate gutter mode
+
+### Fixes
+
+- Fixed the Git Scope window reopening on the HEAD tab instead of the tab that was selected when the IDE was closed
+    - A regression in 2026.2.2: switching to a scope tab was often not remembered (always for the last tab), so the
+      window fell back to an earlier selection such as HEAD.
+- Fixed compatibility with the upcoming IntelliJ IDEA 2026.3 (file opening and VCS API changes)
+
 ## [2026.2.4]
 
 ### Added

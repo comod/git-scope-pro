@@ -14,7 +14,11 @@ repositories {
 
 dependencies {
     intellijPlatform {
-        intellijIdea(providers.gradleProperty("platformVersion"))
+        // Snapshot builds have no installer, so they come from the Maven snapshot repository.
+        val platformVersion = providers.gradleProperty("platformVersion").get()
+        intellijIdea(platformVersion) {
+            useInstaller = !platformVersion.endsWith("EAP-SNAPSHOT")
+        }
         bundledModule("intellij.platform.rpc")
     }
 }

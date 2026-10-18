@@ -2,27 +2,23 @@ package utils;
 
 import com.intellij.ide.ui.UISettings;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.editor.Editor;
-import com.intellij.openapi.editor.LogicalPosition;
 import com.intellij.openapi.editor.ScrollType;
-import com.intellij.openapi.fileEditor.FileEditor;
-import com.intellij.openapi.fileEditor.TextEditor;
-import com.intellij.openapi.fileEditor.ex.FileEditorManagerEx;
-import com.intellij.openapi.fileEditor.ex.FileEditorOpenRequest;
+import com.intellij.openapi.fileEditor.OpenFileDescriptor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Shared helper for opening a file through the platform's canonical FileEditorManager path and
- * optionally placing the caret on a specific line.
+ * Shared helper for opening a file the way Project View does and optionally placing the caret on
+ * a specific line.
  *
- * <p>The Git Scope tool window runs on the backend under the connected client's ClientId (not
- * local) in split mode, so {@link FileEditorManagerEx#openFile} delegates to the same per-client
- * FileEditorManager that Project View uses: full editor initialization (language parsing), the IDE
- * VCS gutter and the plugin's own scope gutter, and reuse of the existing tab instead of a
- * duplicate. {@code usePreviewTab} is requested for forward compatibility (see the preview-tab
- * notes in the single-click handler).
+ * <p>Goes through {@link OpenFileDescriptor#navigate}: the synchronous FileEditorManager open
+ * methods are deprecated as of 2026.3, and their FileEditorOpenRequest replacements are
+ * experimental and changed shape between 2026.2 and 2026.3. The Git Scope tool window runs on the
+ * backend under the connected client's ClientId (not local) in split mode, so navigation reaches
+ * the same per-client FileEditorManager that Project View uses: full editor initialization
+ * (language parsing), the IDE VCS gutter and the plugin's own scope gutter, and reuse of the
+ * existing tab instead of a duplicate.
  */
 public final class FileOpener {
 
@@ -45,27 +41,28 @@ public final class FileOpener {
      * preview tab to a permanent one (only double-click / pin / modification does).
      */
     public static void openAndGoToLine(@NotNull Project project, @NotNull VirtualFile file, int line, boolean requestFocus) {
+        open(project, file, line, requestFocus, true);
+    }
+
+    /**
+     * Opens the file in a permanent tab and focuses it, as a Project View double-click does.
+     * {@code line} is 0-based; -1 leaves the caret where it was.
+     */
+    public static void openPermanent(@NotNull Project project, @NotNull VirtualFile file, int line) {
+        open(project, file, line, true, false);
+    }
+
+    private static void open(@NotNull Project project, @NotNull VirtualFile file, int line,
+                             boolean requestFocus, boolean usePreviewTab) {
         ApplicationManager.getApplication().invokeLater(() -> {
             if (project.isDisposed() || !file.isValid()) return;
 
-            FileEditorOpenRequest request = new FileEditorOpenRequest()
-                    .withUsePreviewTab(true)
-                    .withReuseOpen(true)
-                    .withRequestFocus(requestFocus);
-            var composite = FileEditorManagerEx.getInstanceEx(project).openFile(file, request);
-
-            if (line >= 0) {
-                for (FileEditor fileEditor : composite.getAllEditors()) {
-                    if (fileEditor instanceof TextEditor) {
-                        Editor editor = ((TextEditor) fileEditor).getEditor();
-                        int lineCount = editor.getDocument().getLineCount();
-                        int target = Math.max(0, Math.clamp(lineCount - 1, 0, line));
-                        LogicalPosition pos = new LogicalPosition(target, 0);
-                        editor.getCaretModel().moveToLogicalPosition(pos);
-                        editor.getScrollingModel().scrollToCaret(ScrollType.CENTER);
-                    }
-                }
-            }
+            OpenFileDescriptor descriptor = line >= 0
+                    ? new OpenFileDescriptor(project, file, line, 0)
+                    : new OpenFileDescriptor(project, file);
+            descriptor.setUsePreviewTab(usePreviewTab);
+            descriptor.setScrollType(ScrollType.CENTER);
+            descriptor.navigate(requestFocus);
         });
     }
 

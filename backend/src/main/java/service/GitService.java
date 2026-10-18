@@ -12,11 +12,11 @@ import git4idea.branch.GitBranchType;
 import git4idea.repo.GitRepository;
 import git4idea.repo.GitRepositoryManager;
 import git4idea.ui.branch.GitBranchManager;
-import one.util.streamex.StreamEx;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 public class GitService {
     public static final String BRANCH_HEAD = "HEAD";
@@ -34,7 +34,7 @@ public class GitService {
     @NotNull
     public List<BranchTreeEntry> listOfLocalBranches(GitRepository repo) {
         Collection<GitLocalBranch> branches = repo.getBranches().getLocalBranches();
-        return StreamEx.of(branches)
+        return branches.stream()
                 .map(branch -> {
                     String name = branch.getName();
                     boolean isFav = gitBranchManager.isFavorite(GitBranchType.LOCAL, repo, name);
@@ -45,13 +45,13 @@ public class GitService {
                     if (delta != 0) return delta;
                     return StringUtil.naturalCompare(b1.getName(), b2.getName());
                 })
-                .toList();
+                .collect(Collectors.toList());
     }
 
     @NotNull
     public List<BranchTreeEntry> listOfRemoteBranches(GitRepository repo) {
         Collection<GitRemoteBranch> branches = repo.getBranches().getRemoteBranches();
-        return StreamEx.of(branches)
+        return branches.stream()
                 .map(branch -> {
                     String name = branch.getName();
                     boolean isFav = gitBranchManager.isFavorite(GitBranchType.REMOTE, repo, name);
@@ -62,7 +62,7 @@ public class GitService {
                     if (delta != 0) return delta;
                     return StringUtil.naturalCompare(b1.getName(), b2.getName());
                 })
-                .toList();
+                .collect(Collectors.toList());
     }
 
     /**

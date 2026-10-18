@@ -9,6 +9,8 @@ import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.editor.TextAnnotationGutterProvider
+import com.intellij.openapi.editor.colors.EditorColorsListener
+import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.openapi.editor.event.EditorFactoryEvent
 import com.intellij.openapi.editor.event.EditorFactoryListener
@@ -113,6 +115,12 @@ class ScopeLineStatusMarkerRenderer(
     init {
         Disposer.register(parentDisposable, this)
         installMouseListeners()
+        /* The gutter reads its colors on every paint, but error stripe marks keep the color they
+         * were created with; rebuild them when the scheme or its Git Scope colors change. */
+        ApplicationManager.getApplication().messageBus.connect(this)
+            .subscribe(EditorColorsManager.TOPIC, EditorColorsListener {
+                if (!disposed) gutterHighlighterManager.update(currentRanges)
+            })
     }
 
     private fun installMouseListeners() {
