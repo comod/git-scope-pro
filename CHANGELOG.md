@@ -14,6 +14,7 @@
 - Fixed the Git Scope window reopening on the HEAD tab instead of the tab that was selected when the IDE was closed
     - A regression in 2026.2.2: switching to a scope tab was often not remembered (always for the last tab), so the
       window fell back to an earlier selection such as HEAD.
+- Fixed compatibility with the upcoming IntelliJ IDEA 2026.3 (file opening and VCS API changes)
 
 ## [2026.2.4]
 
