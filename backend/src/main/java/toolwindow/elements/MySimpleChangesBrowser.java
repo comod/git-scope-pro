@@ -14,11 +14,17 @@ import com.intellij.openapi.vcs.changes.ChangesUtil;
 import com.intellij.openapi.vcs.changes.ContentRevision;
 import com.intellij.openapi.vcs.changes.Change;
 import com.intellij.openapi.vcs.changes.CurrentContentRevision;
+import model.MyModel;
+import service.ReviewedFilesService;
 import service.ViewService;
+import state.State;
 import com.intellij.openapi.vcs.changes.actions.diff.ChangeDiffRequestProducer;
 import com.intellij.openapi.vcs.changes.ui.ChangeDiffRequestChain;
 import com.intellij.openapi.vcs.changes.ui.ChangesTree;
 import com.intellij.openapi.vcs.changes.ui.SimpleAsyncChangesBrowser;
+import com.intellij.openapi.vcs.changes.ui.VcsTreeModelData;
+import com.intellij.util.containers.ContainerUtil;
+import com.intellij.util.ui.tree.TreeUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -46,11 +52,16 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
     private AnAction rollbackAction;
     private AnAction createPatchAction;
     private AnAction copyAsPatchAction;
+    private Collection<? extends Change> allChanges = List.of();
+    private List<Change> shownChanges = List.of();
+    private Set<Object> lastIncluded = Set.of();
+    private List<Object> expandedBeforeHide;
+    private final int checkboxWidth = new JCheckBox().getPreferredSize().width;
 
     private void initializeActions() {
         if (selectOpenedFileAction == null) {
             selectOpenedFileAction = new VcsTreeActions.SelectOpenedFileAction();
-            groupByAction = new VcsTreeActions.RightAlignedGroup(
+            groupByAction = new VcsTreeActions.ViewOptionsGroup(
                     (ActionGroup) ActionManager.getInstance().getAction(ChangesTree.GROUP_BY_ACTION_GROUP));
             showUntrackedFilesAction = new VcsTreeActions.ShowUntrackedFilesAction();
             showDeletedFilesAction = new VcsTreeActions.ShowDeletedFilesAction();
@@ -70,9 +81,70 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
         super(project, false, true);
         this.myProject = project;
         setChangesToDisplay(preparedChanges);
+        setInclusionChangedListener(this::onReviewedChanged);
 
         // Add mouse listener for single-click preview functionality
         addSingleClickPreviewSupport();
+    }
+
+    /** Shows the review checkboxes and hides the reviewed files when review mode asks for it. */
+    @Override
+    public void setChangesToDisplay(@NotNull Collection<? extends Change> changes) {
+        display(changes, false);
+    }
+
+    /** A review refresh keeps the tree state and does not rebuild an identical tree. */
+    private void display(Collection<? extends Change> changes, boolean refresh) {
+        allChanges = changes;
+        ReviewedFilesService reviewed = myProject.getService(ReviewedFilesService.class);
+        MyModel model = myProject.getService(ViewService.class).getCurrent();
+        boolean reviewMode = myProject.getService(State.class).getReviewModeEnabled();
+        List<Change> shown = new ArrayList<>();
+        Set<Object> included = new HashSet<>();
+        for (Change change : changes) {
+            boolean isReviewed = reviewMode && reviewed.isReviewed(model, change);
+            if (isReviewed && reviewed.hidesReviewed()) continue;
+            shown.add(change);
+            if (isReviewed) included.add(change);
+        }
+        if (refresh && reviewMode == getViewer().isShowCheckboxes() && shown.equals(shownChanges)
+                && included.equals(lastIncluded)) return;
+        shownChanges = shown;
+        /* Check the files after the rebuild: a tree reset with checked files collapses the other folders
+         * and selects a checked file. lastIncluded follows each step, so the listener writes no mark. */
+        getViewer().setIncludedChanges(lastIncluded = Set.of());
+        getViewer().setShowCheckboxes(reviewMode);
+        super.setChangesToDisplay(shown, refresh ? ChangesTree.KEEP_NON_EMPTY : getViewer().getTreeStateStrategy());
+        getViewer().invokeAfterRefresh(() -> getViewer().setIncludedChanges(lastIncluded = included));
+    }
+
+    /** Redisplays the files after marks or review toggles changed. */
+    public void refreshReviewed() {
+        if (!getViewer().isShowCheckboxes() && !myProject.getService(State.class).getReviewModeEnabled()) return;
+        boolean hide = myProject.getService(ReviewedFilesService.class).hidesReviewed();
+        List<Object> expanded = expandedBeforeHide;
+        // Hide turns on: keep the expanded folders. Hide turns off: expand again those the hidden tree dropped.
+        if (!hide) expandedBeforeHide = null;
+        else if (expanded == null) expandedBeforeHide = TreeUtil.collectExpandedUserObjects(getViewer());
+        display(allChanges, true);
+        if (hide || expanded == null) return;
+        // The rebuild is asynchronous: the tree still shows the hidden state here.
+        Set<Object> hiddenTree = VcsTreeModelData.all(getViewer()).iterateRawUserObjects().toSet();
+        getViewer().invokeAfterRefresh(() -> VcsTreeModelData.all(getViewer()).iterateRawNodes()
+                .filter(node -> expanded.contains(node.getUserObject()) && !hiddenTree.contains(node.getUserObject()))
+                .filter(node -> getViewer().isExpanded(TreeUtil.getPathFromRoot(node.getParent())))
+                .forEach(node -> getViewer().expandPath(TreeUtil.getPathFromRoot(node))));
+    }
+
+    private void onReviewedChanged() {
+        ReviewedFilesService reviewed = myProject.getService(ReviewedFilesService.class);
+        MyModel model = myProject.getService(ViewService.class).getCurrent();
+        Set<Object> checked = new HashSet<>(getViewer().getIncludedSet());
+        // Write only the checkboxes the user changed: the others can show older marks than the stored ones.
+        List<Change> toggled = ContainerUtil.filter(shownChanges, c -> checked.contains(c) != lastIncluded.contains(c));
+        toggled.forEach(c -> reviewed.setReviewed(model, c, checked.contains(c)));
+        lastIncluded = checked;
+        if (!toggled.isEmpty() && reviewed.hidesReviewed()) refreshReviewed();
     }
 
     @Override
@@ -139,6 +211,7 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
                         VirtualFile file = clickedChange.getVirtualFile();
                         if (file != null && isPreviewTabEnabled(myProject)) {
                             openInPreviewTab(myProject, file);
+                            myProject.getService(service.ChangeNavigationService.class).setLastNavigatedFile(file.getPath());
                         }
                     }
                 }
@@ -149,12 +222,14 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
     /**
      * Returns the {@link Change} for the tree node directly under the click point, but only when
      * that node is a file/change leaf. Returns null for directory or grouping nodes (whose user
-     * object is not a Change), so clicking a directory does not open a file.
+     * object is not a Change), so clicking a directory does not open a file. Also returns null for a
+     * click on a review checkbox, which only toggles it (same hit test as ChangesTree).
      */
     private @Nullable Change getClickedChange(MouseEvent e) {
         JTree tree = getViewer();
         javax.swing.tree.TreePath path = tree.getPathForLocation(e.getX(), e.getY());
         if (path == null) return null;
+        if (getViewer().isShowCheckboxes() && e.getX() < tree.getPathBounds(path).x + checkboxWidth) return null;
         Object node = path.getLastPathComponent();
         if (node instanceof com.intellij.openapi.vcs.changes.ui.ChangesBrowserNode<?> cbn) {
             Object userObject = cbn.getUserObject();

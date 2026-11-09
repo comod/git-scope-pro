@@ -14,9 +14,11 @@ import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import implementation.gutter.Range;
 import implementation.gutter.RangesBuilder;
+import model.MyModel;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import rpc.ChangeNavDirection;
+import settings.GitScopeSettings;
 import system.Defs;
 import utils.FileOpener;
 import utils.FileTreeOrder;
@@ -25,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 
 /**
  * Backend service that powers the "next/previous change" and "next/previous changed file"
@@ -66,6 +69,12 @@ public final class ChangeNavigationService {
         this.project = project;
     }
 
+    /** Continues navigation from this file, which the tree opened. */
+    public void setLastNavigatedFile(String path) {
+        lastNavigatedFile = path;
+        lastNavigatedLine = -1;
+    }
+
     /**
      * Navigates relative to the caret in the currently focused editor.
      *
@@ -89,7 +98,14 @@ public final class ChangeNavigationService {
         /* Ordered list of changed files: the union of scope changes and local (working-tree vs
          * HEAD) changes, so navigation visits every file that shows a gutter marker — both the
          * scope markers we paint and the local markers the IDE paints. */
-        List<String> files = orderedFiles(scopeChanges, localChanges);
+        ReviewedFilesService reviewed = project.getService(ReviewedFilesService.class);
+        MyModel model = viewService.getCurrent();
+        Map<String, Change> scope = scopeChanges, local = localChanges;
+        Predicate<String> hidden = path -> reviewed.hidesReviewed()
+                && reviewed.isReviewed(model, scope.getOrDefault(path, local.get(path)));
+        List<String> all = orderedFiles(scopeChanges, localChanges, hidden);
+        List<String> files = new ArrayList<>(all);
+        if (GitScopeSettings.getInstance().isNavigationSkipsHiddenFiles()) files.removeIf(hidden);
         if (files.isEmpty()) {
             // Everything in the scope is deleted, a directory, or otherwise not openable.
             LOG.debug("ChangeNavigation: no navigable files in scope");
@@ -101,11 +117,19 @@ public final class ChangeNavigationService {
          * next/previous presses moving forward instead of snapping back to the first file. */
         String fromFile = currentFilePath;
         int fromLine = caretLine;
-        if (fromFile == null || !files.contains(fromFile)) {
-            if (lastNavigatedFile != null && files.contains(lastNavigatedFile)) {
+        if (fromFile == null || !all.contains(fromFile)) {
+            if (lastNavigatedFile != null && all.contains(lastNavigatedFile)) {
                 fromFile = lastNavigatedFile;
                 fromLine = lastNavigatedLine;
             }
+        }
+        if (all.contains(fromFile) && !files.contains(fromFile)) {
+            // Skipped current file: go to the next remaining file, or the previous one.
+            boolean forward = direction == ChangeNavDirection.NEXT_CHANGE || direction == ChangeNavDirection.NEXT_FILE;
+            int remainingBefore = (int) all.subList(0, all.indexOf(fromFile)).stream().filter(files::contains).count();
+            int targetIdx = wrapIndex(forward ? remainingBefore : remainingBefore - 1, files.size());
+            openFileAtEdge(files, scopeChanges, localChanges, targetIdx, direction != ChangeNavDirection.PREVIOUS_CHANGE);
+            return;
         }
 
         switch (direction) {
@@ -397,11 +421,12 @@ public final class ChangeNavigationService {
      *
      * <p>Falls back to plain file-tree ordering when the tool window has not built its tree (never
      * opened this session), and appends any changed file the tree does not show, so navigation can
-     * never silently skip a file that has gutter markers.
+     * never silently skip a file that has gutter markers. A hidden reviewed file keeps its tree place.
      *
      * <p>Entries that cannot be opened are left out — see {@link #navigable}.
      */
-    private List<String> orderedFiles(Map<String, Change> scopeChanges, Map<String, Change> localChanges) {
+    private List<String> orderedFiles(Map<String, Change> scopeChanges, Map<String, Change> localChanges,
+                                      Predicate<String> hidden) {
         java.util.TreeSet<String> changedFiles = new java.util.TreeSet<>(FileTreeOrder.INSTANCE);
         changedFiles.addAll(scopeChanges.keySet());
         changedFiles.addAll(localChanges.keySet());
@@ -416,8 +441,12 @@ public final class ChangeNavigationService {
         }
 
         java.util.LinkedHashSet<String> ordered = new java.util.LinkedHashSet<>();
+        java.util.TreeSet<String> hiddenFiles = new java.util.TreeSet<>(changedFiles);
+        hiddenFiles.removeIf(hidden.negate());
         for (String path : displayed) {
-            if (changedFiles.contains(path)) ordered.add(path);
+            if (!changedFiles.contains(path)) continue;
+            ordered.addAll(hiddenFiles.headSet(path));
+            ordered.add(path);
         }
         ordered.addAll(changedFiles);
         return navigable(ordered);

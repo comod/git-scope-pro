@@ -2,12 +2,18 @@ package settings
 
 import com.intellij.application.options.colors.ColorAndFontOptions
 import com.intellij.ide.DataManager
+import com.intellij.openapi.actionSystem.CommonDataKeys
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogPanel
+import com.intellij.openapi.ui.Messages
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.dsl.builder.Cell
 import com.intellij.ui.dsl.builder.labelTable
 import com.intellij.ui.dsl.builder.panel
 import com.intellij.ui.dsl.builder.selected
+import com.intellij.util.ui.update.UiNotifyConnector
+import service.ReviewedFilesService
+import javax.swing.JButton
 import javax.swing.JComponent
 import javax.swing.JLabel
 import javax.swing.JSlider
@@ -20,6 +26,9 @@ class GitScopeSettingsPanel {
     private lateinit var scopeFileColorsCheckBox: JBCheckBox
     private lateinit var showUntrackedFilesCheckBox: JBCheckBox
     private lateinit var showDeletedFilesCheckBox: JBCheckBox
+    private lateinit var navigationSkipsHiddenFilesCheckBox: JBCheckBox
+    private lateinit var clearReviewedButton: JButton
+    private lateinit var reviewedStatsLabel: JLabel
 
     val panel: DialogPanel = panel {
         group("Gutter Rendering") {
@@ -73,6 +82,39 @@ class GitScopeSettingsPanel {
                     .component
             }
         }
+        group("Review") {
+            row {
+                navigationSkipsHiddenFilesCheckBox = checkBox("Navigation skips reviewed files hidden from the tree").component
+            }
+            row {
+                clearReviewedButton = button("Clear All Reviewed Marks") { clearReviewedMarks() }.component
+                reviewedStatsLabel = label("").component
+            }
+        }
+    }.also { UiNotifyConnector.doWhenFirstShown(it) { updateReviewStats() } }
+
+    /** The project of the Settings dialog; the page is application-level, so the project comes from the UI context. */
+    private fun reviewProject(): Project? =
+        CommonDataKeys.PROJECT.getData(DataManager.getInstance().getDataContext(clearReviewedButton))
+            ?.takeUnless { it.isDefault }
+
+    /** Runs when the page is first shown: the Settings dialog gives the project only then, after reset(). */
+    private fun updateReviewStats() {
+        val project = reviewProject()
+        clearReviewedButton.isEnabled = project != null
+        reviewedStatsLabel.text =
+            project?.let { "${it.getService(ReviewedFilesService::class.java).stats()} (project ${it.name})" }
+                ?: "No project open"
+    }
+
+    private fun clearReviewedMarks() {
+        val project = reviewProject() ?: return
+        val question = "Clear all reviewed marks of project ${project.name}?"
+        if (Messages.showYesNoDialog(panel, question, "Clear Reviewed Marks", null) != Messages.YES) return
+        val reviewed = project.getService(ReviewedFilesService::class.java)
+        reviewed.clearAll()
+        reviewed.refreshTree()
+        updateReviewStats()
     }
 
     private fun opacityLabels(): Map<Int, JLabel> =
@@ -105,4 +147,8 @@ class GitScopeSettingsPanel {
     var isShowDeletedFiles: Boolean
         get() = showDeletedFilesCheckBox.isSelected
         set(value) { showDeletedFilesCheckBox.isSelected = value }
+
+    var isNavigationSkipsHiddenFiles: Boolean
+        get() = navigationSkipsHiddenFilesCheckBox.isSelected
+        set(value) { navigationSkipsHiddenFilesCheckBox.isSelected = value }
 }
