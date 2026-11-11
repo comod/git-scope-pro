@@ -1,6 +1,8 @@
 package utils;
 
+import com.intellij.diff.util.DiffUserDataKeys;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Key;
 import com.intellij.openapi.vcs.FilePath;
 import com.intellij.openapi.vcs.VcsException;
 import com.intellij.openapi.vcs.changes.Change;
@@ -12,6 +14,9 @@ import com.intellij.openapi.vcs.changes.ui.ChangeDiffRequestChain;
 import com.intellij.openapi.vcs.history.VcsRevisionNumber;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.List;
+import java.util.Map;
 
 /**
  * Builds the Git Scope diff request producer for a change: base scope revision (decorated with the
@@ -43,7 +48,8 @@ public final class ScopeDiff {
                 withScopeName(change.getBeforeRevision(), scopeDisplayName),
                 new CurrentContentRevision(filePath)
         );
-        return ChangeDiffRequestProducer.create(project, modifiedChange);
+        return ChangeDiffRequestProducer.create(project, modifiedChange,
+                Map.<Key<?>, Object>of(DiffUserDataKeys.CONTEXT_ACTIONS, List.of(new MarkViewedAndNextAction(change))));
     }
 
     /** Decorates a revision's displayed number with the scope name, e.g. "abc1234 (master)". */
