@@ -48,8 +48,12 @@ public final class ScopeDiff {
                 withScopeName(change.getBeforeRevision(), scopeDisplayName),
                 new CurrentContentRevision(filePath)
         );
-        return ChangeDiffRequestProducer.create(project, modifiedChange,
-                Map.<Key<?>, Object>of(DiffUserDataKeys.CONTEXT_ACTIONS, List.of(new MarkViewedAndNextAction(change))));
+        return ChangeDiffRequestProducer.create(project, modifiedChange, diffContext(change));
+    }
+
+    /** Diff request user data holding the "mark as viewed" toolbar button for {@code change}. */
+    public static @NotNull Map<Key<?>, Object> diffContext(@NotNull Change change) {
+        return Map.<Key<?>, Object>of(DiffUserDataKeys.CONTEXT_ACTIONS, List.of(new MarkViewedAndNextAction(change)));
     }
 
     /** Decorates a revision's displayed number with the scope name, e.g. "abc1234 (master)". */

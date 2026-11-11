@@ -1,13 +1,17 @@
 package utils;
 
+import com.intellij.diff.DiffContext;
+import com.intellij.diff.DiffContextEx;
 import com.intellij.diff.tools.util.DiffDataKeys;
 import com.intellij.diff.tools.util.PrevNextFileIterable;
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.DumbAwareAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.changes.Change;
+import com.intellij.openapi.vcs.changes.ChangesUtil;
 import model.MyModel;
 import org.jetbrains.annotations.NotNull;
 import service.ReviewedFilesService;
@@ -16,7 +20,8 @@ import state.State;
 
 /**
  * Diff toolbar button: marks the file shown in the diff as viewed, then moves to the next file of
- * the diff chain. On the last file the mark is set and the diff stays.
+ * the diff chain. With "Hide Reviewed Files" on, the file also leaves the chain, so the file
+ * counter and previous/next skip it. On the last file the mark is set and the diff stays.
  */
 public final class MarkViewedAndNextAction extends DumbAwareAction {
 
@@ -42,10 +47,20 @@ public final class MarkViewedAndNextAction extends DumbAwareAction {
         ReviewedFilesService reviewed = project.getService(ReviewedFilesService.class);
         MyModel model = project.getService(ViewService.class).getCurrent();
         reviewed.setReviewed(model, change, true);
-        reviewed.refreshTree();
 
-        PrevNextFileIterable files = e.getData(DiffDataKeys.PREV_NEXT_FILE_ITERABLE);
-        if (files != null && files.canGoNext(false)) files.goNext(false);
+        DiffContext context = e.getData(DiffDataKeys.DIFF_CONTEXT);
+        ScopeDiffChain chain = context == null ? null : context.getUserData(ScopeDiffChain.KEY);
+        if (context instanceof DiffContextEx contextEx && chain != null && reviewed.hidesReviewed()
+                && chain.removeUnlessLast(ChangesUtil.getFilePath(change))) {
+            // The next file now sits at the index of the removed one.
+            contextEx.reloadDiffRequest();
+        } else {
+            PrevNextFileIterable files = e.getData(DiffDataKeys.PREV_NEXT_FILE_ITERABLE);
+            if (files != null && files.canGoNext(false)) files.goNext(false);
+        }
+
+        // The tree rebuild is slow with many files: let the diff move first.
+        ApplicationManager.getApplication().invokeLater(reviewed::refreshTree, project.getDisposed());
     }
 
     @Override

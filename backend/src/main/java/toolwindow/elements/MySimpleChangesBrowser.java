@@ -1,5 +1,8 @@
 package toolwindow.elements;
 
+import com.intellij.diff.DiffDialogHints;
+import com.intellij.diff.DiffManager;
+import com.intellij.openapi.ListSelection;
 import com.intellij.openapi.actionSystem.ActionGroup;
 import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.AnAction;
@@ -329,8 +332,27 @@ public class MySimpleChangesBrowser extends SimpleAsyncChangesBrowser {
             if (producer != null) {
                 return producer;
             }
+            // Deleted files have no working-tree file to compare: keep the platform diff, with our button.
+            if (ChangeDiffRequestProducer.canCreate(myProject, change)) {
+                return ChangeDiffRequestProducer.create(myProject, change, utils.ScopeDiff.diffContext(change));
+            }
         }
         return super.getDiffRequestProducer(userObject);
+    }
+
+    /**
+     * Opens the diff on a chain whose file list shrinks when a file is marked as viewed (see
+     * {@link utils.MarkViewedAndNextAction}); the platform chain is a fixed copy of the selection.
+     */
+    @Override
+    public void showDiff() {
+        if (getShowDiffActionPreview() != null && getShowDiffActionPreview().performDiffAction()) return;
+        ListSelection<ChangeDiffRequestChain.Producer> producers =
+                VcsTreeModelData.getListSelectionOrAll(getViewer()).map(this::getDiffRequestProducer);
+        if (producers.isEmpty()) return;
+        ChangeDiffRequestChain chain = new utils.ScopeDiffChain(producers.getList(), producers.getSelectedIndex());
+        updateDiffContext(chain);
+        DiffManager.getInstance().showDiff(myProject, chain, new DiffDialogHints(null, this));
     }
 
     private String getScopeDisplayName() {
