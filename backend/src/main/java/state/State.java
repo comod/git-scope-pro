@@ -49,6 +49,8 @@ public class State implements PersistentStateComponent<State> {
      */
     public Boolean showUntrackedFiles;
     public Boolean showDeletedFiles;
+    public boolean reviewModeEnabled;
+    public boolean hideReviewedFiles;
 
     public List<MyModelBase> getModelData() {
         return modelData;
@@ -80,6 +82,22 @@ public class State implements PersistentStateComponent<State> {
 
     public void setShowDeletedFiles(Boolean value) {
         showDeletedFiles = value;
+    }
+
+    public boolean getReviewModeEnabled() {
+        return reviewModeEnabled;
+    }
+
+    public void setReviewModeEnabled(boolean value) {
+        reviewModeEnabled = value;
+    }
+
+    public boolean getHideReviewedFiles() {
+        return hideReviewedFiles;
+    }
+
+    public void setHideReviewedFiles(boolean value) {
+        hideReviewedFiles = value;
     }
 
     // In your State class, add these methods:

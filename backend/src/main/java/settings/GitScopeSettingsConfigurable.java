@@ -42,7 +42,8 @@ public class GitScopeSettingsConfigurable implements Configurable {
             || settingsComponent.getGutterMarkerOpacity() != settings.getGutterMarkerOpacity()
             || settingsComponent.isScopeFileColors() != settings.isScopeFileColors()
             || settingsComponent.isShowUntrackedFiles() != settings.isShowUntrackedFiles()
-            || settingsComponent.isShowDeletedFiles() != settings.isShowDeletedFiles();
+            || settingsComponent.isShowDeletedFiles() != settings.isShowDeletedFiles()
+            || settingsComponent.isNavigationSkipsHiddenFiles() != settings.isNavigationSkipsHiddenFiles();
     }
 
     @Override
@@ -61,6 +62,7 @@ public class GitScopeSettingsConfigurable implements Configurable {
          * flipped via the Git Scope window buttons) and are intentionally not refreshed here. */
         settings.setShowUntrackedFiles(settingsComponent.isShowUntrackedFiles());
         settings.setShowDeletedFiles(settingsComponent.isShowDeletedFiles());
+        settings.setNavigationSkipsHiddenFiles(settingsComponent.isNavigationSkipsHiddenFiles());
 
         if (tabColorsChanged) {
             for (var project : ProjectManager.getInstance().getOpenProjects()) {
@@ -92,6 +94,7 @@ public class GitScopeSettingsConfigurable implements Configurable {
         settingsComponent.setScopeFileColors(settings.isScopeFileColors());
         settingsComponent.setShowUntrackedFiles(settings.isShowUntrackedFiles());
         settingsComponent.setShowDeletedFiles(settings.isShowDeletedFiles());
+        settingsComponent.setNavigationSkipsHiddenFiles(settings.isNavigationSkipsHiddenFiles());
     }
 
     @Override

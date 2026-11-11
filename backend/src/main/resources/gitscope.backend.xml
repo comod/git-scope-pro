@@ -41,6 +41,7 @@
         <postStartupActivity implementation="listener.BackendStartupActivity"/>
 
         <projectService serviceImplementation="state.State"/>
+        <projectService serviceImplementation="service.ReviewedFilesService"/>
         <projectService serviceImplementation="service.StatusBarService"/>
         <projectService serviceImplementation="service.GitService"/>
         <projectService serviceImplementation="service.ViewService"/>

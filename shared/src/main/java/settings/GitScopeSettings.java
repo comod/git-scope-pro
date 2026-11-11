@@ -64,6 +64,9 @@ public class GitScopeSettings implements PersistentStateComponent<GitScopeSettin
      */
     public boolean showDeletedFiles = false;
 
+    /** If true, change navigation skips the reviewed files that "Hide Reviewed Files" removes from the tree. */
+    public boolean navigationSkipsHiddenFiles = true;
+
     public static GitScopeSettings getInstance() {
         return ApplicationManager.getApplication().getService(GitScopeSettings.class);
     }
@@ -126,5 +129,13 @@ public class GitScopeSettings implements PersistentStateComponent<GitScopeSettin
 
     public void setShowDeletedFiles(boolean showDeletedFiles) {
         this.showDeletedFiles = showDeletedFiles;
+    }
+
+    public boolean isNavigationSkipsHiddenFiles() {
+        return navigationSkipsHiddenFiles;
+    }
+
+    public void setNavigationSkipsHiddenFiles(boolean navigationSkipsHiddenFiles) {
+        this.navigationSkipsHiddenFiles = navigationSkipsHiddenFiles;
     }
 }

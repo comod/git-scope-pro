@@ -70,6 +70,8 @@ public class VcsTree extends JPanel {
     public void onTabSwitched() {
         SwingUtilities.invokeLater(() -> {
             try {
+                // Another tab can have changed the marks.
+                refreshReviewed();
                 // Get the current tab ID to restore its scroll position
                 String currentTabId = getCurrentTabId();
 
@@ -119,6 +121,10 @@ public class VcsTree extends JPanel {
             paths.add(ChangesUtil.getFilePath(change).getPath());
         }
         return paths;
+    }
+
+    public void refreshReviewed() {
+        if (currentBrowser != null) currentBrowser.refreshReviewed();
     }
 
     public void selectFile(VirtualFile file) {
@@ -222,6 +228,8 @@ public class VcsTree extends JPanel {
         if (shouldSkipUpdate(changes)) {
             LOG.debug("VcsTree.update() SKIPPED - changes match last update (size: " +
                      (changes != null ? changes.size() : "null") + ")");
+            // The scope or the files can change with the same paths, so redraw the marks.
+            refreshReviewed();
             return;
         }
 

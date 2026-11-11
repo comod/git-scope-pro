@@ -3,15 +3,19 @@ package toolwindow;
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.fileEditor.FileEditorManager;
+import com.intellij.openapi.project.DumbAwareAction;
+import com.intellij.openapi.project.DumbAwareToggleAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.VcsDataKeys;
 import com.intellij.openapi.vcs.changes.Change;
 import com.intellij.openapi.vcs.changes.actions.CreatePatchFromChangesAction;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ide.projectView.ProjectView;
+import com.intellij.util.ArrayUtil;
 import model.MyModel;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import service.ReviewedFilesService;
 import service.ToolWindowServiceInterface;
 import service.ViewService;
 import state.State;
@@ -19,6 +23,8 @@ import utils.CustomRollback;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.BiConsumer;
+import java.util.function.Predicate;
 
 public class VcsTreeActions {
     public static class ShowInProjectAction extends AnAction {
@@ -181,6 +187,88 @@ public class VcsTreeActions {
             }
             return super.getChildren(e);
         }
+    }
+
+    /** The "Group By" dropdown with a Review section appended. */
+    public static class ViewOptionsGroup extends RightAlignedGroup {
+        private final AnAction[] reviewActions = {
+                new Separator("Review"),
+                new ReviewToggleAction("Enable Review Mode", State::getReviewModeEnabled, State::setReviewModeEnabled, false),
+                new ReviewToggleAction("Hide Reviewed Files", State::getHideReviewedFiles, State::setHideReviewedFiles, true),
+                new DumbAwareAction("Clear Reviewed Marks") {
+                    @Override
+                    public @NotNull ActionUpdateThread getActionUpdateThread() {
+                        return ActionUpdateThread.EDT;
+                    }
+
+                    @Override
+                    public void update(@NotNull AnActionEvent e) {
+                        e.getPresentation().setEnabled(isReviewMode(e));
+                    }
+
+                    @Override
+                    public void actionPerformed(@NotNull AnActionEvent e) {
+                        Project project = e.getProject();
+                        if (project == null) return;
+                        ReviewedFilesService reviewed = project.getService(ReviewedFilesService.class);
+                        reviewed.clear(project.getService(ViewService.class).getCurrent());
+                        reviewed.refreshTree();
+                    }
+                }
+        };
+
+        public ViewOptionsGroup(@NotNull ActionGroup groupBy) {
+            super(groupBy);
+        }
+
+        @Override
+        public AnAction @NotNull [] getChildren(@Nullable AnActionEvent e) {
+            return ArrayUtil.mergeArrays(super.getChildren(e), reviewActions);
+        }
+    }
+
+    private static class ReviewToggleAction extends DumbAwareToggleAction {
+        private final Predicate<State> getter;
+        private final BiConsumer<State, Boolean> setter;
+        private final boolean needsReviewMode;
+
+        ReviewToggleAction(String text, Predicate<State> getter, BiConsumer<State, Boolean> setter,
+                           boolean needsReviewMode) {
+            super(text);
+            this.getter = getter;
+            this.setter = setter;
+            this.needsReviewMode = needsReviewMode;
+        }
+
+        @Override
+        public @NotNull ActionUpdateThread getActionUpdateThread() {
+            return ActionUpdateThread.EDT;
+        }
+
+        @Override
+        public void update(@NotNull AnActionEvent e) {
+            super.update(e);
+            e.getPresentation().setEnabled(!needsReviewMode || isReviewMode(e));
+        }
+
+        @Override
+        public boolean isSelected(@NotNull AnActionEvent e) {
+            Project project = e.getProject();
+            return project != null && getter.test(project.getService(State.class));
+        }
+
+        @Override
+        public void setSelected(@NotNull AnActionEvent e, boolean state) {
+            Project project = e.getProject();
+            if (project == null) return;
+            setter.accept(project.getService(State.class), state);
+            project.getService(ReviewedFilesService.class).refreshTree();
+        }
+    }
+
+    private static boolean isReviewMode(AnActionEvent e) {
+        Project project = e.getProject();
+        return project != null && project.getService(State.class).getReviewModeEnabled();
     }
 
     /** Presentation toggles (untracked/deleted files, "Group By") right-align via {@link RightAlignedToolbarAction},

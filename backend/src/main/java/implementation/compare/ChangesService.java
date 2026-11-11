@@ -71,7 +71,7 @@ public class ChangesService extends GitCompareWithRefAction implements Disposabl
     }
 
     @NotNull
-    private static String getBranchToCompare(TargetBranchMap targetBranchByRepo, GitRepository repo, int repositoryCount) {
+    public static String getBranchToCompare(TargetBranchMap targetBranchByRepo, GitRepository repo, int repositoryCount) {
         String branchToCompare = targetBranchByRepo != null ? targetBranchByRepo.resolve(repo, repositoryCount) : null;
         if (branchToCompare == null) {
             branchToCompare = GitService.BRANCH_HEAD;
